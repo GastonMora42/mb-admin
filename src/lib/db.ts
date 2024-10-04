@@ -1,30 +1,23 @@
-import { MongoClient } from 'mongodb';
+import prisma from '@/lib/prisma'
+import { Alumno, Concepto, Recibo } from '../types'
 
-const uri = process.env.MONGODB_URI as string;
-const options = {};
-
-declare global {
-  var _mongoClientPromise: Promise<MongoClient>;
+export async function getAlumnos(): Promise<Alumno[]> {
+  return prisma.alumno.findMany()
 }
 
-class Singleton {
-  private static _instance: Singleton;
-  private client: MongoClient;
-  private clientPromise: Promise<MongoClient>;
-
-  private constructor() {
-    this.client = new MongoClient(uri, options);
-    this.clientPromise = this.client.connect();
-  }
-
-  public static get instance() {
-    if (!this._instance) {
-      this._instance = new Singleton();
-    }
-    return this._instance.clientPromise;
-  }
+export async function createAlumno(data: Omit<Alumno, 'id' | 'createdAt' | 'updatedAt'>): Promise<Alumno> {
+  return prisma.alumno.create({ data })
 }
 
-const clientPromise = Singleton.instance;
+export async function getConceptos(): Promise<Concepto[]> {
+  return prisma.concepto.findMany()
+}
 
-export default clientPromise;
+export async function createConcepto(data: Omit<Concepto, 'id' | 'createdAt' | 'updatedAt'>): Promise<Concepto> {
+  return prisma.concepto.create({ data })
+}
+
+export async function createRecibo(data: Omit<Recibo, 'id' | 'createdAt' | 'updatedAt'>): Promise<Recibo> {
+  return prisma.recibo.create({ data })
+}
+

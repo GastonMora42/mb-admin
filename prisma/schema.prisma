@@ -1,0 +1,100 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Alumno {
+  id        Int      @id @default(autoincrement())
+  nombre    String
+  apellido  String
+  dni       String   @unique
+  activo    Boolean  @default(true)
+  fechaNacimiento DateTime
+  email       String?
+  telefono    String?
+  fechaIngreso DateTime @default(now())
+  recibos     Recibo[]
+  ctaCte      CtaCte?
+  estilos     Estilo[] @relation("AlumnoEstilos")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Concepto {
+  id          Int      @id @default(autoincrement())
+  nombre      String
+  descripcion String?
+  monto       Float
+  recibos     Recibo[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Recibo {
+  id          Int      @id @default(autoincrement())
+  fecha       DateTime @default(now())
+  monto       Float
+  alumno      Alumno   @relation(fields: [alumnoId], references: [id])
+  alumnoId    Int
+  concepto    Concepto @relation(fields: [conceptoId], references: [id])
+  conceptoId  Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Estilo {
+  id          Int      @id @default(autoincrement())
+  nombre      String
+  descripcion String?
+  alumnos     Alumno[] @relation("AlumnoEstilos")
+  profesores  Profesor[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Profesor {
+  id          Int      @id @default(autoincrement())
+  nombre      String
+  apellido    String
+  dni         String   @unique
+  email       String?
+  telefono    String?
+  fechaIngreso DateTime @default(now())
+  estilos     Estilo[]
+  liquidaciones Liquidacion[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model CtaCte {
+  id          Int      @id @default(autoincrement())
+  saldo       Float
+  alumno      Alumno   @relation(fields: [alumnoId], references: [id])
+  alumnoId    Int      @unique
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Liquidacion {
+  id          Int      @id @default(autoincrement())
+  fecha       DateTime @default(now())
+  monto       Float
+  profesor    Profesor @relation(fields: [profesorId], references: [id])
+  profesorId  Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model CajaDiaria {
+  id          Int      @id @default(autoincrement())
+  fecha       DateTime @default(now()) @unique
+  apertura    Float
+  cierre      Float
+  diferencia  Float
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
