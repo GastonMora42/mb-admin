@@ -25,13 +25,14 @@ model Alumno {
 }
 
 model Concepto {
-  id          Int      @id @default(autoincrement())
-  nombre      String
-  descripcion String?
-  monto       Float
-  recibos     Recibo[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id              Int      @id @default(autoincrement())
+  nombre          String
+  descripcion     String?
+  monto           Float
+  fueraDeTermino  Boolean  @default(false)
+  recibos         Recibo[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }
 
 model Recibo {
@@ -47,14 +48,16 @@ model Recibo {
 }
 
 model Estilo {
-  id          Int      @id @default(autoincrement())
-  nombre      String
-  descripcion String?
-  alumnos     Alumno[] @relation("AlumnoEstilos")
-  profesores  Profesor[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id              Int       @id @default(autoincrement())
+  nombre          String
+  descripcion     String?
+  profesorId      Int?
+  profesor        Profesor? @relation(fields: [profesorId], references: [id])
+  alumnos         Alumno[]  @relation("AlumnoEstilos")
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 }
+
 
 model Profesor {
   id          Int      @id @default(autoincrement())
