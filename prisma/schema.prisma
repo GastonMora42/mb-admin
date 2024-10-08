@@ -48,7 +48,7 @@ model Recibo {
   numeroRecibo  Int      @unique @default(autoincrement())
   fecha         DateTime @default(now())
   monto         Float
-  periodoPago   String   // Formato "YYYY-MM"
+  periodoPago   String
   tipoPago      TipoPago
   fueraDeTermino Boolean @default(false)
   alumno        Alumno   @relation(fields: [alumnoId], references: [id])

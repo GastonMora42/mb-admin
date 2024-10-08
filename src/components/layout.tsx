@@ -46,7 +46,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         <NavLink href="/profesores">Profesores</NavLink>
         <NavLink href="/cta-cte">Cta. Cte.</NavLink>
         <NavLink href="/liquidaciones">Liquidaciones</NavLink>
-        <NavLink href="/caja-diaria">Caja Diaria</NavLink>
+        <NavLink href="/caja">Caja Diaria</NavLink>
       </Navbar>
       <Main>{children}</Main>
     </Container>
