@@ -29,6 +29,8 @@ model Concepto {
   nombre          String
   descripcion     String?
   monto           Float
+  estiloId        Int
+  estilo          Estilo   @relation(fields: [estiloId], references: [id])
   fueraDeTermino  Boolean  @default(false)
   recibos         Recibo[]
   createdAt       DateTime @default(now())
@@ -62,6 +64,7 @@ model Recibo {
 model Estilo {
   id              Int       @id @default(autoincrement())
   nombre          String
+  conceptos       Concepto[]
   descripcion     String?
   profesorId      Int?
   profesor        Profesor? @relation(fields: [profesorId], references: [id])
