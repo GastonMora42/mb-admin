@@ -105,7 +105,7 @@ export async function handleSignIn(
 
 export async function handleSignOut() {
   try {
-    await signOut();
+    await signOut({ global: true });
     return { success: true, redirectTo: "/login" };
   } catch (error) {
     console.error("Error durante el cierre de sesión:", getErrorMessage(error));

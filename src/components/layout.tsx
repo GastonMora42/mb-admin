@@ -1,54 +1,85 @@
 import React from 'react';
 import Link from 'next/link';
 import styled from 'styled-components';
+import dynamic from 'next/dynamic';
+
+const Navbar = dynamic(() => import('@/components/navBar'), { ssr: false });
 
 const Container = styled.div`
   display: flex;
+  flex-direction: column;
   min-height: 100vh;
-  background-color: #F9F8F8;
 `;
 
-const Navbar = styled.nav`
+const Content = styled.div`
+  display: flex;
+  flex: 1;
+`;
+
+const Sidebar = styled.nav`
   width: 250px;
-  background-color: #000000;
+  background-color: #F9F8F8;
   padding: 20px;
+  height: calc(100vh - 60px); // Resta la altura del navbar
+  overflow-y: auto;
 `;
 
-const NavLink = styled(Link)`
+const Main = styled.main`
+  flex: 1;
+  padding: 20px;
+  background-color: #FFFFFF;
+`;
+
+const NavLink = styled.a`
   display: block;
-  margin-bottom: 15px;
-  color: #FFFFFF;
+  margin-bottom: 10px;
+  color: #000000;
   text-decoration: none;
-  font-size: 16px;
   padding: 10px;
   border-radius: 5px;
   transition: background-color 0.3s;
 
   &:hover {
     background-color: #FFC001;
-    color: #000000;
   }
-`;
-
-const Main = styled.main`
-  flex: 1;
-  padding: 40px;
 `;
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return (
     <Container>
-      <Navbar>
-        <NavLink href="/alumnos">Alumnos</NavLink>
-        <NavLink href="/conceptos">Conceptos</NavLink>
-        <NavLink href="/recibos">Recibos</NavLink>
-        <NavLink href="/estilos">Estilos</NavLink>
-        <NavLink href="/profesores">Profesores</NavLink>
-        <NavLink href="/CtaCte">Cta. Cte.</NavLink>
-        <NavLink href="/liquidaciones">Liquidaciones</NavLink>
-        <NavLink href="/caja">Caja Diaria</NavLink>
-      </Navbar>
-      <Main>{children}</Main>
+      <Navbar />
+      <Content>
+        <Sidebar>
+        <Link href="/dashboard" passHref legacyBehavior>
+            <NavLink>Dashboard</NavLink>
+          </Link>
+          <Link href="/alumnos" passHref legacyBehavior>
+            <NavLink>Alumnos</NavLink>
+          </Link>
+          <Link href="/profesores" passHref legacyBehavior>
+            <NavLink>Profesores</NavLink>
+          </Link>
+          <Link href="/estilos" passHref legacyBehavior>
+            <NavLink>Estilos</NavLink>
+          </Link>
+          <Link href="/conceptos" passHref legacyBehavior>
+            <NavLink>Conceptos</NavLink>
+          </Link>
+          <Link href="/recibos" passHref legacyBehavior>
+            <NavLink>Recibos</NavLink>
+          </Link>
+          <Link href="/CtaCte" passHref legacyBehavior>
+            <NavLink>Cta. Cte.</NavLink>
+          </Link>
+          <Link href="/caja" passHref legacyBehavior>
+            <NavLink>Caja</NavLink>
+          </Link>
+          <Link href="/liquidaciones" passHref legacyBehavior>
+            <NavLink>Liquidaciones</NavLink>
+          </Link>
+        </Sidebar>
+        <Main>{children}</Main>
+      </Content>
     </Container>
   );
 };
