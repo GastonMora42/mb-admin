@@ -29,8 +29,6 @@ export default function SignUpForm() {
         router.push(result.redirectTo || '/confirm-register');
       } else {
         setErrorMessage(result.error || 'Ocurrió un error durante el registro');
-        // Opcionalmente, puedes manejar una redirección en caso de error
-        // router.push(result.redirectTo || '/signup');
       }
     } catch (error) {
       setErrorMessage('Ocurrió un error inesperado durante el registro.');
@@ -87,11 +85,24 @@ export default function SignUpForm() {
                   type="password"
                   autoComplete="new-password"
                   required
-                  className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                  className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
                   placeholder="Contraseña"
                 />
                 <KeyIcon className="pointer-events-none absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
               </div>
+            </div>
+            <div>
+              <label htmlFor="role" className="sr-only">Rol</label>
+              <select
+                id="role"
+                name="role"
+                required
+                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+              >
+                <option value="">Selecciona un rol</option>
+                <option value="Secretaria">Secretaria</option>
+                <option value="Profesor">Profesor</option>
+              </select>
             </div>
           </div>
 

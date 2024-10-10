@@ -6,7 +6,7 @@ import ProtectedRoute from '@/components/ProtectedRoutes';
 import { useRouter } from 'next/router';
 
 
-const publicPaths = ['/', '/login'];
+const publicPaths = ['/', '/login', '/register', '/confirm-register'];
 
 
 export default function App({ Component, pageProps }: AppProps) {

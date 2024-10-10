@@ -10,10 +10,7 @@ import {
 
  import { Amplify } from 'aws-amplify';
 
- export async function handleSignUp(
-  _prevState: string | undefined,
-  formData: FormData
-) {
+export async function handleSignUp(undefined: undefined, formData: FormData) {
   console.log('Amplify Config:', Amplify.getConfig());
   try {
     const { isSignUpComplete, userId, nextStep } = await signUp({
@@ -23,6 +20,7 @@ import {
         userAttributes: {
           email: String(formData.get("email")),
           name: String(formData.get("name")),
+          'custom:role': String(formData.get("role")), // Asegúrate de que este campo exista en tu formulario
         },
         autoSignIn: true,
       }
