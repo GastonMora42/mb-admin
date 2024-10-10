@@ -11,7 +11,7 @@ export function RoleBasedAccess({ allowedRoles, children }: RoleBasedAccessProps
   const userRole = useUserRole();
 
   if (!userRole || !allowedRoles.includes(userRole)) {
-    return null; // O un componente de acceso denegado
+    return null;
   }
 
   return <>{children}</>;

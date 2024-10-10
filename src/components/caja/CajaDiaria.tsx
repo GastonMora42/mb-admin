@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import styled from 'styled-components';
+import { useUserRole } from '@/hooks/useUserRole';
+
 
 const Container = styled.div`
   background-color: #FFFFFF;
@@ -168,11 +170,15 @@ const CajaDiaria = () => {
   const [alumnos, setAlumnos] = useState<{ id: number; nombre: string; apellido: string }[]>([]);
   const [conceptos, setConceptos] = useState<{ id: number; nombre: string }[]>([]);
 
+  const userRole = useUserRole();
+
   useEffect(() => {
-    fetchCajaDiaria();
-    fetchAlumnos();
-    fetchConceptos();
-  }, []);
+    if (userRole === 'Dueño' || userRole === 'Secretaria') {
+      fetchCajaDiaria();
+      fetchAlumnos();
+      fetchConceptos();
+    }
+  }, [userRole]);
 
   const fetchAlumnos = async () => {
     try {
@@ -199,11 +205,15 @@ const CajaDiaria = () => {
   };
 
   const fetchCajaDiaria = async () => {
+    if (userRole !== 'Dueño' && userRole !== 'Secretaria') return;
+    
     setLoading(true);
     try {
+      const today = new Date().toISOString().split('T')[0];
       const queryParams = new URLSearchParams({
-        ...(fechaInicio && { fechaInicio }),
-        ...(fechaFin && { fechaFin }),
+        ...(userRole === 'Dueño' && fechaInicio && { fechaInicio }),
+        ...(userRole === 'Dueño' && fechaFin && { fechaFin }),
+        ...(userRole === 'Secretaria' && { fechaInicio: today, fechaFin: today }),
         ...Object.fromEntries(Object.entries(filtros).filter(([_, v]) => v !== ''))
       });
       const res = await fetch(`/api/cajadiaria?${queryParams}`);
@@ -211,7 +221,7 @@ const CajaDiaria = () => {
       const data = await res.json();
       setCajaData(data);
       setMessage({ 
-        text: fechaInicio || fechaFin ? 
+        text: userRole === 'Dueño' && (fechaInicio || fechaFin) ? 
           "Este es el historial de caja en las fechas seleccionadas" : 
           "Esta es la caja del día corriente", 
         isError: false 
@@ -225,37 +235,46 @@ const CajaDiaria = () => {
   };
 
   const handleFiltroChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setFiltros(prev => ({ ...prev, [name]: value }));
+    if (userRole === 'Dueño') {
+      const { name, value } = e.target;
+      setFiltros(prev => ({ ...prev, [name]: value }));
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    fetchCajaDiaria();
+    if (userRole === 'Dueño' || userRole === 'Secretaria') {
+      fetchCajaDiaria();
+    }
   };
+
+  if (userRole === 'Profesor') {
+    return <Message isError={true}>No tienes acceso a la información de caja diaria.</Message>;
+  }
 
   return (
     <Container>
       <Title>Caja Diaria</Title>
-      <Form onSubmit={handleSubmit}>
-        <FormRow>
-          <InputGroup>
-            <Label>Desde:</Label>
-            <Input
-              type="date"
-              value={fechaInicio}
-              onChange={(e) => setFechaInicio(e.target.value)}
-            />
-          </InputGroup>
-          <InputGroup>
-            <Label>Hasta:</Label>
-            <Input
-              type="date"
-              value={fechaFin}
-              onChange={(e) => setFechaFin(e.target.value)}
-            />
-          </InputGroup>
-        </FormRow>
+      {userRole === 'Dueño' && (
+        <Form onSubmit={handleSubmit}>
+          <FormRow>
+            <InputGroup>
+              <Label>Desde:</Label>
+              <Input
+                type="date"
+                value={fechaInicio}
+                onChange={(e) => setFechaInicio(e.target.value)}
+              />
+            </InputGroup>
+            <InputGroup>
+              <Label>Hasta:</Label>
+              <Input
+                type="date"
+                value={fechaFin}
+                onChange={(e) => setFechaFin(e.target.value)}
+              />
+            </InputGroup>
+          </FormRow>
         <FormRow>
           <InputGroup>
             <Label>N° Recibo:</Label>
@@ -337,15 +356,16 @@ const CajaDiaria = () => {
           </InputGroup>
         </FormRow>
         <Button type="submit" disabled={loading}>
-          {loading ? 'Cargando...' : 'Buscar'}
-        </Button>
-      </Form>
+            {loading ? 'Cargando...' : 'Buscar'}
+          </Button>
+        </Form>
+      )}
 
       {message && (
         <Message isError={message.isError}>{message.text}</Message>
       )}
 
-{cajaData.recibos.length > 0 && (
+      {cajaData.recibos.length > 0 && (
         <>
           <Table>
             <thead>
@@ -374,7 +394,7 @@ const CajaDiaria = () => {
                 </Tr>
               ))}
             </tbody>
-          </Table>
+            </Table>
           
           <TotalesContainer>
             <TotalGeneral>Total General: ${cajaData.totalMonto.toFixed(2)}</TotalGeneral>
