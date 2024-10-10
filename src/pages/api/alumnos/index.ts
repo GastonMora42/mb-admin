@@ -11,7 +11,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       res.status(200).json(alumnos)
     } catch (error) {
       console.error('Error al obtener alumnos:', error)
-      res.status(500).json({ error: 'Error al obtener alumnos' })
+      res.status(500).json({ error: 'Error al obtener alumnos!' })
     }
   } else if (req.method === 'POST') {
     try {

@@ -14,13 +14,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
   } else if (req.method === 'POST') {
     try {
-      const { nombre, descripcion, monto, fueraDeTermino } = req.body
+      const { nombre, descripcion, monto } = req.body
       const concepto = await prisma.concepto.create({
         data: {
           nombre,
           descripcion,
           monto: parseFloat(monto),
-        }
+        },
+        include: { estilo: true }
       })
       res.status(201).json(concepto)
     } catch (error) {

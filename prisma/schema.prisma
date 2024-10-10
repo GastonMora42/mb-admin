@@ -29,9 +29,8 @@ model Concepto {
   nombre          String
   descripcion     String?
   monto           Float
-  estiloId        Int
-  estilo          Estilo   @relation(fields: [estiloId], references: [id])
-  fueraDeTermino  Boolean  @default(false)
+  estiloId        Int?
+  estilo          Estilo?  @relation(fields: [estiloId], references: [id])  // Añadido ? para hacerlo opcional
   recibos         Recibo[]
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt

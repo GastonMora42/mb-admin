@@ -26,10 +26,10 @@ const Input = styled.input`
   border-radius: 4px;
 `;
 
-const Checkbox = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 10px;
+const Select = styled.select`
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
 `;
 
 const Button = styled.button`
@@ -70,83 +70,90 @@ const Tr = styled.tr`
   }
 `;
 
-const Message = styled.div<{ isError?: boolean }>`
-  margin-top: 20px;
-  padding: 10px;
-  border-radius: 4px;
-  background-color: ${props => props.isError ? '#ffcccc' : '#ccffcc'};
-  color: ${props => props.isError ? '#cc0000' : '#006600'};
+const CheckboxLabel = styled.label`
+  display: flex;
+  align-items: center;
+  gap: 10px;
 `;
+
+interface Estilo {
+  id: number;
+  nombre: string;
+}
 
 interface Concepto {
   id: number;
   nombre: string;
-  descripcion?: string;
+  descripcion: string | null;
   monto: number;
+  estiloId: number;
+  estilo: Estilo;
   fueraDeTermino: boolean;
 }
 
-const Conceptos = () => {
+const Conceptos: React.FC = () => {
   const [conceptos, setConceptos] = useState<Concepto[]>([]);
+  const [estilos, setEstilos] = useState<Estilo[]>([]);
   const [nuevoConcepto, setNuevoConcepto] = useState({
     nombre: '',
     descripcion: '',
     monto: '',
+    estiloId: '',
     fueraDeTermino: false
   });
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState<{ text: string; isError: boolean } | null>(null);
-
+  
   useEffect(() => {
     fetchConceptos();
+    fetchEstilos();
   }, []);
 
   const fetchConceptos = async () => {
-    setLoading(true);
     try {
       const res = await fetch('/api/conceptos');
-      if (!res.ok) {
-        throw new Error('Error al obtener conceptos');
+      if (res.ok) {
+        const data = await res.json();
+        setConceptos(data);
       }
-      const data = await res.json();
-      setConceptos(data);
     } catch (error) {
       console.error('Error fetching conceptos:', error);
-      setMessage({ text: 'Error al cargar conceptos. Por favor, intente nuevamente.', isError: true });
-    } finally {
-      setLoading(false);
     }
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value, type, checked } = e.target;
+  const fetchEstilos = async () => {
+    try {
+      const res = await fetch('/api/estilos');
+      if (res.ok) {
+        const data = await res.json();
+        setEstilos(data);
+      }
+    } catch (error) {
+      console.error('Error fetching estilos:', error);
+    }
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value, type } = e.target;
     setNuevoConcepto(prev => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : value
+      [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value
     }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
     try {
       const res = await fetch('/api/conceptos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(nuevoConcepto),
       });
-      if (!res.ok) {
-        throw new Error('Error al crear concepto');
+      if (res.ok) {
+        const conceptoCreado = await res.json();
+        setConceptos(prev => [...prev, conceptoCreado]);
+        setNuevoConcepto({ nombre: '', descripcion: '', monto: '', estiloId: '', fueraDeTermino: false });
       }
-      const conceptoCreado = await res.json();
-      setConceptos(prev => [...prev, conceptoCreado]);
-      setNuevoConcepto({ nombre: '', descripcion: '', monto: '', fueraDeTermino: false });
-      setMessage({ text: `Concepto ${conceptoCreado.nombre} creado con éxito.`, isError: false });
     } catch (error) {
       console.error('Error creating concepto:', error);
-      setMessage({ text: 'Error al crear concepto. Por favor, intente nuevamente.', isError: true });
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -178,29 +185,15 @@ const Conceptos = () => {
           required
           step="0.01"
         />
-        <Checkbox>
-          <input
-            type="checkbox"
-            name="fueraDeTermino"
-            checked={nuevoConcepto.fueraDeTermino}
-            onChange={handleInputChange}
-          />
-          <label htmlFor="fueraDeTermino">Fuera de término</label>
-        </Checkbox>
-        <Button type="submit" disabled={loading}>
-          {loading ? 'Agregando...' : 'Agregar Concepto'}
-        </Button>
+        <Button type="submit">Agregar Concepto</Button>
       </Form>
-      {message && (
-        <Message isError={message.isError}>{message.text}</Message>
-      )}
+
       <Table>
         <thead>
           <Tr>
-            <Th>Nombre</Th>
+            <Th>Titulo</Th>
             <Th>Descripción</Th>
             <Th>Monto</Th>
-            <Th>Fuera de término</Th>
           </Tr>
         </thead>
         <tbody>
@@ -209,7 +202,6 @@ const Conceptos = () => {
               <Td>{concepto.nombre}</Td>
               <Td>{concepto.descripcion}</Td>
               <Td>${concepto.monto.toFixed(2)}</Td>
-              <Td>{concepto.fueraDeTermino ? 'Sí' : 'No'}</Td>
             </Tr>
           ))}
         </tbody>

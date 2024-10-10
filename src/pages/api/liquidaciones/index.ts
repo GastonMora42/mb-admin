@@ -4,14 +4,16 @@ import prisma from '@/lib/prisma'
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'GET') {
     try {
-      const estilos = await prisma.estilo.findMany();
-      res.status(200).json(estilos);
+      const conceptos = await prisma.concepto.findMany({
+        orderBy: { nombre: 'asc' }
+      });
+      res.status(200).json(conceptos);
     } catch (error) {
-      console.error('Error al obtener estilos:', error);
-      res.status(500).json({ error: 'Error al obtener estilos' });
+      console.error('Error al obtener conceptos:', error);
+      res.status(500).json({ error: 'Error al obtener conceptos' });
     }
   } else if (req.method === 'POST') {
-    const { año, periodo, estilosIds } = req.body;
+    const { año, periodo, conceptosIds } = req.body;
 
     try {
       const recibos = await prisma.recibo.findMany({
@@ -19,16 +21,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           AND: [
             { periodoPago: { startsWith: año } },
             { periodoPago: { endsWith: periodo } },
-            { concepto: { estiloId: { in: estilosIds } } }
+            { conceptoId: { in: conceptosIds } }
           ]
         },
         include: {
           alumno: true,
-          concepto: {
-            include: {
-              estilo: true
-            }
-          }
+          concepto: true
         },
         orderBy: { fecha: 'asc' }
       });

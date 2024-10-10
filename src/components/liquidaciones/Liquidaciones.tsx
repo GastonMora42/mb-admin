@@ -70,44 +70,41 @@ const TotalContainer = styled.div`
   font-weight: bold;
 `;
 
-interface Estilo {
+interface Concepto {
   id: number;
   nombre: string;
 }
 
 interface Recibo {
-    id: number;
-    numeroRecibo: number;
-    fecha: string;
-    alumno: { nombre: string; apellido: string };
-    concepto: { 
-      nombre: string; 
-      estilo: { nombre: string } 
-    };
-    monto: number;
-  }
+  id: number;
+  numeroRecibo: number;
+  fecha: string;
+  alumno: { nombre: string; apellido: string };
+  concepto: { nombre: string };
+  monto: number;
+}
 
 const Liquidaciones: React.FC = () => {
-  const [estilos, setEstilos] = useState<Estilo[]>([]);
+  const [conceptos, setConceptos] = useState<Concepto[]>([]);
   const [año, setAño] = useState('');
   const [periodo, setPeriodo] = useState('');
-  const [estilosSeleccionados, setEstilosSeleccionados] = useState<string[]>([]);
+  const [conceptosSeleccionados, setConceptosSeleccionados] = useState<string[]>([]);
   const [recibos, setRecibos] = useState<Recibo[]>([]);
   const [total, setTotal] = useState(0);
 
   useEffect(() => {
-    fetchEstilos();
+    fetchConceptos();
   }, []);
 
-  const fetchEstilos = async () => {
+  const fetchConceptos = async () => {
     try {
       const res = await fetch('/api/liquidaciones');
       if (res.ok) {
         const data = await res.json();
-        setEstilos(data);
+        setConceptos(data);
       }
     } catch (error) {
-      console.error('Error fetching estilos:', error);
+      console.error('Error fetching conceptos:', error);
     }
   };
 
@@ -117,11 +114,7 @@ const Liquidaciones: React.FC = () => {
       const res = await fetch('/api/liquidaciones', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          año, 
-          periodo, 
-          estilosIds: estilosSeleccionados.map(id => parseInt(id)) 
-        }),
+        body: JSON.stringify({ año, periodo, conceptosIds: conceptosSeleccionados.map(Number) }),
       });
       if (res.ok) {
         const data = await res.json();
@@ -165,18 +158,15 @@ const Liquidaciones: React.FC = () => {
           ))}
         </Select>
         <Select 
-  multiple 
-  value={estilosSeleccionados}
-  onChange={(e) => {
-    const selectedOptions = Array.from(e.target.selectedOptions, option => option.value);
-    setEstilosSeleccionados(selectedOptions);
-  }}
-  required
->
-  {estilos.map(estilo => (
-    <option key={estilo.id} value={estilo.id.toString()}>{estilo.nombre}</option>
-  ))}
-</Select>
+          multiple 
+          value={conceptosSeleccionados}
+          onChange={(e) => setConceptosSeleccionados(Array.from(e.target.selectedOptions, option => option.value))}
+          required
+        >
+          {conceptos.map(concepto => (
+            <option key={concepto.id} value={concepto.id}>{concepto.nombre}</option>
+          ))}
+        </Select>
         <Button type="submit">Generar Liquidación</Button>
       </Form>
 
@@ -189,7 +179,6 @@ const Liquidaciones: React.FC = () => {
                 <Th>Fecha</Th>
                 <Th>Alumno</Th>
                 <Th>Concepto</Th>
-                <Th>Estilo</Th>
                 <Th>Importe</Th>
               </Tr>
             </thead>
@@ -200,7 +189,6 @@ const Liquidaciones: React.FC = () => {
                   <Td>{new Date(recibo.fecha).toLocaleDateString()}</Td>
                   <Td>{`${recibo.alumno.nombre} ${recibo.alumno.apellido}`}</Td>
                   <Td>{recibo.concepto.nombre}</Td>
-                  <Td>{recibo.concepto.estilo.nombre}</Td>
                   <Td>
                     <input
                       type="number"
