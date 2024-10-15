@@ -8,7 +8,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test-report": "node --loader ts-node/esm src/scripts/test-report.ts"
+    "test-report": "node --loader ts-node/esm src/scripts/test-report.ts",
+    "test-monthly-report": "node --loader ts-node/esm src/scripts/test-monthly-report.ts"
   },
   "dependencies": {
     "@auth0/nextjs-auth0": "^3.5.0",

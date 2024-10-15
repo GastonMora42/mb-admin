@@ -239,7 +239,7 @@ const AlumnosSueltosAsistencia: React.FC = () => {
         </tbody>
       </Table>
 
-      <SectionTitle>Clases</SectionTitle>
+      <SectionTitle>Clases dictadas</SectionTitle>
       <div>
         <Input
           type="date"
