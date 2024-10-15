@@ -5,7 +5,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (req.method === 'GET') {
     try {
       const estilos = await prisma.estilo.findMany({
-        include: { profesor: true },
+        select: {
+          id: true,
+          nombre: true,
+          descripcion: true,
+          profesor: {
+            select: {
+              id: true,
+              nombre: true,
+              apellido: true
+            }
+          }
+        },
         orderBy: { nombre: 'asc' }
       })
       res.status(200).json(estilos)

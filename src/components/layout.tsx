@@ -59,6 +59,9 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           <Link href="/profesores" passHref legacyBehavior>
             <NavLink>Profesores</NavLink>
           </Link>
+          <Link href="/asistencia" passHref legacyBehavior>
+            <NavLink>Asistencia</NavLink>
+          </Link>
           <Link href="/estilos" passHref legacyBehavior>
             <NavLink>Estilos</NavLink>
           </Link>
