@@ -80,6 +80,9 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           <Link href="/liquidaciones" passHref legacyBehavior>
             <NavLink>Liquidaciones</NavLink>
           </Link>
+          <Link href="/alumnos-sueltos-asistencia" passHref legacyBehavior>
+            <NavLink>Info Clases</NavLink>
+          </Link>
         </Sidebar>
         <Main>{children}</Main>
       </Content>
