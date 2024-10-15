@@ -1,5 +1,7 @@
 import { Amplify, type ResourcesConfig } from "aws-amplify";
 import React from "react";
+import dotenv from 'dotenv';
+dotenv.config();
 
 const authConfig: ResourcesConfig["Auth"] = { 
   Cognito: {
