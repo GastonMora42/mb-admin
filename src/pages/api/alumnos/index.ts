@@ -1,21 +1,33 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import prisma from '@/lib/prisma'
+import { generarDeudaMensual } from '@/utils/alumnoUtils'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'GET') {
     try {
       const alumnos = await prisma.alumno.findMany({
-        where: { activo : true },
+        include: { 
+          alumnoEstilos: {
+            include: {
+              estilo: true
+            }
+          }
+        },
         orderBy: { apellido: 'asc' }
       })
       res.status(200).json(alumnos)
     } catch (error) {
       console.error('Error al obtener alumnos:', error)
-      res.status(500).json({ error: 'Error al obtener alumnos!' })
+      res.status(500).json({ error: 'Error al obtener alumnos' })
     }
   } else if (req.method === 'POST') {
     try {
-      const { nombre, apellido, dni, fechaNacimiento, email, telefono } = req.body;
+      const { 
+        nombre, apellido, dni, fechaNacimiento, email, telefono, 
+        numeroEmergencia, direccion, obraSocial, nombreTutor, dniTutor, 
+        notas, estilosIds 
+      } = req.body;
+
       const alumno = await prisma.alumno.create({
         data: {
           nombre,
@@ -24,9 +36,31 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           fechaNacimiento: new Date(fechaNacimiento),
           email,
           telefono,
-          activo: true
+          numeroEmergencia,
+          direccion,
+          obraSocial,
+          nombreTutor,
+          dniTutor,
+          notas,
+          alumnoEstilos: {
+            create: estilosIds.map((id: any) => ({
+              estilo: { connect: { id } },
+              activo: true
+            }))
+          }
+        },
+        include: {
+          alumnoEstilos: {
+            include: {
+              estilo: true
+            }
+          }
         }
       });
+
+      // Generar deuda mensual para el nuevo alumno
+      await generarDeudaMensual(alumno.id);
+
       res.status(201).json(alumno);
     } catch (error) {
       console.error('Error al crear alumno:', error);
@@ -37,7 +71,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     try {
       const alumno = await prisma.alumno.update({
         where: { id: parseInt(id) },
-        data: { activo }
+        data: { activo },
+        include: { 
+          alumnoEstilos: {
+            include: {
+              estilo: true
+            }
+          }
+        }
       })
       res.status(200).json(alumno)
     } catch (error) {
@@ -45,7 +86,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       res.status(400).json({ error: 'Error al actualizar alumno' })
     }
   } else {
-    res.setHeader('Allow', ['GET', 'POST'])
+    res.setHeader('Allow', ['GET', 'POST', 'PATCH'])
     res.status(405).end(`Method ${req.method} Not Allowed`)
   }
 }

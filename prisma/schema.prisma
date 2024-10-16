@@ -8,21 +8,43 @@ datasource db {
 }
 
 model Alumno {
+  id               Int       @id @default(autoincrement())
+  nombre           String
+  apellido         String
+  dni              String    @unique
+  activo           Boolean   @default(true)
+  fechaNacimiento  DateTime
+  email            String?
+  telefono         String?
+  numeroEmergencia String?
+  direccion        String?
+  obraSocial       String?
+  nombreTutor      String?
+  dniTutor         String?
+  notas            String?
+  fechaIngreso     DateTime  @default(now())
+  recibos          Recibo[]
+  ctaCte           CtaCte?
+  estilos          Estilo[]  @relation("AlumnoEstilos")
+  asistencias      Asistencia[]
+  alumnoEstilos    AlumnoEstilos[]
+  deudas           Deuda[]
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+}
+
+model Deuda {
   id        Int      @id @default(autoincrement())
-  nombre    String
-  apellido  String
-  dni       String   @unique
-  activo    Boolean  @default(true)
-  fechaNacimiento DateTime
-  email       String?
-  telefono    String?
-  fechaIngreso DateTime @default(now())
-  recibos     Recibo[]
-  ctaCte      CtaCte?
-  estilos     Estilo[] @relation("AlumnoEstilos")
-  asistencias Asistencia[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  alumno    Alumno   @relation(fields: [alumnoId], references: [id])
+  alumnoId  Int
+  monto     Float
+  mes       String
+  anio       Int
+  estilo    Estilo   @relation(fields: [estiloId], references: [id])
+  estiloId  Int
+  pagada    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Concepto {
@@ -61,19 +83,32 @@ model Recibo {
   updatedAt     DateTime @updatedAt
 }
 
+
 model Estilo {
   id              Int       @id @default(autoincrement())
   nombre          String
+  monto           Float     @default(0)
+  deudas          Deuda[]
   conceptos       Concepto[]
   clases          Clase[]
   descripcion     String?
   profesorId      Int?
+  alumnoEstilos   AlumnoEstilos[]
   profesor        Profesor? @relation(fields: [profesorId], references: [id])
   alumnos         Alumno[]  @relation("AlumnoEstilos")
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 }
 
+model AlumnoEstilos {
+  alumno   Alumno  @relation(fields: [alumnoId], references: [id])
+  alumnoId Int
+  estilo   Estilo  @relation(fields: [estiloId], references: [id])
+  estiloId Int
+  activo   Boolean @default(true)
+
+  @@id([alumnoId, estiloId])
+}
 
 model Profesor {
   id          Int      @id @default(autoincrement())

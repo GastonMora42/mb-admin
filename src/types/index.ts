@@ -4,4 +4,6 @@ export type { Alumno, Concepto, Recibo, Estilo, Profesor, CtaCte, Liquidacion, C
 
 export type UserRole = 'Secretaria' | 'Profesor' | 'Dueño';
 
+
+
 // Puedes agregar tipos adicionales aquí si es necesario
