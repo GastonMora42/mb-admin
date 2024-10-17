@@ -1,5 +1,3 @@
-"use client"
-
 import { useState } from 'react';
 import { lusitana } from "@/components/fonts";
 import {
@@ -16,8 +14,8 @@ import Link from "next/link";
 import { useRouter } from 'next/router';
 import Image from 'next/image';
 
+const LoginForm: React.FC = () => {
 
-export default function LoginForm() {
   const [errorMessage, setErrorMessage] = useState<string | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -210,3 +208,5 @@ export default function LoginForm() {
     </div>
   );
 }
+
+export default LoginForm

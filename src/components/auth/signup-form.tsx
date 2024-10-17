@@ -1,5 +1,3 @@
-"use client";
-
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { lusitana } from "@/components/fonts";
@@ -13,7 +11,7 @@ import { ArrowRightIcon } from "@heroicons/react/20/solid";
 import { Button } from "@/components/button";
 import { handleSignUp } from "@/lib/cognito-actions";
 
-export default function SignUpForm() {
+const SignUpForm: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
@@ -137,3 +135,5 @@ export default function SignUpForm() {
     </div>
   );
 }
+
+export default SignUpForm

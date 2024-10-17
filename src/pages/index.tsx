@@ -1,30 +1,116 @@
-import AcmeLogo from "@/public/images/Acme-logo";
-import { ArrowRightIcon } from "@heroicons/react/24/outline";
-import Link from "next/link";
-import { lusitana } from "@/components/fonts";
-import Image from "next/image";
+import React from 'react';
+import Link from 'next/link';
+import Image from 'next/image';
+import styled from 'styled-components';
+
+const PageContainer = styled.main`
+  display: flex;
+  min-height: 100vh;
+  background-color: #1a202c;
+`;
+
+const ContentWrapper = styled.div`
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  padding: 2rem;
+`;
+
+const LogoContainer = styled.div`
+  margin-bottom: 2rem;
+`;
+
+const WelcomeCard = styled.div`
+  background-color: #FFFFFF;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  padding: 2rem;
+  max-width: 500px;
+  width: 100%;
+`;
+
+const Title = styled.h1`
+  font-size: 1.5rem;
+  color: #2D3748;
+  margin-bottom: 1.5rem;
+  text-align: center;
+  font-weight: 600;
+`;
+
+const ButtonContainer = styled.div`
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+`;
+
+const Button = styled(Link)`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem 1.5rem;
+  border-radius: 4px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  text-decoration: none;
+  flex: 1;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  }
+
+  svg {
+    margin-left: 0.5rem;
+  }
+`;
+
+const LoginButton = styled(Button)`
+  background-color: #FFC001;
+  color: #1A202C;
+
+  &:hover {
+    background-color: #E6AC00;
+  }
+`;
+
+const RegisterButton = styled(Button)`
+  background-color: #2D3748;
+  color: #FFFFFF;
+
+  &:hover {
+    background-color: #4A5568;
+  }
+`;
 
 export default function Page() {
   return (
-    <main className="flex min-h-screen flex-col p-6">
-      <div className="flex h-20 shrink-0 items-end rounded-lg bg-blue-500 p-4 md:h-52">
-        <AcmeLogo />
-      </div>
-      <div className="mt-4 flex grow flex-col gap-4 md:flex-row">
-        <div className="flex flex-col justify-center gap-6 rounded-lg bg-gray-50 px-6 py-10 md:w-2/5 md:px-20">
-          <p
-            className={`${lusitana.className} text-xl text-gray-800 md:text-3xl md:leading-normal`}
-          >
-            <strong>Bienvenido al panel de Administradores de MB Academia de Danzas</strong>
-          </p>
-          <Link
-            href="/login"
-            className="flex items-center gap-5 self-start rounded-lg bg-blue-500 px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-blue-400 md:text-base"
-          >
-            <span>Log in</span> <ArrowRightIcon className="w-5 md:w-6" />
-          </Link>
-        </div>
-      </div>
-    </main>
+    <PageContainer>
+      <ContentWrapper>
+        <LogoContainer>
+          <Image src="/mb-logo.png" alt="MB Academia de Danzas Logo" width={200} height={80} />
+        </LogoContainer>
+        <WelcomeCard>
+          <Title>Bienvenido al panel de Administradores de MB Academia de Danzas</Title>
+          <ButtonContainer>
+            <LoginButton href="/login">
+              Iniciar sesión
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M4.16666 10H15.8333" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M10 4.16667L15.8333 10L10 15.8333" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </LoginButton>
+            <RegisterButton href="/register">
+              Registrarse
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M10 4.16667V15.8333" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M4.16666 10H15.8333" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </RegisterButton>
+          </ButtonContainer>
+        </WelcomeCard>
+      </ContentWrapper>
+    </PageContainer>
   );
 }
