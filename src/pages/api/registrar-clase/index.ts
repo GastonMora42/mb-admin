@@ -58,11 +58,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       for (const alumnoSuelto of alumnosSueltos) {
         await prisma.alumnoSuelto.create({
           data: {
-            claseId: nuevaClase.id,
             nombre: alumnoSuelto.nombre,
             apellido: alumnoSuelto.apellido,
+            dni: alumnoSuelto.dni,
             telefono: alumnoSuelto.telefono,
             email: alumnoSuelto.email,
+            clases: {
+              connect: { id: nuevaClase.id }
+            }
           },
         });
       }

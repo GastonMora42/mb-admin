@@ -8,29 +8,30 @@ datasource db {
 }
 
 model Alumno {
-  id               Int             @id @default(autoincrement())
-  nombre           String
-  apellido         String
-  dni              String          @unique
-  activo           Boolean         @default(true)
-  fechaNacimiento  DateTime
-  email            String?
-  telefono         String?
-  numeroEmergencia String?
-  direccion        String?
-  obraSocial       String?
-  nombreTutor      String?
-  dniTutor         String?
-  notas            String?
-  fechaIngreso     DateTime        @default(now())
-  recibos          Recibo[]
-  ctaCte           CtaCte?
-  estilos          Estilo[]        @relation("AlumnoEstilos")
-  asistencias      Asistencia[]
-  alumnoEstilos    AlumnoEstilos[]
-  deudas           Deuda[]
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
+  id                       Int             @id @default(autoincrement())
+  nombre                   String
+  apellido                 String
+  dni                      String          @unique
+  activo                   Boolean         @default(true)
+  fechaNacimiento          DateTime
+  email                    String?
+  telefono                 String?
+  numeroEmergencia         String?
+  direccion                String?
+  obraSocial               String?
+  nombreTutor              String?
+  dniTutor                 String?
+  notas                    String?
+  fechaIngreso             DateTime        @default(now())
+  recibos                  Recibo[]
+  alumnosSueltosAnteriores AlumnoSuelto[]  @relation("AlumnoSueltoRegular")
+  ctaCte                   CtaCte?
+  estilos                  Estilo[]        @relation("AlumnoEstilos")
+  asistencias              Asistencia[]
+  alumnoEstilos            AlumnoEstilos[]
+  deudas                   Deuda[]
+  createdAt                DateTime        @default(now())
+  updatedAt                DateTime        @updatedAt
 }
 
 model Deuda {
@@ -96,6 +97,7 @@ model Estilo {
   conceptos     Concepto[]
   clases        Clase[]
   descripcion   String?
+  importe       Float    @default(0)
   profesorId    Int?
   alumnoEstilos AlumnoEstilos[]
   profesor      Profesor?       @relation(fields: [profesorId], references: [id])
@@ -105,13 +107,14 @@ model Estilo {
 }
 
 model AlumnoEstilos {
-  alumno   Alumno  @relation(fields: [alumnoId], references: [id])
-  alumnoId Int
-  estilo   Estilo  @relation(fields: [estiloId], references: [id])
-  estiloId Int
-  activo   Boolean @default(true)
+  id        Int     @id @default(autoincrement())
+  alumno    Alumno  @relation(fields: [alumnoId], references: [id])
+  alumnoId  Int
+  estilo    Estilo  @relation(fields: [estiloId], references: [id])
+  estiloId  Int
+  activo    Boolean @default(true)
 
-  @@id([alumnoId, estiloId])
+  @@unique([alumnoId, estiloId])
 }
 
 model Profesor {
@@ -184,14 +187,16 @@ model Asistencia {
 }
 
 model AlumnoSuelto {
-  id        Int      @id @default(autoincrement())
-  nombre    String
-  apellido  String
-  dni       String   @unique
-  telefono  String?
-  email     String?
-  recibos   Recibo[]
-  clases    Clase[] // Agrega esta línea para la relación inversa
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              Int      @id @default(autoincrement())
+  nombre          String
+  apellido        String
+  dni             String   @unique
+  telefono        String?
+  email           String?
+  recibos         Recibo[]
+  clases          Clase[]
+  alumnoRegularId Int?
+  alumnoRegular   Alumno?  @relation("AlumnoSueltoRegular", fields: [alumnoRegularId], references: [id])
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }

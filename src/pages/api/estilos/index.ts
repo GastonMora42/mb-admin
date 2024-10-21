@@ -9,6 +9,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           id: true,
           nombre: true,
           descripcion: true,
+          importe: true,
           profesor: {
             select: {
               id: true,
@@ -26,11 +27,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
   } else if (req.method === 'POST') {
     try {
-      const { nombre, descripcion, profesorId } = req.body
+      const { nombre, descripcion, profesorId, importe } = req.body
       const estilo = await prisma.estilo.create({
         data: {
           nombre,
           descripcion,
+          importe: parseFloat(importe),
           profesor: profesorId ? { connect: { id: parseInt(profesorId) } } : undefined
         },
         include: { profesor: true }

@@ -19,12 +19,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         where: whereClause,
         include: { 
           alumno: true,
-          alumnoSuelto: true,
+          alumnoSuelto: {
+            include: {
+              alumnoRegular: true
+            }
+          },
           concepto: true
         },
         orderBy: { fecha: 'desc' }
       });
-      res.status(200).json(recibos);
+
+      const procesedRecibos = recibos.map(recibo => {
+        if (recibo.alumnoSuelto && recibo.alumnoSuelto.alumnoRegular) {
+          return {
+            ...recibo,
+            alumno: recibo.alumnoSuelto.alumnoRegular,
+            alumnoSuelto: null
+          };
+        }
+        return recibo;
+      });
+
+      res.status(200).json(procesedRecibos);
     } catch (error) {
       console.error('Error al obtener recibos:', error);
       res.status(500).json({ error: 'Error al obtener recibos' });
@@ -51,8 +67,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       const recibo = await prisma.recibo.create({
         data: reciboData,
-        include: { alumno: true, alumnoSuelto: true, concepto: true }
+        include: { 
+          alumno: true, 
+          alumnoSuelto: {
+            include: {
+              alumnoRegular: true
+            }
+          }, 
+          concepto: true 
+        }
       });
+
+      // Si el alumno suelto está asociado a un alumno regular, devolvemos la información del alumno regular
+      if (recibo.alumnoSuelto && recibo.alumnoSuelto.alumnoRegular) {
+        recibo.alumno = recibo.alumnoSuelto.alumnoRegular;
+        recibo.alumnoSuelto = null;
+      }
+
       res.status(201).json(recibo);
     } catch (error) {
       console.error('Error al crear recibo:', error);

@@ -77,6 +77,7 @@ interface AlumnoConAsistencia extends Alumno {
 interface AlumnoSuelto {
   nombre: string;
   apellido: string;
+  dni: string; // Nuevo campo
   telefono: string;
   email: string;
 }
@@ -98,9 +99,11 @@ const TomarAsistencia = () => {
   const [nuevoAlumnoSuelto, setNuevoAlumnoSuelto] = useState<AlumnoSuelto>({
     nombre: '',
     apellido: '',
+    dni: '', // Nuevo campo
     telefono: '',
     email: ''
   });
+
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -168,7 +171,7 @@ const TomarAsistencia = () => {
   const handleAgregarAlumnoSuelto = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
     setAlumnosSueltos(prev => [...prev, nuevoAlumnoSuelto]);
-    setNuevoAlumnoSuelto({ nombre: '', apellido: '', telefono: '', email: '' });
+    setNuevoAlumnoSuelto({ nombre: '', apellido: '', telefono: '', dni: '', email: '' });
     setMostrarFormularioSuelto(false);
   }, [nuevoAlumnoSuelto]);
 
@@ -270,6 +273,14 @@ const TomarAsistencia = () => {
               placeholder="Apellido"
               required
             />
+            <Input
+            type="text"
+            name="dni"
+            value={nuevoAlumnoSuelto.dni}
+            onChange={handleNuevoAlumnoSueltoChange}
+            placeholder="DNI"
+            required
+          />
             <Input
               type="tel"
               name="telefono"

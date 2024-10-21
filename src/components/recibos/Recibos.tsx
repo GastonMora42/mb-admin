@@ -8,6 +8,12 @@ const Container = styled.div`
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 `;
 
+const TableContainer = styled.div`
+  width: 100%;
+  overflow-x: auto;
+  white-space: nowrap;
+`;
+
 const Title = styled.h2`
   color: #000000;
   margin-bottom: 20px;
@@ -271,6 +277,15 @@ const Recibos: React.FC = () => {
     }
   };
 
+  const renderAlumnoNombre = (recibo: Recibo) => {
+    if (recibo.alumno) {
+      return `${recibo.alumno.nombre} ${recibo.alumno.apellido}`;
+    } else if (recibo.alumnoSuelto) {
+      return `${recibo.alumnoSuelto.nombre} ${recibo.alumnoSuelto.apellido} (Suelto)`;
+    }
+    return 'Desconocido';
+  };
+
   const handleDelete = async (id: number) => {
     if (!confirm('¿Está seguro de que desea eliminar este recibo?')) return;
     setLoading(true);
@@ -330,188 +345,186 @@ const Recibos: React.FC = () => {
           disabled={nuevoRecibo.esClaseSuelta}
         >
           <option value="">Seleccione un alumno regular</option>
-{alumnos.map((alumno) => (
-  <option key={alumno.id} value={alumno.id}>
-    {alumno.nombre} {alumno.apellido}
-  </option>
-))}
-</Select>
-<Select
-name="alumnoSueltoId"
-value={nuevoRecibo.alumnoSueltoId}
-onChange={handleInputChange}
-disabled={!nuevoRecibo.esClaseSuelta}
->
-<option value="">Seleccione un alumno suelto</option>
-{alumnosSueltos.map((alumno) => (
-  <option key={alumno.id} value={alumno.id}>
-    {alumno.nombre} {alumno.apellido}
-  </option>
-))}
-</Select>
-<Select
-name="conceptoId"
-value={nuevoRecibo.conceptoId}
-onChange={handleInputChange}
-required
->
-<option value="">Seleccione un concepto</option>
-{conceptos.map((concepto) => (
-  <option key={concepto.id} value={concepto.id}>
-    {concepto.nombre}
-  </option>
-))}
-</Select>
-<CheckboxLabel>
-<input
-  type="checkbox"
-  name="fueraDeTermino"
-  checked={nuevoRecibo.fueraDeTermino}
-  onChange={handleInputChange}
-/>
-Fuera de término
-</CheckboxLabel>
-<CheckboxLabel>
-<input
-  type="checkbox"
-  name="esClaseSuelta"
-  checked={nuevoRecibo.esClaseSuelta}
-  onChange={handleInputChange}
-/>
-Clase Suelta
-</CheckboxLabel>
-<Button type="submit" disabled={loading}>
-{loading ? 'Creando...' : 'Crear Recibo'}
-</Button>
-</Form>
-
-<Title>Filtros</Title>
-<Form onSubmit={(e) => { e.preventDefault(); fetchRecibos(); }}>
-<Input
-type="number"
-name="numero"
-value={filtros.numero}
-onChange={handleFiltroChange}
-placeholder="Número de recibo"
-/>
-<Select
-name="alumnoId"
-value={filtros.alumnoId}
-onChange={handleFiltroChange}
->
-<option value="">Todos los alumnos regulares</option>
-{alumnos.map((alumno) => (
-  <option key={alumno.id} value={alumno.id}>
-    {alumno.nombre} {alumno.apellido}
-  </option>
-))}
-</Select>
-<Select
-name="alumnoSueltoId"
-value={filtros.alumnoSueltoId}
-onChange={handleFiltroChange}
->
-<option value="">Todos los alumnos sueltos</option>
-{alumnosSueltos.map((alumno) => (
-  <option key={alumno.id} value={alumno.id}>
-    {alumno.nombre} {alumno.apellido}
-  </option>
-))}
-</Select>
-<Select
-name="conceptoId"
-value={filtros.conceptoId}
-onChange={handleFiltroChange}
->
-<option value="">Todos los conceptos</option>
-{conceptos.map((concepto) => (
-  <option key={concepto.id} value={concepto.id}>
-    {concepto.nombre}
-  </option>
-))}
-</Select>
-<Input
-type="month"
-name="periodo"
-value={filtros.periodo}
-onChange={handleFiltroChange}
-/>
-<Select
-name="fueraDeTermino"
-value={filtros.fueraDeTermino}
-onChange={handleFiltroChange}
->
-<option value="">Todos</option>
-<option value="true">Fuera de término</option>
-<option value="false">En término</option>
-</Select>
-<Select
-name="esClaseSuelta"
-value={filtros.esClaseSuelta}
-onChange={handleFiltroChange}
->
-<option value="">Todos</option>
-<option value="true">Clase Suelta</option>
-<option value="false">Regular</option>
-</Select>
-<Button type="submit">Aplicar Filtros</Button>
-</Form>
-
-<Button onClick={() => setMostrarRecibos(!mostrarRecibos)}>
-{mostrarRecibos ? 'Ocultar Recibos' : 'Mostrar Recibos'}
-</Button>
-
-{message && (
-<Message isError={message.isError}>{message.text}</Message>
-)}
-
-{mostrarRecibos && (
-<Table>
-<thead>
-  <Tr>
-    <Th>Número</Th>
-    <Th>Fecha</Th>
-    <Th>Alumno</Th>
-    <Th>Concepto</Th>
-    <Th>Monto</Th>
-    <Th>Periodo</Th>
-    <Th>Tipo de Pago</Th>
-    <Th>Fuera de Término</Th>
-    <Th>Tipo</Th>
-    <Th>Acciones</Th>
-  </Tr>
-</thead>
-<tbody>
-  {recibos.map((recibo) => (
-    <Tr key={recibo.id}>
-      <Td>{recibo.numeroRecibo}</Td>
-      <Td>{new Date(recibo.fecha).toLocaleDateString()}</Td>
-      <Td>
-        {recibo.esClaseSuelta
-          ? `${recibo.alumnoSuelto?.nombre} ${recibo.alumnoSuelto?.apellido} (Suelto)`
-          : `${recibo.alumno?.nombre} ${recibo.alumno?.apellido}`}
-      </Td>
-      <Td>{recibo.concepto.nombre}</Td>
-      <Td>${recibo.monto.toFixed(2)}</Td>
-      <Td>{recibo.periodoPago}</Td>
-      <Td>{recibo.tipoPago}</Td>
-      <Td>{recibo.fueraDeTermino ? 'Sí' : 'No'}</Td>
-      <Td>{recibo.esClaseSuelta ? 'Clase Suelta' : 'Regular'}</Td>
-      <Td>
-        <Button 
-          onClick={() => handleDelete(recibo.id)} 
-          disabled={loading}
+          {alumnos.map((alumno) => (
+            <option key={alumno.id} value={alumno.id}>
+              {alumno.nombre} {alumno.apellido}
+            </option>
+          ))}
+        </Select>
+        <Select
+          name="alumnoSueltoId"
+          value={nuevoRecibo.alumnoSueltoId}
+          onChange={handleInputChange}
+          disabled={!nuevoRecibo.esClaseSuelta}
         >
-          {loading ? 'Eliminando...' : 'Eliminar'}
+          <option value="">Seleccione un alumno suelto</option>
+          {alumnosSueltos.map((alumno) => (
+            <option key={alumno.id} value={alumno.id}>
+              {alumno.nombre} {alumno.apellido}
+            </option>
+          ))}
+        </Select>
+        <Select
+          name="conceptoId"
+          value={nuevoRecibo.conceptoId}
+          onChange={handleInputChange}
+          required
+        >
+          <option value="">Seleccione un concepto</option>
+          {conceptos.map((concepto) => (
+            <option key={concepto.id} value={concepto.id}>
+              {concepto.nombre}
+            </option>
+          ))}
+        </Select>
+        <CheckboxLabel>
+          <input
+            type="checkbox"
+            name="fueraDeTermino"
+            checked={nuevoRecibo.fueraDeTermino}
+            onChange={handleInputChange}
+          />
+          Fuera de término
+        </CheckboxLabel>
+        <CheckboxLabel>
+          <input
+            type="checkbox"
+            name="esClaseSuelta"
+            checked={nuevoRecibo.esClaseSuelta}
+            onChange={handleInputChange}
+          />
+          Clase Suelta
+        </CheckboxLabel>
+        <Button type="submit" disabled={loading}>
+          {loading ? 'Creando...' : 'Crear Recibo'}
         </Button>
-      </Td>
-    </Tr>
-  ))}
-</tbody>
-</Table>
-)}
-</Container>
-);
+      </Form>
+  
+      <Title>Filtros</Title>
+      <Form onSubmit={(e) => { e.preventDefault(); fetchRecibos(); }}>
+        <Input
+          type="number"
+          name="numero"
+          value={filtros.numero}
+          onChange={handleFiltroChange}
+          placeholder="Número de recibo"
+        />
+        <Select
+          name="alumnoId"
+          value={filtros.alumnoId}
+          onChange={handleFiltroChange}
+        >
+          <option value="">Todos los alumnos regulares</option>
+          {alumnos.map((alumno) => (
+            <option key={alumno.id} value={alumno.id}>
+              {alumno.nombre} {alumno.apellido}
+            </option>
+          ))}
+        </Select>
+        <Select
+          name="alumnoSueltoId"
+          value={filtros.alumnoSueltoId}
+          onChange={handleFiltroChange}
+        >
+          <option value="">Todos los alumnos sueltos</option>
+          {alumnosSueltos.map((alumno) => (
+            <option key={alumno.id} value={alumno.id}>
+              {alumno.nombre} {alumno.apellido}
+            </option>
+          ))}
+        </Select>
+        <Select
+          name="conceptoId"
+          value={filtros.conceptoId}
+          onChange={handleFiltroChange}
+        >
+          <option value="">Todos los conceptos</option>
+          {conceptos.map((concepto) => (
+            <option key={concepto.id} value={concepto.id}>
+              {concepto.nombre}
+            </option>
+          ))}
+        </Select>
+        <Input
+          type="month"
+          name="periodo"
+          value={filtros.periodo}
+          onChange={handleFiltroChange}
+        />
+        <Select
+          name="fueraDeTermino"
+          value={filtros.fueraDeTermino}
+          onChange={handleFiltroChange}
+        >
+          <option value="">Todos</option>
+          <option value="true">Fuera de término</option>
+          <option value="false">En término</option>
+        </Select>
+        <Select
+          name="esClaseSuelta"
+          value={filtros.esClaseSuelta}
+          onChange={handleFiltroChange}
+        >
+          <option value="">Todos</option>
+          <option value="true">Clase Suelta</option>
+          <option value="false">Regular</option>
+        </Select>
+        <Button type="submit">Aplicar Filtros</Button>
+      </Form>
+  
+      <Button onClick={() => setMostrarRecibos(!mostrarRecibos)}>
+        {mostrarRecibos ? 'Ocultar Recibos' : 'Mostrar Recibos'}
+      </Button>
+  
+      {message && (
+        <Message isError={message.isError}>{message.text}</Message>
+      )}
+  
+      {mostrarRecibos && (
+        <TableContainer>
+        <Table>
+          <thead>
+            <Tr>
+              <Th>Número</Th>
+              <Th>Fecha</Th>
+              <Th>Alumno</Th>
+              <Th>Concepto</Th>
+              <Th>Monto</Th>
+              <Th>Periodo</Th>
+              <Th>Tipo de Pago</Th>
+              <Th>Fuera de Término</Th>
+              <Th>Tipo</Th>
+              <Th>Acciones</Th>
+            </Tr>
+          </thead>
+          <tbody>
+            {recibos.map((recibo) => (
+              <Tr key={recibo.id}>
+                <Td>{recibo.numeroRecibo}</Td>
+                <Td>{new Date(recibo.fecha).toLocaleDateString()}</Td>
+                <Td>{renderAlumnoNombre(recibo)}</Td>
+                <Td>{recibo.concepto.nombre}</Td>
+                <Td>${recibo.monto.toFixed(2)}</Td>
+                <Td>{recibo.periodoPago}</Td>
+                <Td>{recibo.tipoPago}</Td>
+                <Td>{recibo.fueraDeTermino ? 'Sí' : 'No'}</Td>
+                <Td>{recibo.esClaseSuelta ? 'Clase Suelta' : 'Regular'}</Td>
+                <Td>
+                  <Button 
+                    onClick={() => handleDelete(recibo.id)} 
+                    disabled={loading}
+                  >
+                    {loading ? 'Eliminando...' : 'Eliminar'}
+                  </Button>
+                </Td>
+              </Tr>
+            ))}
+          </tbody>
+        </Table>
+      </TableContainer>
+      )}
+    </Container>
+  );
 };
 
 export default Recibos;

@@ -82,6 +82,7 @@ interface Estilo {
   id: number;
   nombre: string;
   descripcion?: string;
+  importe: number;
   profesor?: {
     id: number;
     nombre: string;
@@ -101,7 +102,8 @@ const Estilos = () => {
   const [nuevoEstilo, setNuevoEstilo] = useState({
     nombre: '',
     descripcion: '',
-    profesorId: ''
+    profesorId: '',
+    importe: ''
   });
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ text: string; isError: boolean } | null>(null);
@@ -163,7 +165,7 @@ const Estilos = () => {
       }
       const estiloCreado = await res.json();
       setEstilos(prev => [...prev, estiloCreado]);
-      setNuevoEstilo({ nombre: '', descripcion: '', profesorId: '' });
+      setNuevoEstilo({ nombre: '', descripcion: '', profesorId: '', importe: '' });
       setMessage({ text: `Estilo ${estiloCreado.nombre} creado con éxito.`, isError: false });
     } catch (error) {
       console.error('Error creating estilo:', error);
@@ -204,6 +206,15 @@ const Estilos = () => {
             </option>
           ))}
         </Select>
+        <Input
+          type="number"
+          name="importe"
+          value={nuevoEstilo.importe}
+          onChange={handleInputChange}
+          placeholder="Importe"
+          required
+          step="0.01"
+        />
         <Button type="submit" disabled={loading}>
           {loading ? 'Agregando...' : 'Agregar Estilo'}
         </Button>
@@ -213,19 +224,21 @@ const Estilos = () => {
       )}
       <Table>
         <thead>
-          <Tr>
+        <Tr>
             <Th>Nombre</Th>
             <Th>Descripción</Th>
+            <Th>Importe</Th>
             <Th>Profesor Encargado</Th>
           </Tr>
         </thead>
         <tbody>
           {estilos.map((estilo) => (
             <Tr key={estilo.id}>
-              <Td>{estilo.nombre}</Td>
-              <Td>{estilo.descripcion}</Td>
-              <Td>{estilo.profesor ? `${estilo.profesor.nombre} ${estilo.profesor.apellido}` : 'No asignado'}</Td>
-            </Tr>
+            <Td>{estilo.nombre}</Td>
+            <Td>{estilo.descripcion}</Td>
+            <Td>${estilo.importe.toFixed(2)}</Td>
+            <Td>{estilo.profesor ? `${estilo.profesor.nombre} ${estilo.profesor.apellido}` : 'No asignado'}</Td>
+          </Tr>
           ))}
         </tbody>
       </Table>

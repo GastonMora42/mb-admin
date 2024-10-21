@@ -57,7 +57,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         ]
       });
 
-      // Agrupar recibos por alumno
+      // Agrupar recibos por alumnos
       const recibosAgrupados = recibos.reduce<RecibosAgrupados>((acc, recibo) => {
         const key = `${recibo.alumno.id}-${recibo.alumno.apellido}-${recibo.alumno.nombre}`;
         if (!acc[key]) {

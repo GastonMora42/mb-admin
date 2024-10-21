@@ -139,7 +139,8 @@ interface Recibo {
   id: number;
   numeroRecibo: number;
   fecha: string;
-  alumno: { id: number; nombre: string; apellido: string };
+  alumno?: { id: number; nombre: string; apellido: string };
+  alumnoSuelto?: { id: number; nombre: string; apellido: string };
   concepto: { id: number; nombre: string };
   periodoPago: string;
   fueraDeTermino: boolean;
@@ -232,6 +233,15 @@ const CajaDiaria = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const renderAlumnoNombre = (recibo: Recibo) => {
+    if (recibo.alumno) {
+      return `${recibo.alumno.nombre} ${recibo.alumno.apellido}`;
+    } else if (recibo.alumnoSuelto) {
+      return `${recibo.alumnoSuelto.nombre} ${recibo.alumnoSuelto.apellido} (Suelto)`;
+    }
+    return 'Desconocido';
   };
 
   const handleFiltroChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -367,34 +377,34 @@ const CajaDiaria = () => {
 
       {cajaData.recibos.length > 0 && (
         <>
-          <Table>
-            <thead>
-              <Tr>
-                <Th>N° Recibo</Th>
-                <Th>Fecha</Th>
-                <Th>Alumno</Th>
-                <Th>Concepto</Th>
-                <Th>Periodo</Th>
-                <Th>Fuera de Término</Th>
-                <Th>Importe</Th>
-                <Th>Tipo de Pago</Th>
-              </Tr>
-            </thead>
-            <tbody>
-              {cajaData.recibos.map((recibo) => (
-                <Tr key={recibo.id}>
-                  <Td>{recibo.numeroRecibo}</Td>
-                  <Td>{new Date(recibo.fecha).toLocaleDateString()}</Td>
-                  <Td>{`${recibo.alumno.nombre} ${recibo.alumno.apellido}`}</Td>
-                  <Td>{recibo.concepto.nombre}</Td>
-                  <Td>{recibo.periodoPago}</Td>
-                  <Td>{recibo.fueraDeTermino ? 'Sí' : 'No'}</Td>
-                  <Td>${recibo.monto.toFixed(2)}</Td>
-                  <Td>{recibo.tipoPago}</Td>
-                </Tr>
-              ))}
-            </tbody>
-            </Table>
+         <Table>
+  <thead>
+    <Tr>
+      <Th>N° Recibo</Th>
+      <Th>Fecha</Th>
+      <Th>Alumno</Th>
+      <Th>Concepto</Th>
+      <Th>Periodo</Th>
+      <Th>Fuera de Término</Th>
+      <Th>Importe</Th>
+      <Th>Tipo de Pago</Th>
+    </Tr>
+  </thead>
+  <tbody>
+    {cajaData.recibos.map((recibo) => (
+      <Tr key={recibo.id}>
+        <Td>{recibo.numeroRecibo}</Td>
+        <Td>{new Date(recibo.fecha).toLocaleDateString()}</Td>
+        <Td>{renderAlumnoNombre(recibo)}</Td>
+        <Td>{recibo.concepto.nombre}</Td>
+        <Td>{recibo.periodoPago}</Td>
+        <Td>{recibo.fueraDeTermino ? 'Sí' : 'No'}</Td>
+        <Td>${recibo.monto.toFixed(2)}</Td>
+        <Td>{recibo.tipoPago}</Td>
+      </Tr>
+    ))}
+  </tbody>
+</Table>
           
           <TotalesContainer>
             <TotalGeneral>Total General: ${cajaData.totalMonto.toFixed(2)}</TotalGeneral>

@@ -3,11 +3,9 @@ import styled from 'styled-components';
 import dynamic from 'next/dynamic';
 import type { ChartData, ChartOptions } from 'chart.js';
 
-// Importación dinámica de los componentes de gráficos y la configuración
 const DynamicPie = dynamic(() => import('react-chartjs-2').then(mod => mod.Pie), { ssr: false });
 const DynamicBar = dynamic(() => import('react-chartjs-2').then(mod => mod.Bar), { ssr: false });
 const DynamicChartConfig = dynamic(() => import('./ChartConfig'), { ssr: false });
-
 
 const DashboardContainer = styled.div`
   padding: 20px;
@@ -19,6 +17,13 @@ const DashboardTitle = styled.h1`
   text-align: center;
   margin-bottom: 50px;
 `;
+
+const pieOptions: ChartOptions<'pie'> = {
+  animation: {
+    duration: 1000,
+    easing: 'easeOutQuart'
+  }
+};
 
 const MetricsGrid = styled.div`
   display: grid;
@@ -63,7 +68,11 @@ interface DashboardData {
   totalAsistencias: number;
   ingresosMes: number;
   estilosPopulares: Array<{ nombre: string; _count: { alumnos: number } }>;
-  deudaTotal: number;
+  deudasMes: number;
+  deudasSaldadasMes: number;
+  deudasPendientesMes: number;
+  alumnosMasDeudas: Array<{ nombre: string; deuda: number }>;
+  estilosMasIngresos: Array<{ nombre: string; ingresos: number }>;
   mesActual: string;
 }
 
@@ -99,13 +108,35 @@ const Dashboard: React.FC = () => {
     ]
   };
 
-  const asistenciasData: ChartData<'bar'> = {
-    labels: ['Asistencias', 'Ausencias'],
+  const deudasData: ChartData<'pie'> = {
+    labels: ['Deudas Saldadas', 'Deudas Pendientes'],
     datasets: [
       {
-        label: 'Asistencias vs Ausencias',
-        data: [dashboardData.totalAsistencias, dashboardData.totalClases * dashboardData.alumnosActivos - dashboardData.totalAsistencias],
-        backgroundColor: ['#36A2EB', '#FF6384']
+        data: [dashboardData.deudasSaldadasMes, dashboardData.deudasPendientesMes],
+        backgroundColor: ['#36A2EB', '#FF6384'],
+        hoverBackgroundColor: ['#36A2EB', '#FF6384']
+      }
+    ]
+  };
+
+  const alumnosDeudasData: ChartData<'bar'> = {
+    labels: dashboardData.alumnosMasDeudas.map(a => a.nombre),
+    datasets: [
+      {
+        label: 'Deuda',
+        data: dashboardData.alumnosMasDeudas.map(a => a.deuda),
+        backgroundColor: '#FF6384'
+      }
+    ]
+  };
+
+  const estilosIngresosData: ChartData<'bar'> = {
+    labels: dashboardData.estilosMasIngresos.map(e => e.nombre),
+    datasets: [
+      {
+        label: 'Ingresos',
+        data: dashboardData.estilosMasIngresos.map(e => e.ingresos),
+        backgroundColor: '#36A2EB'
       }
     ]
   };
@@ -144,17 +175,25 @@ const Dashboard: React.FC = () => {
           <MetricValue>${dashboardData.ingresosMes.toFixed(2)}</MetricValue>
         </MetricCard>
         <MetricCard>
-          <MetricTitle>Deuda Total</MetricTitle>
-          <MetricValue>${dashboardData.deudaTotal.toFixed(2)}</MetricValue>
+          <MetricTitle>Deudas del Mes</MetricTitle>
+          <MetricValue>${dashboardData.deudasMes.toFixed(2)}</MetricValue>
         </MetricCard>
       </MetricsGrid>
       <ChartContainer>
         <h2>Estilos más Populares</h2>
-        <DynamicPie data={estilosData} />
+        <DynamicPie data={estilosData} options={pieOptions} />
       </ChartContainer>
       <ChartContainer>
-        <h2>Asistencias vs Ausencias</h2>
-        <DynamicBar data={asistenciasData} options={barOptions} />
+        <h2>Deudas del Mes</h2>
+        <DynamicPie data={deudasData} />
+      </ChartContainer>
+      <ChartContainer>
+        <h2>Alumnos con Más Deudas</h2>
+        <DynamicBar data={alumnosDeudasData} options={barOptions} />
+      </ChartContainer>
+      <ChartContainer>
+        <h2>Estilos con Más Ingresos</h2>
+        <DynamicBar data={estilosIngresosData} options={barOptions} />
       </ChartContainer>
     </DashboardContainer>
   );

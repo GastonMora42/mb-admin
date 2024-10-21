@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 
 const Container = styled.div`
-  background-color: #FFFFFF;
+  background-color: #FFFFFsF;
   padding: 30px;
   border-radius: 8px;
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
@@ -70,6 +70,7 @@ interface Alumno {
   id: number;
   nombre: string;
   apellido: string;
+  esAlumnoSuelto?: boolean;
 }
 
 interface Recibo {
@@ -77,7 +78,8 @@ interface Recibo {
   numeroRecibo: number;
   fecha: string;
   periodoPago: string;
-  alumno: Alumno;
+  alumno?: { nombre: string; apellido: string };
+  alumnoSuelto?: { nombre: string; apellido: string };
   concepto: { nombre: string };
   monto: number;
   tipoPago: string;
@@ -103,7 +105,10 @@ const CtaCte: React.FC = () => {
       const res = await fetch(`/api/ctacte?query=${searchTerm}`);
       if (res.ok) {
         const data = await res.json();
-        setAlumnos(data);
+        setAlumnos(data.map((a: any) => ({
+          ...a,
+          esAlumnoSuelto: 'alumnoRegularId' in a
+        })));
       }
     } catch (error) {
       console.error('Error fetching alumnos:', error);
@@ -130,6 +135,15 @@ const CtaCte: React.FC = () => {
     setAlumnos([]);
   };
 
+  const renderAlumnoNombre = (recibo: Recibo) => {
+    if (recibo.alumno) {
+      return `${recibo.alumno.nombre} ${recibo.alumno.apellido}`;
+    } else if (recibo.alumnoSuelto) {
+      return `${recibo.alumnoSuelto.nombre} ${recibo.alumnoSuelto.apellido} (Suelto)`;
+    }
+    return 'Desconocido';
+  };
+
   return (
     <Container>
       <Title>Cuenta Corriente</Title>
@@ -143,7 +157,7 @@ const CtaCte: React.FC = () => {
         <AlumnoList>
           {alumnos.map((alumno) => (
             <AlumnoItem key={alumno.id} onClick={() => handleAlumnoSelect(alumno)}>
-              {alumno.nombre} {alumno.apellido}
+              {alumno.nombre} {alumno.apellido} {alumno.esAlumnoSuelto ? '(Suelto)' : ''}
             </AlumnoItem>
           ))}
         </AlumnoList>
@@ -157,6 +171,7 @@ const CtaCte: React.FC = () => {
                 <Th>N° Recibo</Th>
                 <Th>Fecha</Th>
                 <Th>Periodo</Th>
+                <Th>Tipo de Alumno</Th>
                 <Th>Concepto</Th>
                 <Th>Importe</Th>
                 <Th>Forma de Pago</Th>
@@ -168,6 +183,7 @@ const CtaCte: React.FC = () => {
                   <Td>{recibo.numeroRecibo}</Td>
                   <Td>{new Date(recibo.fecha).toLocaleDateString()}</Td>
                   <Td>{recibo.periodoPago}</Td>
+                  <Td>{recibo.alumnoSuelto ? 'Suelto' : 'Regular'}</Td>
                   <Td>{recibo.concepto.nombre}</Td>
                   <Td>${recibo.monto.toFixed(2)}</Td>
                   <Td>{recibo.tipoPago}</Td>

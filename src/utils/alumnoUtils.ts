@@ -8,10 +8,9 @@ export async function generarDeudaMensual(alumnoId: number) {
   const alumno = await prisma.alumno.findUnique({
     where: { id: alumnoId },
     include: { 
-      estilos: {
-        include: {
-          conceptos: true
-        }
+      alumnoEstilos: {
+        where: { activo: true },
+        include: { estilo: true }
       }
     }
   });
@@ -22,11 +21,11 @@ export async function generarDeudaMensual(alumnoId: number) {
   const mes = fechaActual.getMonth() + 1;
   const anio = fechaActual.getFullYear();
 
-  for (const estilo of alumno.estilos) {
+  for (const alumnoEstilo of alumno.alumnoEstilos) {
     const deudaExistente = await prisma.deuda.findFirst({
       where: {
         alumnoId,
-        estiloId: estilo.id,
+        estiloId: alumnoEstilo.estiloId,
         mes: mes.toString(),
         anio,
         pagada: false
@@ -34,14 +33,11 @@ export async function generarDeudaMensual(alumnoId: number) {
     });
 
     if (!deudaExistente) {
-      const conceptoMensual = estilo.conceptos.find(c => c.nombre.toLowerCase().includes('mensual'));
-      const monto = conceptoMensual?.monto || 0;
-
       await prisma.deuda.create({
         data: {
           alumnoId,
-          estiloId: estilo.id,
-          monto,
+          estiloId: alumnoEstilo.estiloId,
+          monto: alumnoEstilo.estilo.importe,
           mes: mes.toString(),
           anio,
         }
@@ -50,28 +46,51 @@ export async function generarDeudaMensual(alumnoId: number) {
   }
 }
 
-export async function generarRecibo(alumnoId: number, estiloId: number, monto: number) {
+export async function generarRecibo(alumnoId: number, conceptoId: number, monto: number, tipoPago: string) {
   const recibo = await prisma.recibo.create({
     data: {
       alumnoId,
-      conceptoId: estiloId, // Asumimos que el conceptoId es el mismo que el estiloId
+      conceptoId,
       monto,
       periodoPago: `${new Date().getMonth() + 1}/${new Date().getFullYear()}`,
-      tipoPago: 'EFECTIVO', // Por defecto, puedes cambiarlo según necesites
+      tipoPago,
+      fecha: new Date(),
     }
   });
 
-  // Marcar la deuda como pagada
-  await prisma.deuda.updateMany({
+  // Obtener todas las deudas pendientes del alumno
+  const deudasPendientes = await prisma.deuda.findMany({
     where: {
       alumnoId,
-      estiloId,
-      mes: recibo.periodoPago.split('/')[0],
-      anio: parseInt(recibo.periodoPago.split('/')[1]),
       pagada: false
     },
-    data: { pagada: true }
+    orderBy: [
+      { anio: 'asc' },
+      { mes: 'asc' }
+    ]
   });
+
+  let montoRestante = monto;
+
+  // Saldar deudas
+  for (const deuda of deudasPendientes) {
+    if (montoRestante >= deuda.monto) {
+      await prisma.deuda.update({
+        where: { id: deuda.id },
+        data: { pagada: true }
+      });
+      montoRestante -= deuda.monto;
+    } else if (montoRestante > 0) {
+      // Si queda un monto parcial, actualizamos la deuda
+      await prisma.deuda.update({
+        where: { id: deuda.id },
+        data: { monto: deuda.monto - montoRestante }
+      });
+      montoRestante = 0;
+    } else {
+      break;
+    }
+  }
 
   return recibo;
 }
@@ -81,6 +100,12 @@ export async function darDeBajaAlumno(alumnoId: number) {
     where: { id: alumnoId },
     data: { activo: false }
   });
+
+  // Desactivar todos los estilos del alumno
+  await prisma.alumnoEstilos.updateMany({
+    where: { alumnoId },
+    data: { activo: false }
+  });
 }
 
 export async function reactivarAlumno(alumnoId: number) {
@@ -88,4 +113,14 @@ export async function reactivarAlumno(alumnoId: number) {
     where: { id: alumnoId },
     data: { activo: true }
   });
+}
+
+export async function generarDeudasMensualesParaTodos() {
+  const alumnosActivos = await prisma.alumno.findMany({
+    where: { activo: true }
+  });
+
+  for (const alumno of alumnosActivos) {
+    await generarDeudaMensual(alumno.id);
+  }
 }
