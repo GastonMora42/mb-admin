@@ -8,11 +8,11 @@ datasource db {
 }
 
 model Alumno {
-  id               Int       @id @default(autoincrement())
+  id               Int             @id @default(autoincrement())
   nombre           String
   apellido         String
-  dni              String    @unique
-  activo           Boolean   @default(true)
+  dni              String          @unique
+  activo           Boolean         @default(true)
   fechaNacimiento  DateTime
   email            String?
   telefono         String?
@@ -22,15 +22,15 @@ model Alumno {
   nombreTutor      String?
   dniTutor         String?
   notas            String?
-  fechaIngreso     DateTime  @default(now())
+  fechaIngreso     DateTime        @default(now())
   recibos          Recibo[]
   ctaCte           CtaCte?
-  estilos          Estilo[]  @relation("AlumnoEstilos")
+  estilos          Estilo[]        @relation("AlumnoEstilos")
   asistencias      Asistencia[]
   alumnoEstilos    AlumnoEstilos[]
   deudas           Deuda[]
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
 }
 
 model Deuda {
@@ -39,7 +39,7 @@ model Deuda {
   alumnoId  Int
   monto     Float
   mes       String
-  anio       Int
+  anio      Int
   estilo    Estilo   @relation(fields: [estiloId], references: [id])
   estiloId  Int
   pagada    Boolean  @default(false)
@@ -48,15 +48,15 @@ model Deuda {
 }
 
 model Concepto {
-  id              Int      @id @default(autoincrement())
-  nombre          String
-  descripcion     String?
-  monto           Float
-  estiloId        Int?
-  estilo          Estilo?  @relation(fields: [estiloId], references: [id])  // Añadido ? para hacerlo opcional
-  recibos         Recibo[]
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id          Int      @id @default(autoincrement())
+  nombre      String
+  descripcion String?
+  monto       Float
+  estiloId    Int?
+  estilo      Estilo?  @relation(fields: [estiloId], references: [id]) // Añadido ? para hacerlo opcional
+  recibos     Recibo[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 enum TipoPago {
@@ -68,36 +68,40 @@ enum TipoPago {
 }
 
 model Recibo {
-  id            Int      @id @default(autoincrement())
-  numeroRecibo  Int      @unique @default(autoincrement())
-  fecha         DateTime @default(now())
-  monto         Float
-  periodoPago   String
-  tipoPago      TipoPago
-  fueraDeTermino Boolean @default(false)
-  alumno        Alumno   @relation(fields: [alumnoId], references: [id])
-  alumnoId      Int
-  concepto      Concepto @relation(fields: [conceptoId], references: [id])
-  conceptoId    Int
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id             Int           @id @default(autoincrement())
+  numeroRecibo   Int           @unique @default(autoincrement())
+  fecha          DateTime      @default(now())
+  monto          Float
+  periodoPago    String
+  tipoPago       TipoPago
+  fueraDeTermino Boolean       @default(false)
+  esClaseSuelta  Boolean       @default(false)
+  alumno         Alumno?       @relation(fields: [alumnoId], references: [id])
+  alumnoId       Int?
+  alumnoSuelto   AlumnoSuelto? @relation(fields: [alumnoSueltoId], references: [id])
+  alumnoSueltoId Int?
+  concepto       Concepto      @relation(fields: [conceptoId], references: [id])
+  conceptoId     Int
+  claseId        Int?
+  clase          Clase?        @relation(fields: [claseId], references: [id])
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 }
 
-
 model Estilo {
-  id              Int       @id @default(autoincrement())
-  nombre          String
-  monto           Float     @default(0)
-  deudas          Deuda[]
-  conceptos       Concepto[]
-  clases          Clase[]
-  descripcion     String?
-  profesorId      Int?
-  alumnoEstilos   AlumnoEstilos[]
-  profesor        Profesor? @relation(fields: [profesorId], references: [id])
-  alumnos         Alumno[]  @relation("AlumnoEstilos")
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id            Int             @id @default(autoincrement())
+  nombre        String
+  monto         Float           @default(0)
+  deudas        Deuda[]
+  conceptos     Concepto[]
+  clases        Clase[]
+  descripcion   String?
+  profesorId    Int?
+  alumnoEstilos AlumnoEstilos[]
+  profesor      Profesor?       @relation(fields: [profesorId], references: [id])
+  alumnos       Alumno[]        @relation("AlumnoEstilos")
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
 }
 
 model AlumnoEstilos {
@@ -111,60 +115,61 @@ model AlumnoEstilos {
 }
 
 model Profesor {
-  id          Int      @id @default(autoincrement())
-  nombre      String
-  apellido    String
-  dni         String   @unique
-  email       String?
-  telefono    String?
-  clases      Clase[]
-  fechaIngreso DateTime @default(now())
-  estilos     Estilo[]
+  id            Int           @id @default(autoincrement())
+  nombre        String
+  apellido      String
+  dni           String        @unique
+  email         String?
+  telefono      String?
+  clases        Clase[]
+  fechaIngreso  DateTime      @default(now())
+  estilos       Estilo[]
   liquidaciones Liquidacion[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
 }
 
 model CtaCte {
-  id          Int      @id @default(autoincrement())
-  saldo       Float
-  alumno      Alumno   @relation(fields: [alumnoId], references: [id])
-  alumnoId    Int      @unique
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id        Int      @id @default(autoincrement())
+  saldo     Float
+  alumno    Alumno   @relation(fields: [alumnoId], references: [id])
+  alumnoId  Int      @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Liquidacion {
-  id          Int      @id @default(autoincrement())
-  fecha       DateTime @default(now())
-  monto       Float
-  profesor    Profesor @relation(fields: [profesorId], references: [id])
-  profesorId  Int
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id         Int      @id @default(autoincrement())
+  fecha      DateTime @default(now())
+  monto      Float
+  profesor   Profesor @relation(fields: [profesorId], references: [id])
+  profesorId Int
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 }
 
 model CajaDiaria {
-  id          Int      @id @default(autoincrement())
-  fecha       DateTime @default(now()) @unique
-  apertura    Float
-  cierre      Float
-  diferencia  Float
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id         Int      @id @default(autoincrement())
+  fecha      DateTime @unique @default(now())
+  apertura   Float
+  cierre     Float
+  diferencia Float
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 }
 
 model Clase {
-  id           Int          @id @default(autoincrement())
-  fecha        DateTime     @default(now())
-  profesorId   Int
-  profesor     Profesor     @relation(fields: [profesorId], references: [id])
-  estiloId     Int
-  estilo       Estilo       @relation(fields: [estiloId], references: [id])
-  asistencias  Asistencia[]
+  id             Int            @id @default(autoincrement())
+  fecha          DateTime       @default(now())
+  profesorId     Int
+  profesor       Profesor       @relation(fields: [profesorId], references: [id])
+  estiloId       Int
+  estilo         Estilo         @relation(fields: [estiloId], references: [id])
+  asistencias    Asistencia[]
   alumnosSueltos AlumnoSuelto[]
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
+  recibos        Recibo[]
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
 }
 
 model Asistencia {
@@ -180,12 +185,13 @@ model Asistencia {
 
 model AlumnoSuelto {
   id        Int      @id @default(autoincrement())
-  claseId   Int
-  clase     Clase    @relation(fields: [claseId], references: [id])
   nombre    String
   apellido  String
+  dni       String   @unique
   telefono  String?
   email     String?
+  recibos   Recibo[]
+  clases    Clase[] // Agrega esta línea para la relación inversa
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }

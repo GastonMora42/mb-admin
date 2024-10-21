@@ -1,41 +1,78 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
+import * as XLSX from 'xlsx';
+import { saveAs } from 'file-saver';
 
 const Container = styled.div`
   background-color: #FFFFFF;
   padding: 30px;
   border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+  max-width: 1000px;
+  margin: 0 auto;
 `;
 
 const Title = styled.h2`
-  color: #000000;
-  margin-bottom: 20px;
+  color: #333;
+  margin-bottom: 30px;
+  text-align: center;
 `;
 
 const Form = styled.form`
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-bottom: 30px;
+`;
+
+const FormGroup = styled.div`
   display: flex;
-  gap: 15px;
-  margin-bottom: 20px;
+  flex-direction: column;
+`;
+
+const Label = styled.label`
+  margin-bottom: 8px;
+  font-weight: bold;
+  color: #555;
 `;
 
 const Select = styled.select`
   padding: 10px;
-  border: 1px solid #ccc;
+  border: 1px solid #ddd;
   border-radius: 4px;
+  font-size: 16px;
+  background-color: #f9f9f9;
+  transition: border-color 0.3s;
+
+  &:focus {
+    outline: none;
+    border-color: #FFC001;
+  }
+`;
+
+const MultiSelect = styled(Select)`
+  height: 120px;
 `;
 
 const Button = styled.button`
   background-color: #FFC001;
   color: #000000;
   border: none;
-  padding: 10px 20px;
+  padding: 12px 20px;
   border-radius: 4px;
   cursor: pointer;
-  transition: background-color 0.3s;
+  transition: background-color 0.3s, transform 0.1s;
+  font-size: 16px;
+  font-weight: bold;
+  grid-column: 1 / -1;
+  width: 100%;
 
   &:hover {
     background-color: #e6ac00;
+  }
+
+  &:active {
+    transform: scale(0.98);
   }
 `;
 
@@ -70,6 +107,10 @@ const TotalContainer = styled.div`
   font-weight: bold;
 `;
 
+const ExportButton = styled(Button)`
+  margin-top: 20px;
+`;
+
 interface Concepto {
   id: number;
   nombre: string;
@@ -82,6 +123,7 @@ interface Recibo {
   alumno: { nombre: string; apellido: string };
   concepto: { nombre: string };
   monto: number;
+  tipoPago: string;
 }
 
 const Liquidaciones: React.FC = () => {
@@ -90,7 +132,8 @@ const Liquidaciones: React.FC = () => {
   const [periodo, setPeriodo] = useState('');
   const [conceptosSeleccionados, setConceptosSeleccionados] = useState<string[]>([]);
   const [recibos, setRecibos] = useState<Recibo[]>([]);
-  const [total, setTotal] = useState(0);
+  const [totalRegular, setTotalRegular] = useState(0);
+  const [totalSuelto, setTotalSuelto] = useState(0);
 
   useEffect(() => {
     fetchConceptos();
@@ -119,54 +162,95 @@ const Liquidaciones: React.FC = () => {
       if (res.ok) {
         const data = await res.json();
         setRecibos(data);
-        calcularTotal(data);
+        calcularTotales(data);
       }
     } catch (error) {
       console.error('Error fetching recibos:', error);
     }
   };
 
-  const handleMontoChange = (id: number, nuevoMonto: number) => {
-    const nuevosRecibos = recibos.map(recibo =>
-      recibo.id === id ? { ...recibo, monto: nuevoMonto } : recibo
-    );
-    setRecibos(nuevosRecibos);
-    calcularTotal(nuevosRecibos);
+  const calcularTotales = (recibos: Recibo[]) => {
+    const totalReg = recibos.filter(r => r.concepto.nombre !== 'Clase Suelta').reduce((sum, r) => sum + r.monto, 0);
+    const totalSue = recibos.filter(r => r.concepto.nombre === 'Clase Suelta').reduce((sum, r) => sum + r.monto, 0);
+    setTotalRegular(totalReg);
+    setTotalSuelto(totalSue);
   };
 
-  const calcularTotal = (recibos: Recibo[]) => {
-    const nuevoTotal = recibos.reduce((sum, recibo) => sum + recibo.monto, 0);
-    setTotal(nuevoTotal);
+  const exportToExcel = () => {
+    const wsData = recibos.map(recibo => ({
+      'N° Recibo': recibo.numeroRecibo,
+      'Fecha': new Date(recibo.fecha).toLocaleDateString(),
+      'Alumno': `${recibo.alumno.nombre} ${recibo.alumno.apellido}`,
+      'Concepto': recibo.concepto.nombre,
+      'Tipo de Pago': recibo.tipoPago,
+      'Importe': recibo.monto
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(wsData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Liquidaciones");
+
+    // Agregar filas con los totales
+    XLSX.utils.sheet_add_aoa(ws, [
+      ["Total Regular", "", "", "", "", totalRegular],
+      ["Total Clases Sueltas", "", "", "", "", totalSuelto],
+      ["Total General", "", "", "", "", totalRegular + totalSuelto]
+    ], { origin: -1 });
+
+    const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    const data = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    saveAs(data, `Liquidaciones_${año}_${periodo}.xlsx`);
   };
 
   return (
     <Container>
-      <Title>Liquidaciones</Title>
+      <Title>Generación de Liquidaciones</Title>
       <Form onSubmit={handleSubmit}>
-        <Select value={año} onChange={(e) => setAño(e.target.value)} required>
-          <option value="">Seleccione año</option>
-          {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map(year => (
-            <option key={year} value={year}>{year}</option>
-          ))}
-        </Select>
-        <Select value={periodo} onChange={(e) => setPeriodo(e.target.value)} required>
-          <option value="">Seleccione periodo</option>
-          {Array.from({ length: 12 }, (_, i) => i + 1).map(month => (
-            <option key={month} value={month.toString().padStart(2, '0')}>
-              {month.toString().padStart(2, '0')}
-            </option>
-          ))}
-        </Select>
-        <Select 
-          multiple 
-          value={conceptosSeleccionados}
-          onChange={(e) => setConceptosSeleccionados(Array.from(e.target.selectedOptions, option => option.value))}
-          required
-        >
-          {conceptos.map(concepto => (
-            <option key={concepto.id} value={concepto.id}>{concepto.nombre}</option>
-          ))}
-        </Select>
+        <FormGroup>
+          <Label htmlFor="año">Año</Label>
+          <Select id="año" value={año} onChange={(e) => setAño(e.target.value)} required>
+            <option value="">Seleccione año</option>
+            {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map(year => (
+              <option key={year} value={year}>{year}</option>
+            ))}
+          </Select>
+        </FormGroup>
+        <FormGroup>
+          <Label htmlFor="periodo">Período</Label>
+          <Select id="periodo" value={periodo} onChange={(e) => setPeriodo(e.target.value)} required>
+            <option value="">Seleccione período</option>
+            {[
+              { value: '01', label: 'Enero' },
+              { value: '02', label: 'Febrero' },
+              { value: '03', label: 'Marzo' },
+              { value: '04', label: 'Abril' },
+              { value: '05', label: 'Mayo' },
+              { value: '06', label: 'Junio' },
+              { value: '07', label: 'Julio' },
+              { value: '08', label: 'Agosto' },
+              { value: '09', label: 'Septiembre' },
+              { value: '10', label: 'Octubre' },
+              { value: '11', label: 'Noviembre' },
+              { value: '12', label: 'Diciembre' }
+            ].map(month => (
+              <option key={month.value} value={month.value}>{month.label}</option>
+            ))}
+          </Select>
+        </FormGroup>
+        <FormGroup style={{ gridColumn: '1 / -1' }}>
+          <Label htmlFor="conceptos">Conceptos (mantén Ctrl para selección múltiple)</Label>
+          <MultiSelect 
+            id="conceptos"
+            multiple 
+            value={conceptosSeleccionados}
+            onChange={(e) => setConceptosSeleccionados(Array.from(e.target.selectedOptions, option => option.value))}
+            required
+          >
+            {conceptos.map(concepto => (
+              <option key={concepto.id} value={concepto.id}>{concepto.nombre}</option>
+            ))}
+          </MultiSelect>
+        </FormGroup>
         <Button type="submit">Generar Liquidación</Button>
       </Form>
 
@@ -179,6 +263,7 @@ const Liquidaciones: React.FC = () => {
                 <Th>Fecha</Th>
                 <Th>Alumno</Th>
                 <Th>Concepto</Th>
+                <Th>Tipo de Pago</Th>
                 <Th>Importe</Th>
               </Tr>
             </thead>
@@ -189,21 +274,20 @@ const Liquidaciones: React.FC = () => {
                   <Td>{new Date(recibo.fecha).toLocaleDateString()}</Td>
                   <Td>{`${recibo.alumno.nombre} ${recibo.alumno.apellido}`}</Td>
                   <Td>{recibo.concepto.nombre}</Td>
-                  <Td>
-                    <input
-                      type="number"
-                      value={recibo.monto}
-                      onChange={(e) => handleMontoChange(recibo.id, Number(e.target.value))}
-                      step="0.01"
-                    />
-                  </Td>
+                  <Td>{recibo.tipoPago}</Td>
+                  <Td>${recibo.monto.toFixed(2)}</Td>
                 </Tr>
               ))}
             </tbody>
           </Table>
           <TotalContainer>
-            Total: ${total.toFixed(2)}
+            Total Regular: ${totalRegular.toFixed(2)}
+            <br />
+            Total Clases Sueltas: ${totalSuelto.toFixed(2)}
+            <br />
+            Total General: ${(totalRegular + totalSuelto).toFixed(2)}
           </TotalContainer>
+          <ExportButton onClick={exportToExcel}>Exportar a Excel</ExportButton>
         </>
       )}
     </Container>

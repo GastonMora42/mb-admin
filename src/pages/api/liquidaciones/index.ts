@@ -1,6 +1,28 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import prisma from '@/lib/prisma'
 
+interface ReciboAgrupado {
+  id: number;
+  numeroRecibo: number;
+  fecha: Date;
+  monto: number;
+  periodoPago: string;
+  tipoPago: string;
+  alumno: {
+    id: number;
+    nombre: string;
+    apellido: string;
+  };
+  concepto: {
+    id: number;
+    nombre: string;
+  };
+}
+
+interface RecibosAgrupados {
+  [key: string]: ReciboAgrupado[];
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'GET') {
     try {
@@ -28,10 +50,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           alumno: true,
           concepto: true
         },
-        orderBy: { fecha: 'asc' }
+        orderBy: [
+          { alumno: { apellido: 'asc' } },
+          { alumno: { nombre: 'asc' } },
+          { fecha: 'asc' }
+        ]
       });
 
-      res.status(200).json(recibos);
+      // Agrupar recibos por alumno
+      const recibosAgrupados = recibos.reduce<RecibosAgrupados>((acc, recibo) => {
+        const key = `${recibo.alumno.id}-${recibo.alumno.apellido}-${recibo.alumno.nombre}`;
+        if (!acc[key]) {
+          acc[key] = [];
+        }
+        acc[key].push(recibo);
+        return acc;
+      }, {});
+
+      // Ordenar y aplanar los recibos agrupados
+      const recibosOrdenados = Object.values(recibosAgrupados).flat();
+
+      res.status(200).json(recibosOrdenados);
     } catch (error) {
       console.error('Error al obtener recibos:', error);
       res.status(500).json({ error: 'Error al obtener recibos' });
@@ -41,3 +80,4 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     res.status(405).end(`Method ${req.method} Not Allowed`);
   }
 }
+
