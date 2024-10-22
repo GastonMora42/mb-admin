@@ -1,5 +1,6 @@
-import type { NextApiRequest, NextApiResponse } from 'next'
-import prisma from '@/lib/prisma'
+// pages/api/dashboard/index.ts
+import type { NextApiRequest, NextApiResponse } from 'next';
+import prisma from '@/lib/prisma';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'GET') {
@@ -9,84 +10,271 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const lastDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
 
       const [
-        totalAlumnos,
+        // Métricas básicas
         alumnosActivos,
-        nuevoAlumnos,
-        totalClases,
-        totalAsistencias,
-        ingresosMes,
-        estilosPopulares,
-        deudasMes,
-        deudasSaldadasMes,
-        deudasPendientesMes,
-        alumnosMasDeudas
+        alumnosNuevos,
+        alumnosInactivos,
+        clasesDelMes,
+        asistenciasDelMes,
+        
+        // Métricas financieras
+        ingresosDelMes,
+        deudasDelMes,
+        deudasPendientes,
+        
+        // Alumnos sueltos
+        alumnosSueltosMes,
+        
+        // Medios de pago
+        mediosPago
       ] = await Promise.all([
-        prisma.alumno.count(),
-        prisma.alumno.count({ where: { activo: true } }),
-        prisma.alumno.count({ where: { fechaIngreso: { gte: firstDayOfMonth, lte: lastDayOfMonth } } }),
-        prisma.clase.count({ where: { fecha: { gte: firstDayOfMonth, lte: lastDayOfMonth } } }),
-        prisma.asistencia.count({ where: { asistio: true, clase: { fecha: { gte: firstDayOfMonth, lte: lastDayOfMonth } } } }),
-        prisma.recibo.aggregate({ _sum: { monto: true }, where: { fecha: { gte: firstDayOfMonth, lte: lastDayOfMonth } } }),
-        prisma.estilo.findMany({
-          select: { id: true, nombre: true, _count: { select: { alumnos: true } } },
-          orderBy: { alumnos: { _count: 'desc' } },
-          take: 5
+        // Alumnos activos
+        prisma.alumno.count({
+          where: { activo: true }
         }),
-        prisma.deuda.aggregate({ _sum: { monto: true }, where: { mes: (currentDate.getMonth() + 1).toString(), anio: currentDate.getFullYear() } }),
-        prisma.deuda.aggregate({ _sum: { monto: true }, where: { mes: (currentDate.getMonth() + 1).toString(), anio: currentDate.getFullYear(), pagada: true } }),
-        prisma.deuda.aggregate({ _sum: { monto: true }, where: { mes: (currentDate.getMonth() + 1).toString(), anio: currentDate.getFullYear(), pagada: false } }),
-        prisma.alumno.findMany({
-          select: { id: true, nombre: true, apellido: true, deudas: { where: { pagada: false }, select: { monto: true } } },
-          orderBy: { deudas: { _count: 'desc' } },
-          take: 5
+
+        // Alumnos nuevos del mes
+        prisma.alumno.count({
+          where: {
+            fechaIngreso: {
+              gte: firstDayOfMonth,
+              lte: lastDayOfMonth
+            }
+          }
+        }),
+
+        // Alumnos inactivos
+        prisma.alumno.count({
+          where: { activo: false }
+        }),
+
+        // Clases del mes
+        prisma.clase.count({
+          where: {
+            fecha: {
+              gte: firstDayOfMonth,
+              lte: lastDayOfMonth
+            }
+          }
+        }),
+
+        // Asistencias del mes
+        prisma.asistencia.count({
+          where: {
+            asistio: true,
+            clase: {
+              fecha: {
+                gte: firstDayOfMonth,
+                lte: lastDayOfMonth
+              }
+            }
+          }
+        }),
+
+        // Ingresos del mes
+        prisma.recibo.aggregate({
+          where: {
+            fecha: {
+              gte: firstDayOfMonth,
+              lte: lastDayOfMonth
+            }
+          },
+          _sum: {
+            monto: true
+          }
+        }),
+
+        // Deudas del mes
+        prisma.deuda.aggregate({
+          where: {
+            mes: (currentDate.getMonth() + 1).toString(),
+            anio: currentDate.getFullYear()
+          },
+          _sum: {
+            monto: true
+          }
+        }),
+
+        // Deudas pendientes total
+        prisma.deuda.aggregate({
+          where: {
+            pagada: false
+          },
+          _sum: {
+            monto: true
+          }
+        }),
+
+        // Alumnos sueltos del mes
+        prisma.alumnoSuelto.count({
+          where: {
+            createdAt: {
+              gte: firstDayOfMonth,
+              lte: lastDayOfMonth
+            }
+          }
+        }),
+
+        // Medios de pago del mes
+        prisma.recibo.groupBy({
+          by: ['tipoPago'],
+          where: {
+            fecha: {
+              gte: firstDayOfMonth,
+              lte: lastDayOfMonth
+            }
+          },
+          _sum: {
+            monto: true
+          },
+          _count: true
         })
       ]);
 
-      // Consulta separada para estilos con más ingresos
-      const estilosIngresos = await prisma.estilo.findMany({
-        select: {
-          id: true,
-          nombre: true,
-          deudas: {
-            where: { 
-              pagada: true,
-              mes: (currentDate.getMonth() + 1).toString(),
-              anio: currentDate.getFullYear()
-            },
-            select: { monto: true }
-          }
-        }
-      });
+      // Rankings limitados
+      const [estilosPopulares, profesoresRanking, alumnosAsistencia] = await Promise.all([
+        // Top 5 estilos
+        prisma.estilo.findMany({
+          select: {
+            nombre: true,
+            _count: {
+              select: {
+                alumnoEstilos: {
+                  where: {
+                    activo: true,
+                    alumno: { activo: true }
+                  }
+                }
+              }
+            }
+          },
+          orderBy: {
+            alumnoEstilos: {
+              _count: 'desc'
+            }
+          },
+          take: 5
+        }),
 
-      const estilosMasIngresos = estilosIngresos
-        .map(e => ({
-          nombre: e.nombre,
-          ingresos: e.deudas.reduce((sum, d) => sum + d.monto, 0)
-        }))
-        .sort((a, b) => b.ingresos - a.ingresos)
-        .slice(0, 5);
+        // Top 5 profesores
+        prisma.profesor.findMany({
+          select: {
+            nombre: true,
+            apellido: true,
+            _count: {
+              select: {
+                clases: {
+                  where: {
+                    fecha: {
+                      gte: firstDayOfMonth,
+                      lte: lastDayOfMonth
+                    }
+                  }
+                }
+              }
+            }
+          },
+          orderBy: {
+            clases: {
+              _count: 'desc'
+            }
+          },
+          take: 5
+        }),
+
+        // Top 10 alumnos por asistencia
+        prisma.alumno.findMany({
+          where: { activo: true },
+          select: {
+            nombre: true,
+            apellido: true,
+            _count: {
+              select: {
+                asistencias: {
+                  where: {
+                    asistio: true,
+                    clase: {
+                      fecha: {
+                        gte: firstDayOfMonth,
+                        lte: lastDayOfMonth
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          orderBy: {
+            asistencias: {
+              _count: 'desc'
+            }
+          },
+          take: 10
+        })
+      ]);
+
+      // Procesamiento de medios de pago
+      const mediosPagoProcessed = mediosPago.reduce((acc, medio) => {
+        acc[medio.tipoPago] = {
+          monto: medio._sum.monto || 0,
+          cantidad: medio._count
+        };
+        return acc;
+      }, {} as Record<string, { monto: number; cantidad: number }>);
+
+      // Cálculo de tasas
+      const tasaCrecimiento = alumnosActivos > 0 
+        ? ((alumnosNuevos / alumnosActivos) * 100).toFixed(1)
+        : "0";
+
+      const tasaAsistencia = clasesDelMes > 0 && alumnosActivos > 0
+        ? ((asistenciasDelMes / (clasesDelMes * alumnosActivos)) * 100).toFixed(1)
+        : "0";
+
+      const tasaCobranza = deudasDelMes._sum?.monto 
+        ? ((ingresosDelMes._sum?.monto || 0) / deudasDelMes._sum.monto * 100).toFixed(1)
+        : "0";
 
       res.status(200).json({
-        totalAlumnos,
-        alumnosActivos,
-        nuevoAlumnos,
-        totalClases,
-        totalAsistencias,
-        ingresosMes: ingresosMes._sum?.monto || 0,
-        estilosPopulares,
-        deudasMes: deudasMes._sum?.monto || 0,
-        deudasSaldadasMes: deudasSaldadasMes._sum?.monto || 0,
-        deudasPendientesMes: deudasPendientesMes._sum?.monto || 0,
-        alumnosMasDeudas: alumnosMasDeudas.map(a => ({ 
-          nombre: `${a.nombre} ${a.apellido}`, 
-          deuda: a.deudas.reduce((sum, d) => sum + d.monto, 0)
-        })),
-        estilosMasIngresos,
-        mesActual: `${currentDate.toLocaleString('default', { month: 'long' })} ${currentDate.getFullYear()}`
+        metricas: {
+          alumnos: {
+            activos: alumnosActivos,
+            nuevos: alumnosNuevos,
+            inactivos: alumnosInactivos,
+            sueltos: alumnosSueltosMes,
+            tasaCrecimiento
+          },
+          clases: {
+            total: clasesDelMes,
+            asistencias: asistenciasDelMes,
+            tasaAsistencia
+          },
+          finanzas: {
+            ingresos: ingresosDelMes._sum?.monto || 0,
+            deudasMes: deudasDelMes._sum?.monto || 0,
+            deudasTotales: deudasPendientes._sum?.monto || 0,
+            tasaCobranza,
+            mediosPago: mediosPagoProcessed
+          }
+        },
+        rankings: {
+          estilosPopulares,
+          profesores: profesoresRanking,
+          alumnosAsistencia
+        },
+        periodo: {
+          mes: currentDate.toLocaleString('es-ES', { month: 'long' }),
+          anio: currentDate.getFullYear()
+        },
+        ultimaActualizacion: new Date().toISOString()
       });
+
     } catch (error) {
       console.error('Error al obtener datos del dashboard:', error);
-      res.status(500).json({ error: 'Error al obtener datos del dashboard' });
+      res.status(500).json({ 
+        error: 'Error al obtener datos del dashboard',
+        details: error instanceof Error ? error.message : 'Error desconocido'
+      });
     }
   } else {
     res.setHeader('Allow', ['GET']);
