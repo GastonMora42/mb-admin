@@ -78,7 +78,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
       });
 
-      // Si el alumno suelto está asociado a un alumno regular, devolvemos la información del alumno regular
+      // Si el alumno suelto está asociado a un alumno regular, devolvemos la información del alumno regulars
       if (recibo.alumnoSuelto && recibo.alumnoSuelto.alumnoRegular) {
         recibo.alumno = recibo.alumnoSuelto.alumnoRegular;
         recibo.alumnoSuelto = null;

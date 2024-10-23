@@ -223,8 +223,8 @@ model DetalleLiquidacion {
   id            Int         @id @default(autoincrement())
   liquidacion   Liquidacion @relation(fields: [liquidacionId], references: [id])
   liquidacionId Int
-  reciboId      Int        
-  recibo        Recibo     @relation(fields: [reciboId], references: [id])
+  reciboId      Int?       
+  recibo        Recibo?     @relation(fields: [reciboId], references: [id])
   montoOriginal Float
   porcentaje    Float
   montoLiquidado Float

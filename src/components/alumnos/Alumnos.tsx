@@ -196,7 +196,8 @@ const Alumnos = () => {
         body: JSON.stringify(alumnoData),
       });
       if (!res.ok) {
-        throw new Error('Error al crear alumno');
+        const error = await res.json();
+        throw new Error(error.error || 'Error al crear alumno');
       }
       const alumnoCreado = await res.json();
       setNuevoAlumno({
@@ -209,7 +210,6 @@ const Alumnos = () => {
       setMessage({ text: `Alumno ${alumnoCreado.nombre} ${alumnoCreado.apellido} creado con éxito y deuda mensual generada.`, isError: false });
     } catch (error) {
       console.error('Error creating alumno:', error);
-      setMessage({ text: 'Error al crear alumno. Por favor, intente nuevamente.', isError: true });
     } finally {
       setLoading(false);
     }
@@ -256,93 +256,106 @@ const Alumnos = () => {
       <Container>
         <Title>Alumnos</Title>
         <ScrollableContainer>
-        <Form onSubmit={handleSubmit}>
-        <Input
-          type="text"
-          name="nombre"
-          value={nuevoAlumno.nombre}
-          onChange={handleInputChange}
-          placeholder="Nombre"
-          required
-        />
-        <Input
-          type="text"
-          name="apellido"
-          value={nuevoAlumno.apellido}
-          onChange={handleInputChange}
-          placeholder="Apellido"
-          required
-        />
-        <Input
-          type="text"
-          name="dni"
-          value={nuevoAlumno.dni}
-          onChange={handleInputChange}
-          placeholder="DNI"
-          required
-        />
-        <Input
-          type="date"
-          name="fechaNacimiento"
-          value={nuevoAlumno.fechaNacimiento}
-          onChange={handleInputChange}
-          required
-        />
-        <Input
-          type="email"
-          name="email"
-          value={nuevoAlumno.email}
-          onChange={handleInputChange}
-          placeholder="Email"
-        />
-        <Input
-          type="tel"
-          name="telefono"
-          value={nuevoAlumno.telefono}
-          onChange={handleInputChange}
-          placeholder="Teléfono"
-        />
-        <Input
-          type="tel"
-          name="numeroEmergencia"
-          value={nuevoAlumno.numeroEmergencia}
-          onChange={handleInputChange}
-          placeholder="Número de Emergencia"
-        />
-        <Input
-          type="text"
-          name="direccion"
-          value={nuevoAlumno.direccion}
-          onChange={handleInputChange}
-          placeholder="Dirección"
-        />
-        <Input
-          type="text"
-          name="obraSocial"
-          value={nuevoAlumno.obraSocial}
-          onChange={handleInputChange}
-          placeholder="Obra Social"
-        />
-        <Input
-          type="text"
-          name="nombreTutor"
-          value={nuevoAlumno.nombreTutor}
-          onChange={handleInputChange}
-          placeholder="Nombre del Tutor (Opcional)"
-        />
-        <Input
-          type="text"
-          name="dniTutor"
-          value={nuevoAlumno.dniTutor}
-          onChange={handleInputChange}
-          placeholder="DNI del Tutor (Opcional)"
-        />
-        <TextArea
-          name="notas"
-          value={nuevoAlumno.notas}
-          onChange={handleInputChange}
-          placeholder="Notas (Opcional)"
-        />
+          <Form onSubmit={handleSubmit}>
+            <label>Nombre:</label>
+            <Input
+              type="text"
+              name="nombre"
+              value={nuevoAlumno.nombre}
+              onChange={handleInputChange}
+              placeholder="Nombre"
+              required
+            />
+            <label>Apellido:</label>
+            <Input
+              type="text"
+              name="apellido"
+              value={nuevoAlumno.apellido}
+              onChange={handleInputChange}
+              placeholder="Apellido"
+              required
+            />
+            <label>DNI:</label>
+            <Input
+              type="text"
+              name="dni"
+              value={nuevoAlumno.dni}
+              onChange={handleInputChange}
+              placeholder="DNI"
+              required
+            />
+            <label>Fecha de Nacimiento:</label>
+            <Input
+              type="date"
+              name="fechaNacimiento"
+              value={nuevoAlumno.fechaNacimiento}
+              onChange={handleInputChange}
+              required
+            />
+            <label>Email:</label>
+            <Input
+              type="email"
+              name="email"
+              value={nuevoAlumno.email}
+              onChange={handleInputChange}
+              placeholder="Email"
+            />
+            <label>Teléfono:</label>
+            <Input
+              type="tel"
+              name="telefono"
+              value={nuevoAlumno.telefono}
+              onChange={handleInputChange}
+              placeholder="Teléfono"
+            />
+            <label>Número de Emergencia:</label>
+            <Input
+              type="tel"
+              name="numeroEmergencia"
+              value={nuevoAlumno.numeroEmergencia}
+              onChange={handleInputChange}
+              placeholder="Número de Emergencia"
+            />
+            <label>Dirección:</label>
+            <Input
+              type="text"
+              name="direccion"
+              value={nuevoAlumno.direccion}
+              onChange={handleInputChange}
+              placeholder="Dirección"
+            />
+            <label>Obra Social:</label>
+            <Input
+              type="text"
+              name="obraSocial"
+              value={nuevoAlumno.obraSocial}
+              onChange={handleInputChange}
+              placeholder="Obra Social"
+            />
+            <label>Nombre del Tutor:</label>
+            <Input
+              type="text"
+              name="nombreTutor"
+              value={nuevoAlumno.nombreTutor}
+              onChange={handleInputChange}
+              placeholder="Nombre del Tutor (Opcional)"
+            />
+            <label>DNI del Tutor:</label>
+            <Input
+              type="text"
+              name="dniTutor"
+              value={nuevoAlumno.dniTutor}
+              onChange={handleInputChange}
+              placeholder="DNI del Tutor (Opcional)"
+            />
+            <label>Notas:</label>
+            <TextArea
+              name="notas"
+              value={nuevoAlumno.notas}
+              onChange={handleInputChange}
+              placeholder="Notas (Opcional)"
+            />
+            <label>Estilos:</label>
             <Select
               name="estilosIds"
               multiple
@@ -358,66 +371,66 @@ const Alumnos = () => {
             </Button>
           </Form>
         </ScrollableContainer>
-        
+  
         <Button onClick={() => setMostrarListado(!mostrarListado)}>
           {mostrarListado ? 'Ocultar Listado' : 'Mostrar Listado'}
         </Button>
-        
+  
         {mostrarListado && (
           <ScrollableContainer>
             <HorizontalScrollContainer>
-            <Table>
-  <thead>
-    <Tr>
-      <Th>Nombre</Th>
-      <Th>Apellido</Th>
-      <Th>DNI</Th>
-      <Th>Email</Th>
-      <Th>Teléfono</Th>
-      <Th>Emergencia</Th>
-      <Th>Dirección</Th>
-      <Th>Obra Social</Th>
-      <Th>Tutor</Th>
-      <Th>DNI Tutor</Th>
-      <Th>Estado</Th>
-      <Th>Estilos</Th>
-      <Th>Acciones</Th>
-    </Tr>
-  </thead>
-  <tbody>
-    {alumnos.map((alumno) => (
-      <Tr key={alumno.id}>
-        <Td>{alumno.nombre}</Td>
-        <Td>{alumno.apellido}</Td>
-        <Td>{alumno.dni}</Td>
-        <Td>{alumno.email}</Td>
-        <Td>{alumno.telefono}</Td>
-        <Td>{alumno.numeroEmergencia}</Td>
-        <Td>{alumno.direccion}</Td>
-        <Td>{alumno.obraSocial}</Td>
-        <Td>{alumno.nombreTutor}</Td>
-        <Td>{alumno.dniTutor}</Td>
-        <Td>{alumno.activo ? 'Activo' : 'Inactivo'}</Td>
-        <Td>
-          <EstilosComponent 
-            alumnoEstilos={alumno.alumnoEstilos} 
-            onEstiloToggle={handleEstiloAlumno}
-            alumnoId={alumno.id}
-          />
-        </Td>
-        <Td>
-          <Button onClick={() => handleEstadoAlumno(alumno.id, !alumno.activo)}>
-            {alumno.activo ? 'Dar de Baja' : 'Reactivar'}
-          </Button>
-        </Td>
-      </Tr>
-    ))}
-  </tbody>
-</Table>
+              <Table>
+                <thead>
+                  <Tr>
+                    <Th>Nombre</Th>
+                    <Th>Apellido</Th>
+                    <Th>DNI</Th>
+                    <Th>Email</Th>
+                    <Th>Teléfono</Th>
+                    <Th>Emergencia</Th>
+                    <Th>Dirección</Th>
+                    <Th>Obra Social</Th>
+                    <Th>Tutor</Th>
+                    <Th>DNI Tutor</Th>
+                    <Th>Estado</Th>
+                    <Th>Estilos</Th>
+                    <Th>Acciones</Th>
+                  </Tr>
+                </thead>
+                <tbody>
+                  {alumnos.map((alumno) => (
+                    <Tr key={alumno.id}>
+                      <Td>{alumno.nombre}</Td>
+                      <Td>{alumno.apellido}</Td>
+                      <Td>{alumno.dni}</Td>
+                      <Td>{alumno.email}</Td>
+                      <Td>{alumno.telefono}</Td>
+                      <Td>{alumno.numeroEmergencia}</Td>
+                      <Td>{alumno.direccion}</Td>
+                      <Td>{alumno.obraSocial}</Td>
+                      <Td>{alumno.nombreTutor}</Td>
+                      <Td>{alumno.dniTutor}</Td>
+                      <Td>{alumno.activo ? 'Activo' : 'Inactivo'}</Td>
+                      <Td>
+                        <EstilosComponent
+                          alumnoEstilos={alumno.alumnoEstilos}
+                          onEstiloToggle={handleEstiloAlumno}
+                          alumnoId={alumno.id}
+                        />
+                      </Td>
+                      <Td>
+                        <Button onClick={() => handleEstadoAlumno(alumno.id, !alumno.activo)}>
+                          {alumno.activo ? 'Dar de Baja' : 'Reactivar'}
+                        </Button>
+                      </Td>
+                    </Tr>
+                  ))}
+                </tbody>
+              </Table>
             </HorizontalScrollContainer>
           </ScrollableContainer>
         )}
-        
+  
         {message && (
           <Message isError={message.isError}>{message.text}</Message>
         )}
