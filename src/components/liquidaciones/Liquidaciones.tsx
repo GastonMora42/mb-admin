@@ -39,10 +39,8 @@ interface Concepto {
 interface FiltrosLiquidacion {
   profesorId?: number;
   alumnoId?: number;
-  fechaDesde: Date | null;
-  fechaHasta: Date | null;
+  periodo: string; // formato "YYYY-MM"
 }
-
 
 interface LiquidacionData {
   regularCount: number;
@@ -157,6 +155,7 @@ const Table = styled.table`
   margin-top: 20px;
 `;
 
+
 const Th = styled.th`
   background-color: #000000;
   color: #FFFFFF;
@@ -237,19 +236,103 @@ const LoadingSpinner = styled.div`
   }
 `;
 
+// Interfaces
+interface Profesor {
+  id: number;
+  nombre: string;
+  apellido: string;
+}
+
+interface Recibo {
+  id: number;
+  numeroRecibo: number;
+  fecha: string;
+  monto: number;
+  tipoPago: string;
+  alumno: Alumno | null;
+  concepto: {
+    nombre: string;
+  };
+}
+
+interface Alumno {
+  id: number;  // Añadido id
+  nombre: string;
+  apellido: string;
+}
+
+interface Concepto {
+  id: number;
+  nombre: string;
+}
+
+interface FiltrosLiquidacion {
+  profesorId?: number;
+  alumnoId?: number;
+  periodo: string;
+}
+
+interface LiquidacionData {
+  regularCount: number;
+  sueltasCount: number;
+  totalRegular: number;
+  totalSueltas: number;
+  montoLiquidacionRegular: number;
+  montoLiquidacionSueltas: number;
+  recibos: Recibo[];
+}
+
+
+// EditableAmount Component
+const EditableAmount: React.FC<{
+  value: number;
+  onChange: (value: number) => void;
+}> = ({ value, onChange }) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [tempValue, setTempValue] = useState(value.toFixed(2));
+
+  const handleBlur = () => {
+    const newValue = parseFloat(tempValue);
+    if (!isNaN(newValue)) {
+      onChange(newValue);
+    }
+    setIsEditing(false);
+  };
+
+  if (isEditing) {
+    return (
+      <Input
+        type="number"
+        step="0.01"
+        value={tempValue}
+        onChange={(e) => setTempValue(e.target.value)}
+        onBlur={handleBlur}
+        autoFocus
+        style={{ width: '100px' }}
+      />
+    );
+  }
+
+  return (
+    <span onClick={() => setIsEditing(true)} style={{ cursor: 'pointer' }}>
+      ${value.toFixed(2)}
+    </span>
+  );
+};
+
+// Main Component
 const Liquidaciones: React.FC = () => {
   const [profesores, setProfesores] = useState<Profesor[]>([]);
   const [alumnos, setAlumnos] = useState<Alumno[]>([]);
+  const [editableRecibos, setEditableRecibos] = useState<{[key: number]: number}>({});
   const [filtros, setFiltros] = useState<FiltrosLiquidacion>({
     profesorId: undefined,
     alumnoId: undefined,
-    fechaDesde: null,
-    fechaHasta: null
+    periodo: new Date().toISOString().slice(0, 7) // Formato YYYY-MM
   });
   const [liquidacionData, setLiquidacionData] = useState<LiquidacionData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
   useEffect(() => {
     fetchProfesores();
     fetchAlumnos();
@@ -267,82 +350,6 @@ const Liquidaciones: React.FC = () => {
     }
   };
 
-
-  const exportToExcel = () => {
-    if (!liquidacionData) return;
-  
-    // Crear los datos para el encabezado
-    const wsData = [
-      ['LIQUIDACIÓN'],
-      [''],
-      ['RESUMEN'],
-      ['Cursos Regulares'],
-      ['Cantidad de alumnos:', liquidacionData.regularCount],
-      ['Total recaudado:', `$${liquidacionData.totalRegular.toFixed(2)}`],
-      ['Porcentaje profesor:', '60%'],
-      ['Monto liquidación:', `$${liquidacionData.montoLiquidacionRegular.toFixed(2)}`],
-      [''],
-      ['Clases Sueltas'],
-      ['Cantidad de alumnos:', liquidacionData.sueltasCount],
-      ['Total recaudado:', `$${liquidacionData.totalSueltas.toFixed(2)}`],
-      ['Porcentaje profesor:', '80%'],
-      ['Monto liquidación:', `$${liquidacionData.montoLiquidacionSueltas.toFixed(2)}`],
-      [''],
-      ['TOTAL A LIQUIDAR:', `$${(liquidacionData.montoLiquidacionRegular + liquidacionData.montoLiquidacionSueltas).toFixed(2)}`],
-      [''],
-      ['DETALLE DE RECIBOS'],
-      ['N° Recibo', 'Fecha', 'Alumno', 'Concepto', 'Tipo de Pago', 'Monto', 'Liquidación'],
-      // Agregar los recibos
-      ...liquidacionData.recibos.map(recibo => [
-        recibo.numeroRecibo,
-        new Date(recibo.fecha).toLocaleDateString(),
-        recibo.alumno ? `${recibo.alumno.apellido}, ${recibo.alumno.nombre}` : 'Sin alumno',
-        recibo.concepto.nombre,
-        recibo.tipoPago,
-        `$${recibo.monto.toFixed(2)}`,
-        `$${(recibo.monto * (recibo.concepto.nombre === 'Clase Suelta' ? 0.8 : 0.6)).toFixed(2)}`
-      ])
-    ];
-  
-    // Crear el libro de trabajo
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.aoa_to_sheet(wsData);
-  
-    // Configurar ancho de columnas
-    const wscols = [
-      { wch: 15 }, // N° Recibo
-      { wch: 15 }, // Fecha
-      { wch: 30 }, // Alumno
-      { wch: 20 }, // Concepto
-      { wch: 15 }, // Tipo de Pago
-      { wch: 12 }, // Monto
-      { wch: 12 }  // Liquidación
-    ];
-  
-    ws['!cols'] = wscols;
-  
-    // Agregar la hoja al libro
-    XLSX.utils.book_append_sheet(wb, ws, 'Liquidación');
-  
-    // Generar el buffer
-    const excelBuffer = XLSX.write(wb, { 
-      bookType: 'xlsx', 
-      type: 'array' 
-    });
-  
-    // Crear el blob y guardarlo
-    const data = new Blob([excelBuffer], { 
-      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
-    });
-  
-    // Obtener la fecha actual para el nombre del archivo
-    const fecha = new Date().toLocaleDateString().replace(/\//g, '-');
-    
-    // Guardar el archivo
-    saveAs(data, `Liquidacion_${fecha}.xlsx`);
-  };
-
-
   const fetchAlumnos = async () => {
     try {
       const res = await fetch('/api/alumnos');
@@ -357,12 +364,10 @@ const Liquidaciones: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!filtros.fechaDesde || !filtros.fechaHasta) {
-      setError('Por favor seleccione un rango de fechas');
+    if (!filtros.periodo) {
+      setError('Por favor seleccione un período');
       return;
     }
-
-  
 
     setLoading(true);
     setError(null);
@@ -371,11 +376,7 @@ const Liquidaciones: React.FC = () => {
       const res = await fetch('/api/liquidaciones', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          ...filtros,
-          fechaDesde: filtros.fechaDesde.toISOString(),
-          fechaHasta: filtros.fechaHasta.toISOString()
-        }),
+        body: JSON.stringify(filtros),
       });
 
       if (!res.ok) {
@@ -384,47 +385,106 @@ const Liquidaciones: React.FC = () => {
 
       const data = await res.json();
       setLiquidacionData(data);
+      // Reiniciar los montos editables cuando se carga nueva data
+      setEditableRecibos({});
     } catch (error) {
       setError('Error al generar la liquidación');
       console.error('Error generando liquidación:', error);
     } finally {
       setLoading(false);
     }
+  };
 
+  const exportToExcel = () => {
+    if (!liquidacionData) return;
+
+    const totalRegularEditado = liquidacionData.recibos
+      .filter(r => r.concepto.nombre !== 'Clase Suelta')
+      .reduce((sum, r) => sum + (editableRecibos[r.id] ?? (r.monto * 0.6)), 0);
+
+    const totalSueltasEditado = liquidacionData.recibos
+      .filter(r => r.concepto.nombre === 'Clase Suelta')
+      .reduce((sum, r) => sum + (editableRecibos[r.id] ?? (r.monto * 0.8)), 0);
+
+    const profesor = filtros.profesorId 
+      ? profesores.find(p => p.id === filtros.profesorId)
+      : null;
+
+    const wsData = [
+      ['LIQUIDACIÓN DE PROFESORES'],
+      [`Período: ${filtros.periodo}`],
+      profesor ? [`Profesor: ${profesor.apellido}, ${profesor.nombre}`] : ['Todos los profesores'],
+      [''],
+      ['RESUMEN'],
+      ['Cursos Regulares'],
+      ['Cantidad de alumnos:', liquidacionData.regularCount],
+      ['Total a liquidar:', `$${totalRegularEditado.toFixed(2)}`],
+      [''],
+      ['Clases Sueltas'],
+      ['Cantidad de alumnos:', liquidacionData.sueltasCount],
+      ['Total a liquidar:', `$${totalSueltasEditado.toFixed(2)}`],
+      [''],
+      ['TOTAL A LIQUIDAR:', `$${(totalRegularEditado + totalSueltasEditado).toFixed(2)}`],
+      [''],
+      ['DETALLE DE RECIBOS'],
+      ['N° Recibo', 'Fecha', 'Alumno', 'Concepto', 'Tipo de Pago', 'Monto Original', 'Monto a Liquidar'],
+      ...liquidacionData.recibos.map(recibo => [
+        recibo.numeroRecibo,
+        new Date(recibo.fecha).toLocaleDateString(),
+        recibo.alumno ? `${recibo.alumno.apellido}, ${recibo.alumno.nombre}` : 'Sin alumno',
+        recibo.concepto.nombre,
+        recibo.tipoPago,
+        `$${recibo.monto.toFixed(2)}`,
+        `$${(editableRecibos[recibo.id] ?? (recibo.monto * (recibo.concepto.nombre === 'Clase Suelta' ? 0.8 : 0.6))).toFixed(2)}`
+      ])
+    ];
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+    const wscols = [
+      { wch: 15 }, // N° Recibo
+      { wch: 15 }, // Fecha
+      { wch: 30 }, // Alumno
+      { wch: 20 }, // Concepto
+      { wch: 15 }, // Tipo de Pago
+      { wch: 15 }, // Monto Original
+      { wch: 15 }  // Monto a Liquidar
+    ];
+
+    ws['!cols'] = wscols;
+
+    XLSX.utils.book_append_sheet(wb, ws, 'Liquidación');
+
+    const excelBuffer = XLSX.write(wb, { 
+      bookType: 'xlsx', 
+      type: 'array' 
+    });
+
+    const data = new Blob([excelBuffer], { 
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+    });
     
+    saveAs(data, `Liquidacion_${filtros.periodo}${profesor ? `_${profesor.apellido}` : ''}.xlsx`);
   };
 
   return (
-  <Container>
+    <Container>
       <Title>Generación de Liquidaciones</Title>
       
       {error && <ErrorMessage>{error}</ErrorMessage>}
 
       <Form onSubmit={handleSubmit}>
         <FormGroup>
-          <Label htmlFor="fechaDesde">Fecha Desde</Label>
+          <Label htmlFor="periodo">Período</Label>
           <Input
-            type="date"
-            id="fechaDesde"
+            type="month"
+            id="periodo"
             required
-            value={filtros.fechaDesde ? filtros.fechaDesde.toISOString().split('T')[0] : ''}
+            value={filtros.periodo}
             onChange={(e) => setFiltros(prev => ({
               ...prev,
-              fechaDesde: e.target.value ? new Date(e.target.value) : null
-            }))}
-          />
-        </FormGroup>
-
-        <FormGroup>
-          <Label htmlFor="fechaHasta">Fecha Hasta</Label>
-          <Input
-            type="date"
-            id="fechaHasta"
-            required
-            value={filtros.fechaHasta ? filtros.fechaHasta.toISOString().split('T')[0] : ''}
-            onChange={(e) => setFiltros(prev => ({
-              ...prev,
-              fechaHasta: e.target.value ? new Date(e.target.value) : null
+              periodo: e.target.value
             }))}
           />
         </FormGroup>
@@ -433,7 +493,7 @@ const Liquidaciones: React.FC = () => {
           <Label htmlFor="profesor">Profesor (Opcional)</Label>
           <Select 
             id="profesor" 
-            value={filtros.profesorId || ''} 
+            value={filtros.profesorId || ''}
             onChange={(e) => setFiltros(prev => ({
               ...prev,
               profesorId: e.target.value ? Number(e.target.value) : undefined
@@ -452,7 +512,7 @@ const Liquidaciones: React.FC = () => {
           <Label htmlFor="alumno">Alumno (Opcional)</Label>
           <Select 
             id="alumno" 
-            value={filtros.alumnoId || ''} 
+            value={filtros.alumnoId || ''}
             onChange={(e) => setFiltros(prev => ({
               ...prev,
               alumnoId: e.target.value ? Number(e.target.value) : undefined
@@ -460,7 +520,7 @@ const Liquidaciones: React.FC = () => {
           >
             <option value="">Todos los alumnos</option>
             {alumnos.map(alumno => (
-              <option key={alumno.nombre} value={alumno.nombre}>
+              <option key={alumno.id} value={alumno.id}>
                 {`${alumno.apellido}, ${alumno.nombre}`}
               </option>
             ))}
@@ -510,25 +570,36 @@ const Liquidaciones: React.FC = () => {
                 <Th>Alumno</Th>
                 <Th>Concepto</Th>
                 <Th>Tipo de Pago</Th>
-                <Th>Monto</Th>
-                <Th>Liquidación</Th>
+                <Th>Monto Original</Th>
+                <Th>Monto a Liquidar</Th>
               </tr>
             </thead>
             <tbody>
               {liquidacionData.recibos.map((recibo) => {
                 const porcentaje = recibo.concepto.nombre === 'Clase Suelta' ? 0.8 : 0.6;
+                const montoLiquidacion = editableRecibos[recibo.id] ?? (recibo.monto * porcentaje);
+                
                 return (
                   <tr key={recibo.id}>
                     <Td>{recibo.numeroRecibo}</Td>
                     <Td>{new Date(recibo.fecha).toLocaleDateString()}</Td>
                     <Td>
-  {recibo.alumno ? `${recibo.alumno.apellido}, ${recibo.alumno.nombre}` : 'Sin alumno'}
-</Td>
-
+                      {recibo.alumno ? `${recibo.alumno.apellido}, ${recibo.alumno.nombre}` : 'Sin alumno'}
+                    </Td>
                     <Td>{recibo.concepto.nombre}</Td>
                     <Td>{recibo.tipoPago}</Td>
                     <Td>${recibo.monto.toFixed(2)}</Td>
-                    <Td>${(recibo.monto * porcentaje).toFixed(2)}</Td>
+                    <Td>
+                      <EditableAmount
+                        value={montoLiquidacion}
+                        onChange={(newValue) => {
+                          setEditableRecibos(prev => ({
+                            ...prev,
+                            [recibo.id]: newValue
+                          }));
+                        }}
+                      />
+                    </Td>
                   </tr>
                 );
               })}

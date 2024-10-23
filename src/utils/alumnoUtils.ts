@@ -1,6 +1,6 @@
 // utils/alumnoUtils.ts
 
-import { PrismaClient, Alumno, Estilo, Deuda, Recibo } from '@prisma/client';
+import { PrismaClient, Alumno, Estilo, Deuda, Recibo, TipoPago } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -46,14 +46,19 @@ export async function generarDeudaMensual(alumnoId: number) {
   }
 }
 
-export async function generarRecibo(alumnoId: number, conceptoId: number, monto: number, tipoPago: string) {
+export async function generarRecibo(
+  alumnoId: number, 
+  conceptoId: number, 
+  monto: number, 
+  tipoPago: TipoPago  // Cambiado de string a TipoPago
+) {
   const recibo = await prisma.recibo.create({
     data: {
       alumnoId,
       conceptoId,
       monto,
       periodoPago: `${new Date().getMonth() + 1}/${new Date().getFullYear()}`,
-      tipoPago,
+      tipoPago, // Ahora tipoPago debe ser uno de los valores del enum
       fecha: new Date(),
     }
   });

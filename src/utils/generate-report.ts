@@ -28,6 +28,7 @@ const cajaDiaria = await prisma.cajaDiaria.findFirst({
     },
     include: {
       alumno: true,
+      alumnoSuelto: true,  // Añadimos esto
       concepto: true,
     },
   });
@@ -117,14 +118,14 @@ const cajaDiaria = await prisma.cajaDiaria.findFirst({
             <th>Tipo de Pago</th>
           </tr>
           ${recibos.map(r => `
-            <tr>
-              <td>${r.numeroRecibo}</td>
-              <td>${r.alumno.nombre} ${r.alumno.apellido}</td>
-              <td>${r.concepto.nombre}</td>
-              <td>$${r.monto.toFixed(2)}</td>
-              <td>${r.tipoPago}</td>
-            </tr>
-          `).join('')}
+  <tr>
+    <td>${r.numeroRecibo}</td>
+    <td>${r.alumno ? `${r.alumno.nombre} ${r.alumno.apellido}` : 'Sin alumno'}</td>
+    <td>${r.concepto.nombre}</td>
+    <td>$${r.monto.toFixed(2)}</td>
+    <td>${r.tipoPago}</td>
+  </tr>
+`).join('')}
         </table>
       ` : '<p>No se generaron recibos en este día.</p>'}
     </div>

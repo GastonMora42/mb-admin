@@ -11,8 +11,7 @@ interface LiquidacionResponse {
   montoLiquidacionRegular: number;
   montoLiquidacionSueltas: number;
   recibos: any[];
-  fechaDesde: string;
-  fechaHasta: string;
+  periodo: string;
   detallesPorProfesor?: {
     [key: string]: {
       nombre: string;
@@ -50,19 +49,24 @@ export default async function handler(
   }
 
   if (req.method === 'POST') {
-    const { fechaDesde, fechaHasta, profesorId, alumnoId } = req.body;
+    const { periodo, profesorId, alumnoId } = req.body;
 
     try {
-      // Validación de fechas
-      if (!fechaDesde || !fechaHasta) {
-        return res.status(400).json({ error: 'Las fechas son requeridas' });
+      // Validación del período
+      if (!periodo) {
+        return res.status(400).json({ error: 'El período es requerido' });
       }
 
+      // Extraer año y mes del período
+      const [year, month] = periodo.split('-');
+      const startDate = new Date(Number(year), Number(month) - 1, 1);
+      const endDate = new Date(Number(year), Number(month), 0); // último día del mes
+
       // Construimos el where dinámicamente
-      const where: any = {
+      const where: Prisma.ReciboWhereInput = {
         AND: [
-          { fecha: { gte: new Date(fechaDesde) } },
-          { fecha: { lte: new Date(fechaHasta) } }
+          { fecha: { gte: startDate } },
+          { fecha: { lte: endDate } }
         ]
       };
 
@@ -166,47 +170,47 @@ export default async function handler(
         montoLiquidacionRegular,
         montoLiquidacionSueltas,
         recibos,
-        fechaDesde,
-        fechaHasta,
+        periodo,
         detallesPorProfesor: Object.keys(detallesPorProfesor).length > 0 ? detallesPorProfesor : undefined
       };
 
-if (recibos.length > 0) {
-  const createData: Prisma.LiquidacionCreateInput = {
-    fecha: new Date(),
-    mes: new Date(fechaDesde).getMonth() + 1,
-    anio: new Date(fechaDesde).getFullYear(),
-    montoTotal: montoLiquidacionRegular + montoLiquidacionSueltas,
-    montoCursos: montoLiquidacionRegular,
-    montoClasesSueltas: montoLiquidacionSueltas,
-    porcentajeCursos: 0.60,
-    porcentajeClasesSueltas: 0.80,
-    estado: 'PENDIENTE',
-    ...(profesorId ? {
-      profesor: {
-        connect: {
-          id: Number(profesorId)
-        }
-      }
-    } : {}),
-    detalles: {
-      create: recibos.map(recibo => ({
-        montoOriginal: recibo.monto,
-        porcentaje: recibo.concepto.nombre === 'Clase Suelta' ? 0.8 : 0.6,
-        montoLiquidado: recibo.monto * (recibo.concepto.nombre === 'Clase Suelta' ? 0.8 : 0.6),
-        recibo: {
-          connect: {
-            id: recibo.id
+      // Guardamos la liquidación en la base de datos si hay recibos
+      if (recibos.length > 0) {
+        const createData: Prisma.LiquidacionCreateInput = {
+          fecha: new Date(),
+          mes: Number(month),
+          anio: Number(year),
+          montoTotal: montoLiquidacionRegular + montoLiquidacionSueltas,
+          montoCursos: montoLiquidacionRegular,
+          montoClasesSueltas: montoLiquidacionSueltas,
+          porcentajeCursos: 0.60,
+          porcentajeClasesSueltas: 0.80,
+          estado: 'PENDIENTE',
+          ...(profesorId ? {
+            profesor: {
+              connect: {
+                id: Number(profesorId)
+              }
+            }
+          } : {}),
+          detalles: {
+            create: recibos.map(recibo => ({
+              montoOriginal: recibo.monto,
+              porcentaje: recibo.concepto.nombre === 'Clase Suelta' ? 0.8 : 0.6,
+              montoLiquidado: recibo.monto * (recibo.concepto.nombre === 'Clase Suelta' ? 0.8 : 0.6),
+              recibo: {
+                connect: {
+                  id: recibo.id
+                }
+              }
+            }))
           }
-        }
-      }))
-    }
-  };
+        };
 
-  await prisma.liquidacion.create({
-    data: createData
-  });
-}
+        await prisma.liquidacion.create({
+          data: createData
+        });
+      }
 
       return res.status(200).json(liquidacionData);
     } catch (error) {
@@ -218,7 +222,6 @@ if (recibos.length > 0) {
     }
   }
 
-  // Si el método HTTP no está permitido
   res.setHeader('Allow', ['GET', 'POST']);
   return res.status(405).end(`Method ${req.method} Not Allowed`);
 }
