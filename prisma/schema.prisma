@@ -83,6 +83,7 @@ model Recibo {
   alumnoSueltoId Int?
   concepto       Concepto      @relation(fields: [conceptoId], references: [id])
   conceptoId     Int
+  detallesLiquidacion DetalleLiquidacion[]
   claseId        Int?
   clase          Clase?        @relation(fields: [claseId], references: [id])
   createdAt      DateTime      @default(now())
@@ -141,16 +142,6 @@ model CtaCte {
   updatedAt DateTime @updatedAt
 }
 
-model Liquidacion {
-  id         Int      @id @default(autoincrement())
-  fecha      DateTime @default(now())
-  monto      Float
-  profesor   Profesor @relation(fields: [profesorId], references: [id])
-  profesorId Int
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-}
-
 model CajaDiaria {
   id         Int      @id @default(autoincrement())
   fecha      DateTime @unique @default(now())
@@ -199,4 +190,44 @@ model AlumnoSuelto {
   alumnoRegular   Alumno?  @relation("AlumnoSueltoRegular", fields: [alumnoRegularId], references: [id])
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+}
+
+enum EstadoLiquidacion {
+  PENDIENTE
+  PAGADA
+  ANULADA
+}
+
+model Liquidacion {
+  id              Int               @id @default(autoincrement())
+  fecha           DateTime          @default(now())
+  mes             Int
+  anio            Int
+  profesor        Profesor?         @relation(fields: [profesorId], references: [id]) // Hacemos la relación opcional
+  profesorId      Int?              // Hacemos el campo opcional
+  montoTotal      Float
+  montoCursos     Float
+  montoClasesSueltas Float
+  porcentajeCursos Float           @default(0.60)  // 60% por defecto
+  porcentajeClasesSueltas Float    @default(0.80)  // 80% por defecto
+  estado          EstadoLiquidacion @default(PENDIENTE)
+  metodoPago      TipoPago?
+  fechaPago       DateTime?
+  observaciones   String?
+  detalles        DetalleLiquidacion[]
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+}
+
+model DetalleLiquidacion {
+  id            Int         @id @default(autoincrement())
+  liquidacion   Liquidacion @relation(fields: [liquidacionId], references: [id])
+  liquidacionId Int
+  reciboId      Int        
+  recibo        Recibo     @relation(fields: [reciboId], references: [id])
+  montoOriginal Float
+  porcentaje    Float
+  montoLiquidado Float
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
 }

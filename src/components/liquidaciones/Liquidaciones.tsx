@@ -1,7 +1,58 @@
+
+
+// components/Liquidaciones.tsx
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
+
+// Interfaces
+interface Profesor {
+  id: number;
+  nombre: string;
+  apellido: string;
+}
+
+interface Recibo {
+  id: number;
+  numeroRecibo: number;
+  fecha: string;
+  monto: number;
+  tipoPago: string;
+  alumno: Alumno | null; // asegúrate de que puede ser null
+  concepto: {
+    nombre: string;
+  };
+}
+
+interface Alumno {
+  nombre: string;
+  apellido: string;
+}
+
+interface Concepto {
+  id: number;
+  nombre: string;
+}
+
+
+interface FiltrosLiquidacion {
+  profesorId?: number;
+  alumnoId?: number;
+  fechaDesde: Date | null;
+  fechaHasta: Date | null;
+}
+
+
+interface LiquidacionData {
+  regularCount: number;
+  sueltasCount: number;
+  totalRegular: number;
+  totalSueltas: number;
+  montoLiquidacionRegular: number;
+  montoLiquidacionSueltas: number;
+  recibos: Recibo[];
+}
 
 const Container = styled.div`
   background-color: #FFFFFF;
@@ -16,6 +67,30 @@ const Title = styled.h2`
   color: #333;
   margin-bottom: 30px;
   text-align: center;
+`;
+
+const Input = styled.input`
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 16px;
+  width: 100%;
+  background-color: #f9f9f9;
+  transition: border-color 0.3s;
+
+  &:focus {
+    outline: none;
+    border-color: #FFC001;
+  }
+`;
+
+const ErrorMessage = styled.div`
+  color: #dc3545;
+  padding: 10px;
+  margin-bottom: 20px;
+  background-color: #f8d7da;
+  border: 1px solid #f5c6cb;
+  border-radius: 4px;
 `;
 
 const Form = styled.form`
@@ -111,183 +186,357 @@ const ExportButton = styled(Button)`
   margin-top: 20px;
 `;
 
-interface Concepto {
-  id: number;
-  nombre: string;
-}
+const ResumenContainer = styled.div`
+  margin: 20px 0;
+  padding: 20px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+`;
 
-interface Recibo {
-  id: number;
-  numeroRecibo: number;
-  fecha: string;
-  alumno: { nombre: string; apellido: string };
-  concepto: { nombre: string };
-  monto: number;
-  tipoPago: string;
-}
+const ResumenGrid = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin: 20px 0;
+`;
+
+const ResumenItem = styled.div`
+  background-color: white;
+  padding: 15px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+
+  div {
+    margin: 5px 0;
+    font-size: 14px;
+  }
+`;
+
+const TotalGeneral = styled.div`
+  text-align: right;
+  font-size: 18px;
+  font-weight: bold;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 2px solid #ddd;
+`;
+
+const LoadingSpinner = styled.div`
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  border: 3px solid #f3f3f3;
+  border-top: 3px solid #3498db;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-right: 10px;
+
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+`;
 
 const Liquidaciones: React.FC = () => {
-  const [conceptos, setConceptos] = useState<Concepto[]>([]);
-  const [año, setAño] = useState('');
-  const [periodo, setPeriodo] = useState('');
-  const [conceptosSeleccionados, setConceptosSeleccionados] = useState<string[]>([]);
-  const [recibos, setRecibos] = useState<Recibo[]>([]);
-  const [totalRegular, setTotalRegular] = useState(0);
-  const [totalSuelto, setTotalSuelto] = useState(0);
+  const [profesores, setProfesores] = useState<Profesor[]>([]);
+  const [alumnos, setAlumnos] = useState<Alumno[]>([]);
+  const [filtros, setFiltros] = useState<FiltrosLiquidacion>({
+    profesorId: undefined,
+    alumnoId: undefined,
+    fechaDesde: null,
+    fechaHasta: null
+  });
+  const [liquidacionData, setLiquidacionData] = useState<LiquidacionData | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchConceptos();
+    fetchProfesores();
+    fetchAlumnos();
   }, []);
 
-  const fetchConceptos = async () => {
+  const fetchProfesores = async () => {
     try {
-      const res = await fetch('/api/liquidaciones');
-      if (res.ok) {
-        const data = await res.json();
-        setConceptos(data);
-      }
+      const res = await fetch('/api/profesores');
+      if (!res.ok) throw new Error('Error al cargar profesores');
+      const data = await res.json();
+      setProfesores(data);
     } catch (error) {
-      console.error('Error fetching conceptos:', error);
+      setError('Error al cargar los profesores');
+      console.error('Error fetching profesores:', error);
+    }
+  };
+
+
+  const exportToExcel = () => {
+    if (!liquidacionData) return;
+  
+    // Crear los datos para el encabezado
+    const wsData = [
+      ['LIQUIDACIÓN'],
+      [''],
+      ['RESUMEN'],
+      ['Cursos Regulares'],
+      ['Cantidad de alumnos:', liquidacionData.regularCount],
+      ['Total recaudado:', `$${liquidacionData.totalRegular.toFixed(2)}`],
+      ['Porcentaje profesor:', '60%'],
+      ['Monto liquidación:', `$${liquidacionData.montoLiquidacionRegular.toFixed(2)}`],
+      [''],
+      ['Clases Sueltas'],
+      ['Cantidad de alumnos:', liquidacionData.sueltasCount],
+      ['Total recaudado:', `$${liquidacionData.totalSueltas.toFixed(2)}`],
+      ['Porcentaje profesor:', '80%'],
+      ['Monto liquidación:', `$${liquidacionData.montoLiquidacionSueltas.toFixed(2)}`],
+      [''],
+      ['TOTAL A LIQUIDAR:', `$${(liquidacionData.montoLiquidacionRegular + liquidacionData.montoLiquidacionSueltas).toFixed(2)}`],
+      [''],
+      ['DETALLE DE RECIBOS'],
+      ['N° Recibo', 'Fecha', 'Alumno', 'Concepto', 'Tipo de Pago', 'Monto', 'Liquidación'],
+      // Agregar los recibos
+      ...liquidacionData.recibos.map(recibo => [
+        recibo.numeroRecibo,
+        new Date(recibo.fecha).toLocaleDateString(),
+        recibo.alumno ? `${recibo.alumno.apellido}, ${recibo.alumno.nombre}` : 'Sin alumno',
+        recibo.concepto.nombre,
+        recibo.tipoPago,
+        `$${recibo.monto.toFixed(2)}`,
+        `$${(recibo.monto * (recibo.concepto.nombre === 'Clase Suelta' ? 0.8 : 0.6)).toFixed(2)}`
+      ])
+    ];
+  
+    // Crear el libro de trabajo
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+  
+    // Configurar ancho de columnas
+    const wscols = [
+      { wch: 15 }, // N° Recibo
+      { wch: 15 }, // Fecha
+      { wch: 30 }, // Alumno
+      { wch: 20 }, // Concepto
+      { wch: 15 }, // Tipo de Pago
+      { wch: 12 }, // Monto
+      { wch: 12 }  // Liquidación
+    ];
+  
+    ws['!cols'] = wscols;
+  
+    // Agregar la hoja al libro
+    XLSX.utils.book_append_sheet(wb, ws, 'Liquidación');
+  
+    // Generar el buffer
+    const excelBuffer = XLSX.write(wb, { 
+      bookType: 'xlsx', 
+      type: 'array' 
+    });
+  
+    // Crear el blob y guardarlo
+    const data = new Blob([excelBuffer], { 
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+    });
+  
+    // Obtener la fecha actual para el nombre del archivo
+    const fecha = new Date().toLocaleDateString().replace(/\//g, '-');
+    
+    // Guardar el archivo
+    saveAs(data, `Liquidacion_${fecha}.xlsx`);
+  };
+
+
+  const fetchAlumnos = async () => {
+    try {
+      const res = await fetch('/api/alumnos');
+      if (!res.ok) throw new Error('Error al cargar alumnos');
+      const data = await res.json();
+      setAlumnos(data);
+    } catch (error) {
+      setError('Error al cargar los alumnos');
+      console.error('Error fetching alumnos:', error);
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!filtros.fechaDesde || !filtros.fechaHasta) {
+      setError('Por favor seleccione un rango de fechas');
+      return;
+    }
+
+  
+
+    setLoading(true);
+    setError(null);
+    
     try {
       const res = await fetch('/api/liquidaciones', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ año, periodo, conceptosIds: conceptosSeleccionados.map(Number) }),
+        body: JSON.stringify({ 
+          ...filtros,
+          fechaDesde: filtros.fechaDesde.toISOString(),
+          fechaHasta: filtros.fechaHasta.toISOString()
+        }),
       });
-      if (res.ok) {
-        const data = await res.json();
-        setRecibos(data);
-        calcularTotales(data);
+
+      if (!res.ok) {
+        throw new Error('Error al generar la liquidación');
       }
+
+      const data = await res.json();
+      setLiquidacionData(data);
     } catch (error) {
-      console.error('Error fetching recibos:', error);
+      setError('Error al generar la liquidación');
+      console.error('Error generando liquidación:', error);
+    } finally {
+      setLoading(false);
     }
-  };
 
-  const calcularTotales = (recibos: Recibo[]) => {
-    const totalReg = recibos.filter(r => r.concepto.nombre !== 'Clase Suelta').reduce((sum, r) => sum + r.monto, 0);
-    const totalSue = recibos.filter(r => r.concepto.nombre === 'Clase Suelta').reduce((sum, r) => sum + r.monto, 0);
-    setTotalRegular(totalReg);
-    setTotalSuelto(totalSue);
-  };
-
-  const exportToExcel = () => {
-    const wsData = recibos.map(recibo => ({
-      'N° Recibo': recibo.numeroRecibo,
-      'Fecha': new Date(recibo.fecha).toLocaleDateString(),
-      'Alumno': `${recibo.alumno.nombre} ${recibo.alumno.apellido}`,
-      'Concepto': recibo.concepto.nombre,
-      'Tipo de Pago': recibo.tipoPago,
-      'Importe': recibo.monto
-    }));
-
-    const ws = XLSX.utils.json_to_sheet(wsData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Liquidaciones");
-
-    // Agregar filas con los totales
-    XLSX.utils.sheet_add_aoa(ws, [
-      ["Total Regular", "", "", "", "", totalRegular],
-      ["Total Clases Sueltas", "", "", "", "", totalSuelto],
-      ["Total General", "", "", "", "", totalRegular + totalSuelto]
-    ], { origin: -1 });
-
-    const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-    const data = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    saveAs(data, `Liquidaciones_${año}_${periodo}.xlsx`);
+    
   };
 
   return (
-    <Container>
+  <Container>
       <Title>Generación de Liquidaciones</Title>
+      
+      {error && <ErrorMessage>{error}</ErrorMessage>}
+
       <Form onSubmit={handleSubmit}>
         <FormGroup>
-          <Label htmlFor="año">Año</Label>
-          <Select id="año" value={año} onChange={(e) => setAño(e.target.value)} required>
-            <option value="">Seleccione año</option>
-            {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map(year => (
-              <option key={year} value={year}>{year}</option>
-            ))}
-          </Select>
-        </FormGroup>
-        <FormGroup>
-          <Label htmlFor="periodo">Período</Label>
-          <Select id="periodo" value={periodo} onChange={(e) => setPeriodo(e.target.value)} required>
-            <option value="">Seleccione período</option>
-            {[
-              { value: '01', label: 'Enero' },
-              { value: '02', label: 'Febrero' },
-              { value: '03', label: 'Marzo' },
-              { value: '04', label: 'Abril' },
-              { value: '05', label: 'Mayo' },
-              { value: '06', label: 'Junio' },
-              { value: '07', label: 'Julio' },
-              { value: '08', label: 'Agosto' },
-              { value: '09', label: 'Septiembre' },
-              { value: '10', label: 'Octubre' },
-              { value: '11', label: 'Noviembre' },
-              { value: '12', label: 'Diciembre' }
-            ].map(month => (
-              <option key={month.value} value={month.value}>{month.label}</option>
-            ))}
-          </Select>
-        </FormGroup>
-        <FormGroup style={{ gridColumn: '1 / -1' }}>
-          <Label htmlFor="conceptos">Conceptos (mantén Ctrl para selección múltiple)</Label>
-          <MultiSelect 
-            id="conceptos"
-            multiple 
-            value={conceptosSeleccionados}
-            onChange={(e) => setConceptosSeleccionados(Array.from(e.target.selectedOptions, option => option.value))}
+          <Label htmlFor="fechaDesde">Fecha Desde</Label>
+          <Input
+            type="date"
+            id="fechaDesde"
             required
-          >
-            {conceptos.map(concepto => (
-              <option key={concepto.id} value={concepto.id}>{concepto.nombre}</option>
-            ))}
-          </MultiSelect>
+            value={filtros.fechaDesde ? filtros.fechaDesde.toISOString().split('T')[0] : ''}
+            onChange={(e) => setFiltros(prev => ({
+              ...prev,
+              fechaDesde: e.target.value ? new Date(e.target.value) : null
+            }))}
+          />
         </FormGroup>
-        <Button type="submit">Generar Liquidación</Button>
+
+        <FormGroup>
+          <Label htmlFor="fechaHasta">Fecha Hasta</Label>
+          <Input
+            type="date"
+            id="fechaHasta"
+            required
+            value={filtros.fechaHasta ? filtros.fechaHasta.toISOString().split('T')[0] : ''}
+            onChange={(e) => setFiltros(prev => ({
+              ...prev,
+              fechaHasta: e.target.value ? new Date(e.target.value) : null
+            }))}
+          />
+        </FormGroup>
+
+        <FormGroup>
+          <Label htmlFor="profesor">Profesor (Opcional)</Label>
+          <Select 
+            id="profesor" 
+            value={filtros.profesorId || ''} 
+            onChange={(e) => setFiltros(prev => ({
+              ...prev,
+              profesorId: e.target.value ? Number(e.target.value) : undefined
+            }))}
+          >
+            <option value="">Todos los profesores</option>
+            {profesores.map(profesor => (
+              <option key={profesor.id} value={profesor.id}>
+                {`${profesor.apellido}, ${profesor.nombre}`}
+              </option>
+            ))}
+          </Select>
+        </FormGroup>
+
+        <FormGroup>
+          <Label htmlFor="alumno">Alumno (Opcional)</Label>
+          <Select 
+            id="alumno" 
+            value={filtros.alumnoId || ''} 
+            onChange={(e) => setFiltros(prev => ({
+              ...prev,
+              alumnoId: e.target.value ? Number(e.target.value) : undefined
+            }))}
+          >
+            <option value="">Todos los alumnos</option>
+            {alumnos.map(alumno => (
+              <option key={alumno.nombre} value={alumno.nombre}>
+                {`${alumno.apellido}, ${alumno.nombre}`}
+              </option>
+            ))}
+          </Select>
+        </FormGroup>
+
+        <Button type="submit" disabled={loading}>
+          {loading ? (
+            <>
+              <LoadingSpinner />
+              Generando...
+            </>
+          ) : 'Generar Liquidación'}
+        </Button>
       </Form>
 
-      {recibos.length > 0 && (
+      {liquidacionData && (
         <>
+          <ResumenContainer>
+            <h3>Resumen de Liquidación</h3>
+            <ResumenGrid>
+              <ResumenItem>
+                <h4>Cursos Regulares</h4>
+                <div>Cantidad de alumnos: {liquidacionData.regularCount}</div>
+                <div>Total recaudado: ${liquidacionData.totalRegular.toFixed(2)}</div>
+                <div>Porcentaje profesor: 60%</div>
+                <div>Monto liquidación: ${liquidacionData.montoLiquidacionRegular.toFixed(2)}</div>
+              </ResumenItem>
+              <ResumenItem>
+                <h4>Clases Sueltas</h4>
+                <div>Cantidad de alumnos: {liquidacionData.sueltasCount}</div>
+                <div>Total recaudado: ${liquidacionData.totalSueltas.toFixed(2)}</div>
+                <div>Porcentaje profesor: 80%</div>
+                <div>Monto liquidación: ${liquidacionData.montoLiquidacionSueltas.toFixed(2)}</div>
+              </ResumenItem>
+            </ResumenGrid>
+            <TotalGeneral>
+              Total a Liquidar: ${(liquidacionData.montoLiquidacionRegular + liquidacionData.montoLiquidacionSueltas).toFixed(2)}
+            </TotalGeneral>
+          </ResumenContainer>
+
           <Table>
             <thead>
-              <Tr>
+              <tr>
                 <Th>N° Recibo</Th>
                 <Th>Fecha</Th>
                 <Th>Alumno</Th>
                 <Th>Concepto</Th>
                 <Th>Tipo de Pago</Th>
-                <Th>Importe</Th>
-              </Tr>
+                <Th>Monto</Th>
+                <Th>Liquidación</Th>
+              </tr>
             </thead>
             <tbody>
-              {recibos.map((recibo) => (
-                <Tr key={recibo.id}>
-                  <Td>{recibo.numeroRecibo}</Td>
-                  <Td>{new Date(recibo.fecha).toLocaleDateString()}</Td>
-                  <Td>{`${recibo.alumno.nombre} ${recibo.alumno.apellido}`}</Td>
-                  <Td>{recibo.concepto.nombre}</Td>
-                  <Td>{recibo.tipoPago}</Td>
-                  <Td>${recibo.monto.toFixed(2)}</Td>
-                </Tr>
-              ))}
+              {liquidacionData.recibos.map((recibo) => {
+                const porcentaje = recibo.concepto.nombre === 'Clase Suelta' ? 0.8 : 0.6;
+                return (
+                  <tr key={recibo.id}>
+                    <Td>{recibo.numeroRecibo}</Td>
+                    <Td>{new Date(recibo.fecha).toLocaleDateString()}</Td>
+                    <Td>
+  {recibo.alumno ? `${recibo.alumno.apellido}, ${recibo.alumno.nombre}` : 'Sin alumno'}
+</Td>
+
+                    <Td>{recibo.concepto.nombre}</Td>
+                    <Td>{recibo.tipoPago}</Td>
+                    <Td>${recibo.monto.toFixed(2)}</Td>
+                    <Td>${(recibo.monto * porcentaje).toFixed(2)}</Td>
+                  </tr>
+                );
+              })}
             </tbody>
           </Table>
-          <TotalContainer>
-            Total Regular: ${totalRegular.toFixed(2)}
-            <br />
-            Total Clases Sueltas: ${totalSuelto.toFixed(2)}
-            <br />
-            Total General: ${(totalRegular + totalSuelto).toFixed(2)}
-          </TotalContainer>
-          <ExportButton onClick={exportToExcel}>Exportar a Excel</ExportButton>
+          <ExportButton onClick={exportToExcel}>
+            Exportar a Excel
+          </ExportButton>
         </>
       )}
     </Container>
