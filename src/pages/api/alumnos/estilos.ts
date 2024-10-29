@@ -11,7 +11,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(400).json({ error: 'alumnoId y estiloId son requeridos' })
       }
 
-      // Convertir IDs a números y validar
       const parsedAlumnoId = parseInt(alumnoId)
       const parsedEstiloId = parseInt(estiloId)
 
@@ -19,100 +18,151 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(400).json({ error: 'IDs inválidos' })
       }
 
-      // Verificar que el alumno y el estilo existen
-      const [alumnoExists, estiloExists] = await Promise.all([
-        prisma.alumno.findUnique({ where: { id: parsedAlumnoId } }),
-        prisma.estilo.findUnique({ where: { id: parsedEstiloId } })
-      ])
+      await prisma.$transaction(async (prisma) => {
+        // Actualizar o crear la relación estilo-alumno
+        if (activo) {
+          await prisma.alumnoEstilos.upsert({
+            where: {
+              alumnoId_estiloId: {
+                alumnoId: parsedAlumnoId,
+                estiloId: parsedEstiloId
+              }
+            },
+            update: { 
+              activo: true,
+              fechaInicio: new Date() 
+            },
+            create: {
+              alumnoId: parsedAlumnoId,
+              estiloId: parsedEstiloId,
+              activo: true,
+              fechaInicio: new Date()
+            }
+          });
 
-      if (!alumnoExists || !estiloExists) {
-        return res.status(404).json({ error: 'Alumno o estilo no encontrado' })
-      }
+          // Crear deuda para el nuevo estilo
+          const estilo = await prisma.estilo.findUnique({
+            where: { id: parsedEstiloId }
+          });
 
-      // Actualizar o crear la relación
-      if (activo) {
-        await prisma.alumnoEstilos.upsert({
-          where: {
-            alumnoId_estiloId: {
+          if (estilo) {
+            const currentDate = new Date();
+            await prisma.deuda.create({
+              data: {
+                alumnoId: parsedAlumnoId,
+                estiloId: parsedEstiloId,
+                monto: estilo.monto,
+                montoOriginal: estilo.monto,
+                mes: (currentDate.getMonth() + 1).toString(),
+                anio: currentDate.getFullYear(),
+                fechaVencimiento: new Date(
+                  currentDate.getFullYear(),
+                  currentDate.getMonth(),
+                  10
+                ),
+                pagada: false
+              }
+            });
+          }
+        } else {
+          await prisma.alumnoEstilos.updateMany({
+            where: {
               alumnoId: parsedAlumnoId,
               estiloId: parsedEstiloId
+            },
+            data: { 
+              activo: false,
+              fechaFin: new Date()
             }
-          },
-          update: { 
-            activo: true 
-          },
-          create: {
-            alumnoId: parsedAlumnoId,
-            estiloId: parsedEstiloId,
-            activo: true
-          }
-        })
-      } else {
-        // Intentar desactivar solo si existe
-        await prisma.alumnoEstilos.updateMany({
+          });
+        }
+
+        // Recalcular descuentos automáticos
+        const estilosActivos = await prisma.alumnoEstilos.count({
           where: {
             alumnoId: parsedAlumnoId,
-            estiloId: parsedEstiloId
-          },
-          data: { 
-            activo: false 
+            activo: true
           }
-        })
-      }
-      
-      // Obtener el alumno actualizado con sus estilos
+        });
+
+        // Desactivar descuentos automáticos anteriores
+        await prisma.descuentoAplicado.updateMany({
+          where: {
+            alumnoId: parsedAlumnoId,
+            descuento: {
+              esAutomatico: true
+            },
+            activo: true
+          },
+          data: {
+            activo: false,
+            fechaFin: new Date()
+          }
+        });
+
+        // Aplicar nuevo descuento automático si corresponde
+        if (estilosActivos >= 2) {
+          const descuentoAutomatico = await prisma.descuento.findFirst({
+            where: {
+              esAutomatico: true,
+              minEstilos: {
+                lte: estilosActivos
+              },
+              activo: true
+            },
+            orderBy: {
+              porcentaje: 'desc'
+            }
+          });
+
+          if (descuentoAutomatico) {
+            await prisma.descuentoAplicado.create({
+              data: {
+                alumnoId: parsedAlumnoId,
+                descuentoId: descuentoAutomatico.id,
+                fechaInicio: new Date(),
+                activo: true
+              }
+            });
+          }
+        }
+      });
+
+      // Obtener alumno actualizado con toda su información
       const alumnoActualizado = await prisma.alumno.findUnique({
-        where: { 
-          id: parsedAlumnoId 
-        },
+        where: { id: parsedAlumnoId },
         include: { 
           alumnoEstilos: {
+            include: {
+              estilo: true
+            }
+          },
+          descuentosVigentes: {
             where: {
-              activo: true // Solo incluir estilos activos
+              activo: true
             },
             include: {
-              estilo: {
-                select: {
-                  id: true,
-                  nombre: true,
-                  monto: true
-                }
-              }
+              descuento: true
             }
           }
         }
-      })
-      
-      // Crear una deuda automática si se está activando un estilo
-      if (activo) {
-        const currentDate = new Date()
-        await prisma.deuda.create({
-          data: {
-            alumnoId: parsedAlumnoId,
-            estiloId: parsedEstiloId,
-            monto: estiloExists.monto,
-            mes: (currentDate.getMonth() + 1).toString(),
-            anio: currentDate.getFullYear(),
-            pagada: false
-          }
-        })
-      }
+      });
 
       res.status(200).json({
         success: true,
         alumno: alumnoActualizado,
         message: activo ? 'Estilo activado correctamente' : 'Estilo desactivado correctamente'
-      })
+      });
 
     } catch (error) {
-      console.error('Error al actualizar estilo del alumno:', error)
+      console.error('Error al actualizar estilo del alumno:', error);
       res.status(500).json({ 
         error: 'Error al actualizar estilo del alumno',
         details: error instanceof Error ? error.message : 'Error desconocido'
-      })
+      });
     }
   } else {
-    res.setHeader('Allow', ['PATCH'])
-    res.status(405).end(`Method ${req.method} Not Allowed`)
+    res.setHeader('Allow', ['PATCH']);
+    res.status(405).end(`Method ${req.method} Not Allowed`);
   }
 }

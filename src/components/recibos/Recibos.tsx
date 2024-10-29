@@ -916,7 +916,7 @@ const crearRecibosPendientes = async () => {
           </InputGroup>
   
           <InputGroup>
-            <InputLabel>Descuento Manual (%)</InputLabel>
+            <InputLabel>Puedes aplicar un descuento Manual (%)</InputLabel>
             <Input
               type="number"
               name="descuentoManual"

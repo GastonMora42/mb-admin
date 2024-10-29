@@ -9,7 +9,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           id: true,
           nombre: true,
           descripcion: true,
-          importe: true,
+          importe: true,        // Lo mantenemos por compatibilidad
+          monto: true,          // Añadimos este
           profesor: {
             select: {
               id: true,
@@ -19,31 +20,40 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           }
         },
         orderBy: { nombre: 'asc' }
-      })
-      res.status(200).json(estilos)
+      });
+  
+      // Asegurarnos de que siempre devolvemos un valor en monto
+      const estilosConMonto = estilos.map(estilo => ({
+        ...estilo,
+        monto: estilo.importe || 0  // Usamos importe como monto
+      }));
+  
+      res.status(200).json(estilosConMonto);
     } catch (error) {
-      console.error('Error al obtener estilos:', error)
-      res.status(500).json({ error: 'Error al obtener estilos' })
+      console.error('Error al obtener estilos:', error);
+      res.status(500).json({ error: 'Error al obtener estilos' });
     }
   } else if (req.method === 'POST') {
     try {
-      const { nombre, descripcion, profesorId, importe } = req.body
+      const { nombre, descripcion, profesorId, importe } = req.body;
+      const importeNumerico = parseFloat(importe);
+      
       const estilo = await prisma.estilo.create({
         data: {
           nombre,
           descripcion,
-          importe: parseFloat(importe),
+          importe: importeNumerico,
+          monto: importeNumerico,     // Agregamos este campo
           profesor: profesorId ? { connect: { id: parseInt(profesorId) } } : undefined
         },
-        include: { profesor: true }
-      })
-      res.status(201).json(estilo)
+        include: { 
+          profesor: true 
+        }
+      });
+      res.status(201).json(estilo);
     } catch (error) {
-      console.error('Error al crear estilo:', error)
-      res.status(400).json({ error: 'Error al crear estilo' })
+      console.error('Error al crear estilo:', error);
+      res.status(400).json({ error: 'Error al crear estilo' });
     }
-  } else {
-    res.setHeader('Allow', ['GET', 'POST'])
-    res.status(405).end(`Method ${req.method} Not Allowed`)
   }
-}
+};

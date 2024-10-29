@@ -1,4 +1,5 @@
 export type Alumno = {
+    descuentosVigentes: any;
     id: number;
     nombre: string;
     apellido: string;
@@ -26,7 +27,7 @@ export type Alumno = {
   export type Estilo = {
     id: number;
     nombre: string;
-    monto: number;
+    monto: number; 
     descripcion: string | null;
     profesorId: number | null;
     profesor: Profesor | null;
@@ -44,6 +45,8 @@ export type Alumno = {
     estilo: Estilo;
     estiloId: number;
     activo: boolean;
+    fechaInicio: Date;
+    fechaFin?: Date;
   };
   
  // Actualizar el tipo Deuda:

@@ -124,11 +124,13 @@ const Alumnos = () => {
     nombreTutor: '',
     dniTutor: '',
     notas: '',
-    estilosIds: [] as string[]
+    estilosIds: [] as string[],
+    descuentoManual: '', // Nuevo campo
   });
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ text: string; isError: boolean } | null>(null);
   const [mostrarListado, setMostrarListado] = useState(false);
+  const [descuentoAutomatico, setDescuentoAutomatico] = useState<number | null>(null);
 
   useEffect(() => {
     fetchAlumnos();
@@ -167,6 +169,16 @@ const Alumnos = () => {
     }
   };
 
+  const calcularDescuentoAutomatico = (estilosSeleccionados: string[]) => {
+    if (estilosSeleccionados.length >= 2) {
+      // Por ejemplo, 10% para 2 estilos, 15% para 3 o más
+      const porcentaje = estilosSeleccionados.length >= 3 ? 15 : 10;
+      setDescuentoAutomatico(porcentaje);
+    } else {
+      setDescuentoAutomatico(null);
+    }
+  };
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     if (name === 'estilosIds') {
@@ -175,6 +187,12 @@ const Alumnos = () => {
         option => option.value
       );
       setNuevoAlumno(prev => ({ ...prev, [name]: selectedOptions }));
+      calcularDescuentoAutomatico(selectedOptions);
+    } else if (name === 'descuentoManual') {
+      const numValue = parseFloat(value);
+      if (!isNaN(numValue) && numValue >= 0 && numValue <= 100) {
+        setNuevoAlumno(prev => ({ ...prev, [name]: value }));
+      }
     } else {
       setNuevoAlumno(prev => ({ ...prev, [name]: value }));
     }
@@ -188,28 +206,41 @@ const Alumnos = () => {
         ...nuevoAlumno,
         fechaNacimiento: new Date(nuevoAlumno.fechaNacimiento).toISOString(),
         activo: true,
-        estilosIds: nuevoAlumno.estilosIds.map(id => parseInt(id, 10))
+        estilosIds: nuevoAlumno.estilosIds.map(id => parseInt(id, 10)),
+        descuentoManual: nuevoAlumno.descuentoManual ? 
+          parseFloat(nuevoAlumno.descuentoManual) : undefined
       };
+  
       const res = await fetch('/api/alumnos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(alumnoData),
       });
+  
       if (!res.ok) {
         const error = await res.json();
         throw new Error(error.error || 'Error al crear alumno');
       }
+  
       const alumnoCreado = await res.json();
       setNuevoAlumno({
-        nombre: '', apellido: '', dni: '', fechaNacimiento: '', email: '', telefono: '',
-        numeroEmergencia: '', direccion: '', obraSocial: '', nombreTutor: '', dniTutor: '', notas: '',
-        estilosIds: []
+        nombre: '', apellido: '', dni: '', fechaNacimiento: '', 
+        email: '', telefono: '', numeroEmergencia: '', direccion: '', 
+        obraSocial: '', nombreTutor: '', dniTutor: '', notas: '',
+        estilosIds: [], descuentoManual: ''
       });
+      setDescuentoAutomatico(null);
       setAlumnos(prevAlumnos => [...prevAlumnos, alumnoCreado]);
-      await generarDeudaMensual(alumnoCreado.id);
-      setMessage({ text: `Alumno ${alumnoCreado.nombre} ${alumnoCreado.apellido} creado con éxito y deuda mensual generada.`, isError: false });
+      setMessage({ 
+        text: `Alumno ${alumnoCreado.nombre} ${alumnoCreado.apellido} creado con éxito.`, 
+        isError: false 
+      });
     } catch (error) {
       console.error('Error creating alumno:', error);
+      setMessage({ 
+        text: error instanceof Error ? error.message : 'Error al crear alumno', 
+        isError: true 
+      });
     } finally {
       setLoading(false);
     }
@@ -370,6 +401,34 @@ const Alumnos = () => {
               {loading ? 'Agregando...' : 'Agregar Alumno'}
             </Button>
           </Form>
+
+          {/* Después de la selección de estilos */}
+<div style={{ marginTop: '20px', padding: '15px', backgroundColor: '#f9f9f9', borderRadius: '4px' }}>
+  <h3>Descuentos</h3>
+  
+  {descuentoAutomatico && (
+    <div style={{ marginBottom: '15px' }}>
+      <label style={{ color: '#006600' }}>
+        ¡Descuento automático por múltiples estilos!: {descuentoAutomatico}%
+      </label>
+    </div>
+  )}
+  
+  <div>
+    <label>Descuento Manual (%):</label>
+    <Input
+      type="number"
+      name="descuentoManual"
+      value={nuevoAlumno.descuentoManual}
+      onChange={handleInputChange}
+      placeholder="Ingrese descuento manual"
+      min="0"
+      max="100"
+      step="1"
+    />
+  </div>
+</div>
+
         </ScrollableContainer>
   
         <Button onClick={() => setMostrarListado(!mostrarListado)}>
@@ -394,6 +453,8 @@ const Alumnos = () => {
                     <Th>DNI Tutor</Th>
                     <Th>Estado</Th>
                     <Th>Estilos</Th>
+                    <Th>Descuentos</Th>
+
                     <Th>Acciones</Th>
                   </Tr>
                 </thead>
@@ -418,6 +479,14 @@ const Alumnos = () => {
                           alumnoId={alumno.id}
                         />
                       </Td>
+                      <Td>
+  {alumno.descuentosVigentes?.map((d: { id: React.Key | null | undefined; descuento: { esAutomatico: any; porcentaje: string | number | bigint | boolean | React.ReactElement<any, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | React.ReactPortal | Promise<React.AwaitedReactNode> | null | undefined; }; }) => (
+    <div key={d.id}>
+      {d.descuento.esAutomatico ? 'Auto: ' : 'Manual: '}
+      {d.descuento.porcentaje}%
+    </div>
+  ))}
+</Td>
                       <Td>
                         <Button onClick={() => handleEstadoAlumno(alumno.id, !alumno.activo)}>
                           {alumno.activo ? 'Dar de Baja' : 'Reactivar'}
