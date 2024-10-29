@@ -46,19 +46,24 @@ export type Alumno = {
     activo: boolean;
   };
   
-  export type Deuda = {
-    id: number;
-    alumno: Alumno;
-    alumnoId: number;
-    monto: number;
-    mes: string;
-    anio: number;
-    estilo: Estilo;
-    estiloId: number;
-    pagada: boolean;
-    createdAt: Date;
-    updatedAt: Date;
-  };
+ // Actualizar el tipo Deuda:
+export type Deuda = {
+  id: number;
+  alumno: Alumno;
+  alumnoId: number;
+  monto: number;
+  montoOriginal: number;
+  mes: string;
+  anio: number;
+  estilo: Estilo;
+  estiloId: number;
+  pagada: boolean;
+  fechaPago?: Date;
+  fechaVencimiento: Date;
+  pagos: PagoDeuda[];
+  createdAt: Date;
+  updatedAt: Date;
+};
   
   export type Concepto = {
     id: number;
@@ -80,21 +85,74 @@ export type Alumno = {
     OTRO = 'OTRO'
   }
   
-  export type Recibo = {
-    id: number;
-    numeroRecibo: number;
-    fecha: Date;
-    monto: number;
-    periodoPago: string;
-    tipoPago: TipoPago;
-    fueraDeTermino: boolean;
-    alumno: Alumno;
-    alumnoId: number;
-    concepto: Concepto;
-    conceptoId: number;
-    createdAt: Date;
-    updatedAt: Date;
-  };
+// Actualizar el tipo Recibo existente:
+export type Recibo = {
+  alumnoSuelto: any;
+  id: number;
+  numeroRecibo: number;
+  fecha: Date;
+  fechaEfecto: Date;
+  monto: number;
+  montoOriginal: number;
+  descuento?: number;
+  periodoPago: string;
+  tipoPago: TipoPago;
+  fueraDeTermino: boolean;
+  esClaseSuelta: boolean;
+  esMesCompleto: boolean;
+  alumno: Alumno;
+  alumnoId: number;
+  concepto: Concepto;
+  conceptoId: number;
+  pagosDeuda: PagoDeuda[];
+  anulado: boolean;
+  motivoAnulacion?: string;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+  // Agregar a tu archivo de types:
+
+export type DescuentoAplicado = {
+  id: number;
+  descuento: Descuento;
+  descuentoId: number;
+  alumno: Alumno;
+  alumnoId: number;
+  fechaInicio: Date;
+  fechaFin?: Date;
+  activo: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type Descuento = {
+  id: number;
+  nombre: string;
+  porcentaje: number;
+  activo: boolean;
+  esAutomatico: boolean;
+  minEstilos?: number;
+  aplicadoA: DescuentoAplicado[];
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+
+
+export type PagoDeuda = {
+  id: number;
+  deuda: Deuda;
+  deudaId: number;
+  recibo: Recibo;
+  reciboId: number;
+  monto: number;
+  fecha: Date;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+
   
   export type Profesor = {
     id: number;

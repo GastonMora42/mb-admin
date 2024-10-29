@@ -3,7 +3,19 @@ import prisma from '@/lib/prisma'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'GET') {
-    const { numero, alumnoId, alumnoSueltoId, conceptoId, periodo, fueraDeTermino, esClaseSuelta } = req.query;
+    const { 
+      numero, 
+      alumnoId, 
+      alumnoSueltoId, 
+      conceptoId, 
+      periodo, 
+      fueraDeTermino, 
+      esClaseSuelta,
+      esMesCompleto,
+      fechaDesde,
+      fechaHasta,
+      anulado
+    } = req.query;
     
     let whereClause: any = {};
     if (numero) whereClause.numeroRecibo = parseInt(numero as string);
@@ -13,6 +25,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (periodo) whereClause.periodoPago = periodo as string;
     if (fueraDeTermino) whereClause.fueraDeTermino = fueraDeTermino === 'true';
     if (esClaseSuelta) whereClause.esClaseSuelta = esClaseSuelta === 'true';
+    if (esMesCompleto) whereClause.esMesCompleto = esMesCompleto === 'true';
+    if (anulado !== undefined) whereClause.anulado = anulado === 'true';
+    
+    // Filtro por rango de fechas
+    if (fechaDesde || fechaHasta) {
+      whereClause.fecha = {};
+      if (fechaDesde) whereClause.fecha.gte = new Date(fechaDesde as string);
+      if (fechaHasta) whereClause.fecha.lte = new Date(fechaHasta as string);
+    }
 
     try {
       const recibos = await prisma.recibo.findMany({
@@ -24,7 +45,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               alumnoRegular: true
             }
           },
-          concepto: true
+          concepto: true,
+          pagosDeuda: {
+            include: {
+              deuda: true
+            }
+          }
         },
         orderBy: { fecha: 'desc' }
       });
@@ -47,38 +73,96 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
   } else if (req.method === 'POST') {
     try {
-      const { monto, periodoPago, tipoPago, alumnoId, alumnoSueltoId, conceptoId, fueraDeTermino, esClaseSuelta } = req.body;
-      console.log('Recibido en API:', req.body);
-      
-      const reciboData: any = {
-        monto: parseFloat(monto),
+      const { 
+        monto, 
+        montoOriginal, // Asegúrate de recibir esto
+        descuento,
         periodoPago,
         tipoPago,
+        alumnoId,
+        alumnoSueltoId,
+        conceptoId,
+        fechaEfecto,
+        fueraDeTermino,
+        esClaseSuelta,
+        esMesCompleto,
+        deudasAPagar 
+      } = req.body;
+
+      const reciboData = {
+        monto: parseFloat(monto),
+        montoOriginal: parseFloat(montoOriginal), // Asegúrate de incluirlo
+        descuento: descuento ? parseFloat(descuento) : null,
+        periodoPago,
+        tipoPago,
+        fechaEfecto: new Date(fechaEfecto),
         fueraDeTermino: Boolean(fueraDeTermino),
         esClaseSuelta: Boolean(esClaseSuelta),
-        concepto: { connect: { id: parseInt(conceptoId) } }
+        esMesCompleto: Boolean(esMesCompleto),
+        concepto: {
+          connect: { id: parseInt(conceptoId) }
+        },
+        ...(alumnoId ? {
+          alumno: { connect: { id: parseInt(alumnoId) } }
+        } : {}),
+        ...(alumnoSueltoId ? {
+          alumnoSuelto: { connect: { id: parseInt(alumnoSueltoId) } }
+        } : {})
       };
 
-      if (esClaseSuelta) {
-        reciboData.alumnoSuelto = { connect: { id: parseInt(alumnoSueltoId) } };
-      } else {
-        reciboData.alumno = { connect: { id: parseInt(alumnoId) } };
-      }
+      const recibo = await prisma.$transaction(async (prisma) => {
+        const nuevoRecibo = await prisma.recibo.create({
+          data: reciboData,
+          include: {
+            alumno: true,
+            alumnoSuelto: {
+              include: {
+                alumnoRegular: true
+              }
+            },
+            concepto: true,
+            pagosDeuda: true
+          }
+        });
 
-      const recibo = await prisma.recibo.create({
-        data: reciboData,
-        include: { 
-          alumno: true, 
-          alumnoSuelto: {
-            include: {
-              alumnoRegular: true
+        // Crear pagos de deuda si existen
+        if (deudasAPagar && deudasAPagar.length > 0) {
+          for (const { deudaId, monto } of deudasAPagar) {
+            await prisma.pagoDeuda.create({
+              data: {
+                deudaId: parseInt(deudaId),
+                reciboId: nuevoRecibo.id,
+                monto: parseFloat(monto),
+              }
+            });
+
+            // Actualizar estado de la deuda
+            const pagosDeuda = await prisma.pagoDeuda.findMany({
+              where: { deudaId: parseInt(deudaId) },
+              select: { monto: true }
+            });
+
+            const totalPagado = pagosDeuda.reduce((sum, pago) => sum + pago.monto, 0);
+            const deuda = await prisma.deuda.findUnique({
+              where: { id: parseInt(deudaId) }
+            });
+
+            if (deuda && totalPagado >= deuda.monto) {
+              await prisma.deuda.update({
+                where: { id: parseInt(deudaId) },
+                data: { 
+                  pagada: true,
+                  fechaPago: new Date()
+                }
+              });
             }
-          }, 
-          concepto: true 
+          }
         }
+
+        return nuevoRecibo;
       });
 
-      // Si el alumno suelto está asociado a un alumno regular, devolvemos la información del alumno regulars
+      // Procesar alumno regular si existe
       if (recibo.alumnoSuelto && recibo.alumnoSuelto.alumnoRegular) {
         recibo.alumno = recibo.alumnoSuelto.alumnoRegular;
         recibo.alumnoSuelto = null;
@@ -98,13 +182,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     try {
       const reciboId = parseInt(id);
-      await prisma.recibo.delete({
-        where: { id: reciboId }
+      // En lugar de eliminar, marcar como anulado
+      await prisma.recibo.update({
+        where: { id: reciboId },
+        data: { 
+          anulado: true,
+          motivoAnulacion: 'Recibo anulado por el usuario'
+        }
       });
-      res.status(200).json({ message: 'Recibo eliminado exitosamente' });
+      
+      res.status(200).json({ message: 'Recibo anulado exitosamente' });
     } catch (error) {
-      console.error('Error al eliminar recibo:', error);
-      res.status(500).json({ error: 'Error al eliminar recibo' });
+      console.error('Error al anular recibo:', error);
+      res.status(500).json({ error: 'Error al anular recibo' });
     }
   } else {
     res.setHeader('Allow', ['GET', 'POST', 'DELETE']);
