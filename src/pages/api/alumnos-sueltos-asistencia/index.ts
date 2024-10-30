@@ -1,22 +1,9 @@
+// pages/api/alumnos-sueltos-asistencia.ts
 import { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
-import { CognitoJwtVerifier } from "aws-jwt-verify";
-
-const verifier = CognitoJwtVerifier.create({
-  userPoolId: "us-east-1_OpCljWDF7",
-  tokenUse: "access",
-  clientId: "7tmctt10ht1q3tff359eii7jv0",
-});
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const token = req.headers.authorization?.split(' ')[1];
-  if (!token) {
-    return res.status(401).json({ error: 'No se proporcionó token de autenticación' });
-  }
-
   try {
-    await verifier.verify(token);
-
     switch (req.method) {
       case 'GET':
         await handleGetRequest(req, res);

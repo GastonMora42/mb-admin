@@ -1,3 +1,5 @@
+import { ReactNode } from "react";
+
 export type Alumno = {
     descuentosVigentes: any;
     id: number;
@@ -25,6 +27,7 @@ export type Alumno = {
   };
   
   export type Estilo = {
+    importe: any;
     id: number;
     nombre: string;
     monto: number; 
@@ -158,6 +161,9 @@ export type PagoDeuda = {
 
   
   export type Profesor = {
+    cuit: ReactNode;
+    porcentajeClasesSueltasPorDefecto: ReactNode;
+    porcentajePorDefecto: ReactNode;
     id: number;
     nombre: string;
     apellido: string;
