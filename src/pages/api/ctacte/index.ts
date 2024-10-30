@@ -1,3 +1,4 @@
+// pages/api/ctacte.ts
 import type { NextApiRequest, NextApiResponse } from 'next'
 import prisma from '@/lib/prisma'
 
@@ -15,6 +16,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               { apellido: { contains: query as string, mode: 'insensitive' } },
             ],
           },
+          include: {
+            ctaCte: true,
+            deudas: {
+              where: {
+                pagada: false
+              }
+            }
+          },
           take: 10,
         });
 
@@ -24,19 +33,69 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               { nombre: { contains: query as string, mode: 'insensitive' } },
               { apellido: { contains: query as string, mode: 'insensitive' } },
             ],
-            alumnoRegularId: null, // Solo incluir los que no se han convertido en regulares
+            alumnoRegularId: null,
           },
           take: 10,
         });
 
         return res.status(200).json([...alumnos, ...alumnosSueltos]);
       } else if (alumnoId) {
-        // Buscar recibos del alumno (tanto como regular como suelto)
+        // Obtener información completa del alumno
+        const alumnoInfo = await prisma.alumno.findUnique({
+          where: { id: parseInt(alumnoId as string) },
+          include: {
+            ctaCte: true,
+            deudas: {
+              include: {
+                estilo: true,
+                pagos: {
+                  include: {
+                    recibo: true
+                  }
+                }
+              },
+              orderBy: [
+                { anio: 'desc' },
+                { mes: 'desc' }
+              ]
+            },
+            alumnoEstilos: {
+              where: { activo: true },
+              include: {
+                estilo: true
+              }
+            },
+            descuentosVigentes: {
+              where: { activo: true },
+              include: {
+                descuento: true
+              }
+            }
+          }
+        });
+
+        if (!alumnoInfo) {
+          return res.status(404).json({ error: 'Alumno no encontrado' });
+        }
+
+        // Buscar todos los recibos (regulares y sueltos)
         const recibosRegulares = await prisma.recibo.findMany({
-          where: { alumnoId: parseInt(alumnoId as string) },
+          where: { 
+            alumnoId: parseInt(alumnoId as string),
+            anulado: false
+          },
           include: {
             alumno: true,
             concepto: true,
+            pagosDeuda: {
+              include: {
+                deuda: {
+                  include: {
+                    estilo: true
+                  }
+                }
+              }
+            }
           },
           orderBy: { fecha: 'desc' },
         });
@@ -46,21 +105,54 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             OR: [
               { alumnoSueltoId: parseInt(alumnoId as string) },
               { alumnoSuelto: { alumnoRegularId: parseInt(alumnoId as string) } }
-            ]
+            ],
+            anulado: false
           },
           include: {
             alumnoSuelto: true,
-            concepto: true,
+            concepto: true
           },
           orderBy: { fecha: 'desc' },
         });
 
-        const todosLosRecibos = [...recibosRegulares, ...recibosSueltos].sort((a, b) => 
-          new Date(b.fecha).getTime() - new Date(a.fecha).getTime()
-        );
+        const todosLosRecibos = [...recibosRegulares, ...recibosSueltos]
+          .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
 
-        const total = todosLosRecibos.reduce((sum, recibo) => sum + recibo.monto, 0);
-        return res.status(200).json({ recibos: todosLosRecibos, total });
+        // Calcular estadísticas y totales
+        const estadisticas = {
+          totalPagado: todosLosRecibos.reduce((sum, recibo) => sum + recibo.monto, 0),
+          deudaTotal: alumnoInfo.deudas
+            .filter(d => !d.pagada)
+            .reduce((sum, deuda) => sum + deuda.monto, 0),
+          cantidadDeudas: alumnoInfo.deudas.filter(d => !d.pagada).length,
+          estilosActivos: alumnoInfo.alumnoEstilos.length,
+          ultimoPago: todosLosRecibos[0]?.fecha || null,
+          descuentosActivos: alumnoInfo.descuentosVigentes.map(dv => ({
+            tipo: dv.descuento.esAutomatico ? 'Automático' : 'Manual',
+            porcentaje: dv.descuento.porcentaje
+          }))
+        };
+
+        // Verificar estado de pagos
+        const mesActual = new Date().getMonth() + 1;
+        const anioActual = new Date().getFullYear();
+        const deudasMesActual = alumnoInfo.deudas.filter(
+          d => d.mes === mesActual.toString() && d.anio === anioActual && !d.pagada
+        );
+        const estadoPagos = {
+          alDia: deudasMesActual.length === 0,
+          mesesAdeudados: [...new Set(alumnoInfo.deudas
+            .filter(d => !d.pagada)
+            .map(d => `${d.mes}/${d.anio}`))]
+        };
+
+        return res.status(200).json({
+          alumnoInfo,
+          recibos: todosLosRecibos,
+          estadisticas,
+          estadoPagos
+        });
+
       } else {
         return res.status(400).json({ error: 'Parámetros inválidos' });
       }
