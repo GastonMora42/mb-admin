@@ -24,6 +24,11 @@ interface LiquidacionResponse {
   };
 }
 
+interface PorcentajesPersonalizados {
+  porcentajeCursos: number;
+  porcentajeClasesSueltas: number;
+}
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -37,7 +42,9 @@ export default async function handler(
         select: {
           id: true,
           nombre: true,
-          apellido: true
+          apellido: true,
+          porcentajePorDefecto: true,
+          porcentajeClasesSueltasPorDefecto: true
         }
       });
       
@@ -49,7 +56,17 @@ export default async function handler(
   }
 
   if (req.method === 'POST') {
-    const { periodo, profesorId, alumnoId } = req.body;
+    const { 
+      periodo, 
+      profesorId, 
+      alumnoId, 
+      porcentajes 
+    } = req.body as {
+      periodo: string;
+      profesorId?: number;
+      alumnoId?: number;
+      porcentajes: PorcentajesPersonalizados;
+    };
 
     try {
       // Validación del período
@@ -60,17 +77,17 @@ export default async function handler(
       // Extraer año y mes del período
       const [year, month] = periodo.split('-');
       const startDate = new Date(Number(year), Number(month) - 1, 1);
-      const endDate = new Date(Number(year), Number(month), 0); // último día del mes
+      const endDate = new Date(Number(year), Number(month), 0);
 
-      // Construimos el where dinámicamente
+      // Construir where dinámicamente
       const where: Prisma.ReciboWhereInput = {
         AND: [
           { fecha: { gte: startDate } },
-          { fecha: { lte: endDate } }
+          { fecha: { lte: endDate } },
+          { anulado: false }  // Solo recibos no anulados
         ]
       };
 
-      // Añadimos filtros opcionales
       if (profesorId) {
         where.clase = {
           profesorId: Number(profesorId)
@@ -81,7 +98,7 @@ export default async function handler(
         where.alumnoId = Number(alumnoId);
       }
 
-      // Obtenemos los recibos
+      // Obtener recibos con toda la información necesaria
       const recibos = await prisma.recibo.findMany({
         where,
         include: {
@@ -106,7 +123,9 @@ export default async function handler(
                 select: {
                   id: true,
                   nombre: true,
-                  apellido: true
+                  apellido: true,
+                  porcentajePorDefecto: true,
+                  porcentajeClasesSueltasPorDefecto: true
                 }
               },
               estilo: true
@@ -118,18 +137,29 @@ export default async function handler(
         ]
       });
 
-      // Procesamos los recibos
+      // Procesar recibos con los porcentajes personalizados
       const regularRecibos = recibos.filter(r => r.concepto.nombre !== 'Clase Suelta');
       const sueltasRecibos = recibos.filter(r => r.concepto.nombre === 'Clase Suelta');
 
       const totalRegular = regularRecibos.reduce((sum, r) => sum + r.monto, 0);
       const totalSueltas = sueltasRecibos.reduce((sum, r) => sum + r.monto, 0);
 
-      // Si no hay filtro de profesor, agrupamos por profesor
+      const montoLiquidacionRegular = totalRegular * porcentajes.porcentajeCursos;
+      const montoLiquidacionSueltas = totalSueltas * porcentajes.porcentajeClasesSueltas;
+
+      // Calcular montos de liquidación para cada recibo
+      const recibosConLiquidacion = recibos.map(recibo => ({
+        ...recibo,
+        montoLiquidacion: recibo.concepto.nombre === 'Clase Suelta'
+          ? recibo.monto * porcentajes.porcentajeClasesSueltas
+          : recibo.monto * porcentajes.porcentajeCursos
+      }));
+
+      // Agrupar por profesor si no hay filtro de profesor
       let detallesPorProfesor: LiquidacionResponse['detallesPorProfesor'] = {};
       
       if (!profesorId) {
-        recibos.forEach(recibo => {
+        recibosConLiquidacion.forEach(recibo => {
           if (recibo.clase?.profesor) {
             const profesorId = recibo.clase.profesor.id;
             const profesorNombre = `${recibo.clase.profesor.apellido}, ${recibo.clase.profesor.nombre}`;
@@ -149,32 +179,16 @@ export default async function handler(
             
             if (recibo.concepto.nombre === 'Clase Suelta') {
               detallesPorProfesor[profesorId].totalSueltas += recibo.monto;
-              detallesPorProfesor[profesorId].montoLiquidacionSueltas += recibo.monto * 0.8;
+              detallesPorProfesor[profesorId].montoLiquidacionSueltas += recibo.montoLiquidacion;
             } else {
               detallesPorProfesor[profesorId].totalRegular += recibo.monto;
-              detallesPorProfesor[profesorId].montoLiquidacionRegular += recibo.monto * 0.6;
+              detallesPorProfesor[profesorId].montoLiquidacionRegular += recibo.montoLiquidacion;
             }
           }
         });
       }
 
-      const montoLiquidacionRegular = totalRegular * 0.6;
-      const montoLiquidacionSueltas = totalSueltas * 0.8;
-
-      // Preparamos la respuesta
-      const liquidacionData: LiquidacionResponse = {
-        regularCount: regularRecibos.length,
-        sueltasCount: sueltasRecibos.length,
-        totalRegular,
-        totalSueltas,
-        montoLiquidacionRegular,
-        montoLiquidacionSueltas,
-        recibos,
-        periodo,
-        detallesPorProfesor: Object.keys(detallesPorProfesor).length > 0 ? detallesPorProfesor : undefined
-      };
-
-      // Guardamos la liquidación en la base de datos si hay recibos
+      // Crear la liquidación en la base de datos
       if (recibos.length > 0) {
         const createData: Prisma.LiquidacionCreateInput = {
           fecha: new Date(),
@@ -183,8 +197,8 @@ export default async function handler(
           montoTotal: montoLiquidacionRegular + montoLiquidacionSueltas,
           montoCursos: montoLiquidacionRegular,
           montoClasesSueltas: montoLiquidacionSueltas,
-          porcentajeCursos: 0.60,
-          porcentajeClasesSueltas: 0.80,
+          porcentajeCursos: porcentajes.porcentajeCursos,
+          porcentajeClasesSueltas: porcentajes.porcentajeClasesSueltas,
           estado: 'PENDIENTE',
           ...(profesorId ? {
             profesor: {
@@ -194,10 +208,12 @@ export default async function handler(
             }
           } : {}),
           detalles: {
-            create: recibos.map(recibo => ({
+            create: recibosConLiquidacion.map(recibo => ({
               montoOriginal: recibo.monto,
-              porcentaje: recibo.concepto.nombre === 'Clase Suelta' ? 0.8 : 0.6,
-              montoLiquidado: recibo.monto * (recibo.concepto.nombre === 'Clase Suelta' ? 0.8 : 0.6),
+              porcentaje: recibo.concepto.nombre === 'Clase Suelta' 
+                ? porcentajes.porcentajeClasesSueltas 
+                : porcentajes.porcentajeCursos,
+              montoLiquidado: recibo.montoLiquidacion,
               recibo: {
                 connect: {
                   id: recibo.id
@@ -211,6 +227,21 @@ export default async function handler(
           data: createData
         });
       }
+
+      // Preparar respuesta
+      const liquidacionData: LiquidacionResponse = {
+        regularCount: regularRecibos.length,
+        sueltasCount: sueltasRecibos.length,
+        totalRegular,
+        totalSueltas,
+        montoLiquidacionRegular,
+        montoLiquidacionSueltas,
+        recibos: recibosConLiquidacion,
+        periodo,
+        detallesPorProfesor: Object.keys(detallesPorProfesor).length > 0 
+          ? detallesPorProfesor 
+          : undefined
+      };
 
       return res.status(200).json(liquidacionData);
     } catch (error) {

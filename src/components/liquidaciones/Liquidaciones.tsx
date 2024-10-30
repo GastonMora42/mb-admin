@@ -1,13 +1,28 @@
 
-
-// components/Liquidaciones.tsx
+// components/Liquidaciones/index.tsx
 import React, { useState, useEffect } from 'react';
-import styled from 'styled-components';
-import * as XLSX from 'xlsx';
-import { saveAs } from 'file-saver';
+import { 
+  Document, 
+  Page, 
+  Text, 
+  View, 
+  StyleSheet, 
+  PDFViewer 
+} from '@react-pdf/renderer';
+import PreviewModal from './PreviewModal';
+import LiquidacionPDF from './LiquidacionPDF';
+import { styled } from 'styled-components';
 
-// Interfaces
+
 interface Profesor {
+  id: number;
+  nombre: string;
+  apellido: string;
+  porcentajePorDefecto: number;
+  porcentajeClasesSueltasPorDefecto: number;
+}
+
+interface Alumno {
   id: number;
   nombre: string;
   apellido: string;
@@ -19,27 +34,11 @@ interface Recibo {
   fecha: string;
   monto: number;
   tipoPago: string;
-  alumno: Alumno | null; // asegúrate de que puede ser null
+  alumno: Alumno | null;
   concepto: {
     nombre: string;
   };
-}
-
-interface Alumno {
-  nombre: string;
-  apellido: string;
-}
-
-interface Concepto {
-  id: number;
-  nombre: string;
-}
-
-
-interface FiltrosLiquidacion {
-  profesorId?: number;
-  alumnoId?: number;
-  periodo: string; // formato "YYYY-MM"
+  montoLiquidacion?: number;
 }
 
 interface LiquidacionData {
@@ -50,7 +49,21 @@ interface LiquidacionData {
   montoLiquidacionRegular: number;
   montoLiquidacionSueltas: number;
   recibos: Recibo[];
+  periodo: string;
 }
+
+interface FiltrosLiquidacion {
+  profesorId?: number;
+  alumnoId?: number;
+  periodo: string;
+}
+
+interface PorcentajesPersonalizados {
+  porcentajeCursos: number;
+  porcentajeClasesSueltas: number;
+}
+
+// Styled Components (mantener los que ya tenías)
 
 const Container = styled.div`
   background-color: #FFFFFF;
@@ -65,6 +78,13 @@ const Title = styled.h2`
   color: #333;
   margin-bottom: 30px;
   text-align: center;
+`;
+
+const ButtonContainer = styled.div`
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
 `;
 
 const Input = styled.input`
@@ -236,382 +256,297 @@ const LoadingSpinner = styled.div`
   }
 `;
 
-// Interfaces
-interface Profesor {
-  id: number;
-  nombre: string;
-  apellido: string;
-}
 
-interface Recibo {
-  id: number;
-  numeroRecibo: number;
-  fecha: string;
-  monto: number;
-  tipoPago: string;
-  alumno: Alumno | null;
-  concepto: {
-    nombre: string;
-  };
-}
+// Nuevo styled component para la sección de porcentajes
+const PorcentajesSection = styled.div`
+  margin: 20px 0;
+  padding: 20px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #dee2e6;
+`;
 
-interface Alumno {
-  id: number;  // Añadido id
-  nombre: string;
-  apellido: string;
-}
+const PorcentajesGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 20px;
+  margin-top: 15px;
+`;
 
-interface Concepto {
-  id: number;
-  nombre: string;
-}
+const PorcentajeInput = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 
-interface FiltrosLiquidacion {
-  profesorId?: number;
-  alumnoId?: number;
-  periodo: string;
-}
-
-interface LiquidacionData {
-  regularCount: number;
-  sueltasCount: number;
-  totalRegular: number;
-  totalSueltas: number;
-  montoLiquidacionRegular: number;
-  montoLiquidacionSueltas: number;
-  recibos: Recibo[];
-}
-
-
-// EditableAmount Component
-const EditableAmount: React.FC<{
-  value: number;
-  onChange: (value: number) => void;
-}> = ({ value, onChange }) => {
-  const [isEditing, setIsEditing] = useState(false);
-  const [tempValue, setTempValue] = useState(value.toFixed(2));
-
-  const handleBlur = () => {
-    const newValue = parseFloat(tempValue);
-    if (!isNaN(newValue)) {
-      onChange(newValue);
-    }
-    setIsEditing(false);
-  };
-
-  if (isEditing) {
-    return (
-      <Input
-        type="number"
-        step="0.01"
-        value={tempValue}
-        onChange={(e) => setTempValue(e.target.value)}
-        onBlur={handleBlur}
-        autoFocus
-        style={{ width: '100px' }}
-      />
-    );
+  label {
+    font-weight: 500;
+    color: #495057;
   }
 
-  return (
-    <span onClick={() => setIsEditing(true)} style={{ cursor: 'pointer' }}>
-      ${value.toFixed(2)}
-    </span>
-  );
-};
+  input {
+    padding: 8px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    width: 100px;
+    
+    &:focus {
+      border-color: #FFC001;
+      outline: none;
+      box-shadow: 0 0 0 2px rgba(255, 192, 1, 0.2);
+    }
+  }
+`;
 
-// Main Component
+const PreviewButton = styled(Button)`
+  background-color: #28a745;
+  margin-right: 10px;
+
+  &:hover {
+    background-color: #218838;
+  }
+`;
+
 const Liquidaciones: React.FC = () => {
+  // Estados existentes
   const [profesores, setProfesores] = useState<Profesor[]>([]);
   const [alumnos, setAlumnos] = useState<Alumno[]>([]);
-  const [editableRecibos, setEditableRecibos] = useState<{[key: number]: number}>({});
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [filtros, setFiltros] = useState<FiltrosLiquidacion>({
     profesorId: undefined,
     alumnoId: undefined,
-    periodo: new Date().toISOString().slice(0, 7) // Formato YYYY-MM
+    periodo: new Date().toISOString().slice(0, 7)
   });
+
+  // Nuevos estados
   const [liquidacionData, setLiquidacionData] = useState<LiquidacionData | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
+  const [porcentajesPersonalizados, setPorcentajesPersonalizados] = useState<PorcentajesPersonalizados>({
+    porcentajeCursos: 60,
+    porcentajeClasesSueltas: 80
+  });
+  const [profesorSeleccionado, setProfesorSeleccionado] = useState<Profesor | null>(null);
+  const [mostrarPorcentajes, setMostrarPorcentajes] = useState(false);
+
+  // Effects existentes
   useEffect(() => {
     fetchProfesores();
     fetchAlumnos();
   }, []);
 
-  const fetchProfesores = async () => {
-    try {
-      const res = await fetch('/api/profesores');
-      if (!res.ok) throw new Error('Error al cargar profesores');
-      const data = await res.json();
-      setProfesores(data);
-    } catch (error) {
-      setError('Error al cargar los profesores');
-      console.error('Error fetching profesores:', error);
-    }
-  };
-
-  const fetchAlumnos = async () => {
-    try {
-      const res = await fetch('/api/alumnos');
-      if (!res.ok) throw new Error('Error al cargar alumnos');
-      const data = await res.json();
-      setAlumnos(data);
-    } catch (error) {
-      setError('Error al cargar los alumnos');
-      console.error('Error fetching alumnos:', error);
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!filtros.periodo) {
-      setError('Por favor seleccione un período');
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-    
-    try {
-      const res = await fetch('/api/liquidaciones', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(filtros),
-      });
-
-      if (!res.ok) {
-        throw new Error('Error al generar la liquidación');
+  useEffect(() => {
+    if (filtros.profesorId) {
+      const profesor = profesores.find(p => p.id === Number(filtros.profesorId));
+      if (profesor) {
+        setProfesorSeleccionado(profesor);
+        setPorcentajesPersonalizados({
+          porcentajeCursos: profesor.porcentajePorDefecto * 100,
+          porcentajeClasesSueltas: profesor.porcentajeClasesSueltasPorDefecto * 100
+        });
       }
-
-      const data = await res.json();
-      setLiquidacionData(data);
-      // Reiniciar los montos editables cuando se carga nueva data
-      setEditableRecibos({});
-    } catch (error) {
-      setError('Error al generar la liquidación');
-      console.error('Error generando liquidación:', error);
-    } finally {
-      setLoading(false);
+    } else {
+      setProfesorSeleccionado(null);
+      setPorcentajesPersonalizados({
+        porcentajeCursos: 60,
+        porcentajeClasesSueltas: 80
+      });
     }
-  };
+  }, [filtros.profesorId, profesores]);
+  // Funciones existentes actualizadas
+ const fetchProfesores = async () => {
+  try {
+    const res = await fetch('/api/profesores');
+    if (!res.ok) throw new Error('Error al cargar profesores');
+    const data = await res.json();
+    setProfesores(data);
+  } catch (error) {
+    setError('Error al cargar los profesores');
+    console.error('Error fetching profesores:', error);
+  }
+};
 
-  const exportToExcel = () => {
-    if (!liquidacionData) return;
+const fetchAlumnos = async () => {
+  try {
+    const res = await fetch('/api/alumnos');
+    if (!res.ok) throw new Error('Error al cargar alumnos');
+    const data = await res.json();
+    setAlumnos(data);
+  } catch (error) {
+    setError('Error al cargar los alumnos');
+    console.error('Error fetching alumnos:', error);
+  }
+};
 
-    const totalRegularEditado = liquidacionData.recibos
-      .filter(r => r.concepto.nombre !== 'Clase Suelta')
-      .reduce((sum, r) => sum + (editableRecibos[r.id] ?? (r.monto * 0.6)), 0);
+// Nuevas funciones de manejo
+const handlePorcentajeChange = (tipo: 'cursos' | 'sueltas', valor: string) => {
+  const numeroValor = parseFloat(valor);
+  if (isNaN(numeroValor) || numeroValor < 0 || numeroValor > 100) return;
 
-    const totalSueltasEditado = liquidacionData.recibos
-      .filter(r => r.concepto.nombre === 'Clase Suelta')
-      .reduce((sum, r) => sum + (editableRecibos[r.id] ?? (r.monto * 0.8)), 0);
+  setPorcentajesPersonalizados(prev => ({
+    ...prev,
+    [tipo === 'cursos' ? 'porcentajeCursos' : 'porcentajeClasesSueltas']: numeroValor
+  }));
+};
 
-    const profesor = filtros.profesorId 
-      ? profesores.find(p => p.id === filtros.profesorId)
-      : null;
+const calcularLiquidacion = async () => {
+  setError(null);
+  setLoading(true);
 
-    const wsData = [
-      ['LIQUIDACIÓN DE PROFESORES'],
-      [`Período: ${filtros.periodo}`],
-      profesor ? [`Profesor: ${profesor.apellido}, ${profesor.nombre}`] : ['Todos los profesores'],
-      [''],
-      ['RESUMEN'],
-      ['Cursos Regulares'],
-      ['Cantidad de alumnos:', liquidacionData.regularCount],
-      ['Total a liquidar:', `$${totalRegularEditado.toFixed(2)}`],
-      [''],
-      ['Clases Sueltas'],
-      ['Cantidad de alumnos:', liquidacionData.sueltasCount],
-      ['Total a liquidar:', `$${totalSueltasEditado.toFixed(2)}`],
-      [''],
-      ['TOTAL A LIQUIDAR:', `$${(totalRegularEditado + totalSueltasEditado).toFixed(2)}`],
-      [''],
-      ['DETALLE DE RECIBOS'],
-      ['N° Recibo', 'Fecha', 'Alumno', 'Concepto', 'Tipo de Pago', 'Monto Original', 'Monto a Liquidar'],
-      ...liquidacionData.recibos.map(recibo => [
-        recibo.numeroRecibo,
-        new Date(recibo.fecha).toLocaleDateString(),
-        recibo.alumno ? `${recibo.alumno.apellido}, ${recibo.alumno.nombre}` : 'Sin alumno',
-        recibo.concepto.nombre,
-        recibo.tipoPago,
-        `$${recibo.monto.toFixed(2)}`,
-        `$${(editableRecibos[recibo.id] ?? (recibo.monto * (recibo.concepto.nombre === 'Clase Suelta' ? 0.8 : 0.6))).toFixed(2)}`
-      ])
-    ];
-
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.aoa_to_sheet(wsData);
-
-    const wscols = [
-      { wch: 15 }, // N° Recibo
-      { wch: 15 }, // Fecha
-      { wch: 30 }, // Alumno
-      { wch: 20 }, // Concepto
-      { wch: 15 }, // Tipo de Pago
-      { wch: 15 }, // Monto Original
-      { wch: 15 }  // Monto a Liquidar
-    ];
-
-    ws['!cols'] = wscols;
-
-    XLSX.utils.book_append_sheet(wb, ws, 'Liquidación');
-
-    const excelBuffer = XLSX.write(wb, { 
-      bookType: 'xlsx', 
-      type: 'array' 
+  try {
+    const res = await fetch('/api/liquidaciones', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...filtros,
+        porcentajes: {
+          porcentajeCursos: porcentajesPersonalizados.porcentajeCursos / 100,
+          porcentajeClasesSueltas: porcentajesPersonalizados.porcentajeClasesSueltas / 100
+        }
+      }),
     });
 
-    const data = new Blob([excelBuffer], { 
-      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
-    });
+    if (!res.ok) {
+      throw new Error('Error al generar la liquidación');
+    }
+
+    const data = await res.json();
+    setLiquidacionData(data);
+    setMostrarPorcentajes(true);
+  } catch (error) {
+    setError('Error al generar la liquidación');
+    console.error('Error generando liquidación:', error);
+  } finally {
+    setLoading(false);
+  }
+};
+
+// JSX
+return (
+  <Container>
+    <Title>Generación de Liquidaciones</Title>
     
-    saveAs(data, `Liquidacion_${filtros.periodo}${profesor ? `_${profesor.apellido}` : ''}.xlsx`);
-  };
+    {error && <ErrorMessage>{error}</ErrorMessage>}
 
-  return (
-    <Container>
-      <Title>Generación de Liquidaciones</Title>
-      
-      {error && <ErrorMessage>{error}</ErrorMessage>}
+    <Form onSubmit={(e) => { e.preventDefault(); calcularLiquidacion(); }}>
+      <FormGroup>
+        <Label htmlFor="periodo">Período</Label>
+        <Input
+          type="month"
+          id="periodo"
+          required
+          value={filtros.periodo}
+          onChange={(e) => setFiltros(prev => ({
+            ...prev,
+            periodo: e.target.value
+          }))}
+        />
+      </FormGroup>
 
-      <Form onSubmit={handleSubmit}>
-        <FormGroup>
-          <Label htmlFor="periodo">Período</Label>
-          <Input
-            type="month"
-            id="periodo"
-            required
-            value={filtros.periodo}
-            onChange={(e) => setFiltros(prev => ({
-              ...prev,
-              periodo: e.target.value
-            }))}
-          />
-        </FormGroup>
+      <FormGroup>
+        <Label htmlFor="profesor">Profesor</Label>
+        <Select 
+          id="profesor" 
+          value={filtros.profesorId || ''}
+          onChange={(e) => setFiltros(prev => ({
+            ...prev,
+            profesorId: e.target.value ? Number(e.target.value) : undefined
+          }))}
+        >
+          <option value="">Seleccionar profesor</option>
+          {profesores.map(profesor => (
+            <option key={profesor.id} value={profesor.id}>
+              {`${profesor.apellido}, ${profesor.nombre}`}
+            </option>
+          ))}
+        </Select>
+      </FormGroup>
 
-        <FormGroup>
-          <Label htmlFor="profesor">Profesor (Opcional)</Label>
-          <Select 
-            id="profesor" 
-            value={filtros.profesorId || ''}
-            onChange={(e) => setFiltros(prev => ({
-              ...prev,
-              profesorId: e.target.value ? Number(e.target.value) : undefined
-            }))}
-          >
-            <option value="">Todos los profesores</option>
-            {profesores.map(profesor => (
-              <option key={profesor.id} value={profesor.id}>
-                {`${profesor.apellido}, ${profesor.nombre}`}
-              </option>
-            ))}
-          </Select>
-        </FormGroup>
+      {profesorSeleccionado && (
+        <PorcentajesSection>
+          <h3>Porcentajes de Liquidación</h3>
+          <p>Puede modificar los porcentajes por defecto para esta liquidación</p>
+          
+          <PorcentajesGrid>
+            <PorcentajeInput>
+              <label>Cursos Regulares (%)</label>
+              <input
+                type="number"
+                value={porcentajesPersonalizados.porcentajeCursos}
+                onChange={(e) => handlePorcentajeChange('cursos', e.target.value)}
+                min="0"
+                max="100"
+                step="1"
+              />
+              <small>Por defecto: {profesorSeleccionado.porcentajePorDefecto * 100}%</small>
+            </PorcentajeInput>
 
-        <FormGroup>
-          <Label htmlFor="alumno">Alumno (Opcional)</Label>
-          <Select 
-            id="alumno" 
-            value={filtros.alumnoId || ''}
-            onChange={(e) => setFiltros(prev => ({
-              ...prev,
-              alumnoId: e.target.value ? Number(e.target.value) : undefined
-            }))}
-          >
-            <option value="">Todos los alumnos</option>
-            {alumnos.map(alumno => (
-              <option key={alumno.id} value={alumno.id}>
-                {`${alumno.apellido}, ${alumno.nombre}`}
-              </option>
-            ))}
-          </Select>
-        </FormGroup>
-
-        <Button type="submit" disabled={loading}>
-          {loading ? (
-            <>
-              <LoadingSpinner />
-              Generando...
-            </>
-          ) : 'Generar Liquidación'}
-        </Button>
-      </Form>
-
-      {liquidacionData && (
-        <>
-          <ResumenContainer>
-            <h3>Resumen de Liquidación</h3>
-            <ResumenGrid>
-              <ResumenItem>
-                <h4>Cursos Regulares</h4>
-                <div>Cantidad de alumnos: {liquidacionData.regularCount}</div>
-                <div>Total recaudado: ${liquidacionData.totalRegular.toFixed(2)}</div>
-                <div>Porcentaje profesor: 60%</div>
-                <div>Monto liquidación: ${liquidacionData.montoLiquidacionRegular.toFixed(2)}</div>
-              </ResumenItem>
-              <ResumenItem>
-                <h4>Clases Sueltas</h4>
-                <div>Cantidad de alumnos: {liquidacionData.sueltasCount}</div>
-                <div>Total recaudado: ${liquidacionData.totalSueltas.toFixed(2)}</div>
-                <div>Porcentaje profesor: 80%</div>
-                <div>Monto liquidación: ${liquidacionData.montoLiquidacionSueltas.toFixed(2)}</div>
-              </ResumenItem>
-            </ResumenGrid>
-            <TotalGeneral>
-              Total a Liquidar: ${(liquidacionData.montoLiquidacionRegular + liquidacionData.montoLiquidacionSueltas).toFixed(2)}
-            </TotalGeneral>
-          </ResumenContainer>
-
-          <Table>
-            <thead>
-              <tr>
-                <Th>N° Recibo</Th>
-                <Th>Fecha</Th>
-                <Th>Alumno</Th>
-                <Th>Concepto</Th>
-                <Th>Tipo de Pago</Th>
-                <Th>Monto Original</Th>
-                <Th>Monto a Liquidar</Th>
-              </tr>
-            </thead>
-            <tbody>
-              {liquidacionData.recibos.map((recibo) => {
-                const porcentaje = recibo.concepto.nombre === 'Clase Suelta' ? 0.8 : 0.6;
-                const montoLiquidacion = editableRecibos[recibo.id] ?? (recibo.monto * porcentaje);
-                
-                return (
-                  <tr key={recibo.id}>
-                    <Td>{recibo.numeroRecibo}</Td>
-                    <Td>{new Date(recibo.fecha).toLocaleDateString()}</Td>
-                    <Td>
-                      {recibo.alumno ? `${recibo.alumno.apellido}, ${recibo.alumno.nombre}` : 'Sin alumno'}
-                    </Td>
-                    <Td>{recibo.concepto.nombre}</Td>
-                    <Td>{recibo.tipoPago}</Td>
-                    <Td>${recibo.monto.toFixed(2)}</Td>
-                    <Td>
-                      <EditableAmount
-                        value={montoLiquidacion}
-                        onChange={(newValue) => {
-                          setEditableRecibos(prev => ({
-                            ...prev,
-                            [recibo.id]: newValue
-                          }));
-                        }}
-                      />
-                    </Td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </Table>
-          <ExportButton onClick={exportToExcel}>
-            Exportar a Excel
-          </ExportButton>
-        </>
+            <PorcentajeInput>
+              <label>Clases Sueltas (%)</label>
+              <input
+                type="number"
+                value={porcentajesPersonalizados.porcentajeClasesSueltas}
+                onChange={(e) => handlePorcentajeChange('sueltas', e.target.value)}
+                min="0"
+                max="100"
+                step="1"
+              />
+              <small>Por defecto: {profesorSeleccionado.porcentajeClasesSueltasPorDefecto * 100}%</small>
+            </PorcentajeInput>
+          </PorcentajesGrid>
+        </PorcentajesSection>
       )}
-    </Container>
-  );
+
+      <Button type="submit" disabled={loading}>
+        {loading ? (
+          <>
+            <LoadingSpinner />
+            Calculando...
+          </>
+        ) : 'Calcular Liquidación'}
+      </Button>
+    </Form>
+
+    {liquidacionData && mostrarPorcentajes && (
+      <>
+        <ResumenContainer>
+          <h3>Resumen de Liquidación</h3>
+          <ResumenGrid>
+            <ResumenItem>
+              <h4>Cursos Regulares</h4>
+              <div>Cantidad de alumnos: {liquidacionData.regularCount}</div>
+              <div>Total recaudado: ${liquidacionData.totalRegular.toFixed(2)}</div>
+              <div>Porcentaje profesor: {porcentajesPersonalizados.porcentajeCursos}%</div>
+              <div>Monto liquidación: ${(liquidacionData.totalRegular * porcentajesPersonalizados.porcentajeCursos / 100).toFixed(2)}</div>
+            </ResumenItem>
+
+            <ResumenItem>
+              <h4>Clases Sueltas</h4>
+              <div>Cantidad de alumnos: {liquidacionData.sueltasCount}</div>
+              <div>Total recaudado: ${liquidacionData.totalSueltas.toFixed(2)}</div>
+              <div>Porcentaje profesor: {porcentajesPersonalizados.porcentajeClasesSueltas}%</div>
+              <div>Monto liquidación: ${(liquidacionData.totalSueltas * porcentajesPersonalizados.porcentajeClasesSueltas / 100).toFixed(2)}</div>
+            </ResumenItem>
+          </ResumenGrid>
+
+          <ButtonContainer>
+            <PreviewButton onClick={() => setShowPreview(true)}>
+              Vista Previa
+            </PreviewButton>
+          </ButtonContainer>
+        </ResumenContainer>
+      </>
+    )}
+
+    {showPreview && liquidacionData && (
+      <PreviewModal
+        liquidacionData={liquidacionData}
+        profesor={profesorSeleccionado}
+        porcentajesPersonalizados={porcentajesPersonalizados}
+        onClose={() => setShowPreview(false)}
+      />
+    )}
+  </Container>
+);
 };
 
 export default Liquidaciones;
