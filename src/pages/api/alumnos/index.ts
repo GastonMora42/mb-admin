@@ -1,7 +1,8 @@
-import type { NextApiRequest, NextApiResponse } from 'next'
-import prisma from '@/lib/prisma'
+import type { NextApiRequest, NextApiResponse } from 'next';
+import prisma from '@/lib/prisma';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  // GET
   if (req.method === 'GET') {
     try {
       const alumnos = await prisma.alumno.findMany({
@@ -35,13 +36,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         },
         orderBy: { apellido: 'asc' }
       });
-      res.status(200).json(alumnos);
+      return res.status(200).json(alumnos);
     } catch (error) {
       console.error('Error al obtener alumnos:', error);
-      res.status(500).json({ error: 'Error al obtener alumnos' });
+      return res.status(500).json({ error: 'Error al obtener alumnos' });
     }
   }
-  
+  // POST
   if (req.method === 'POST') {
     try {
       const { 
@@ -49,32 +50,29 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         numeroEmergencia, direccion, obraSocial, nombreTutor, dniTutor, 
         notas, estilosIds, descuentoManual 
       } = req.body;
-  
-      // Primero, verificamos el alumno suelto y el existente fuera de la transacción
+
+      // Verificaciones iniciales
       const alumnoSueltoExistente = await prisma.alumnoSuelto.findUnique({
         where: { dni }
       });
-  
+
       const alumnoExistente = await prisma.alumno.findUnique({
         where: { dni }
       });
-  
+
       if (alumnoExistente) {
         throw new Error('Ya existe un alumno con ese DNI');
       }
-  
-      // Obtenemos los estilos antes de la transacción
+
+      // Obtener los estilos
       const estilos = await prisma.estilo.findMany({
-        where: {
-          id: {
-            in: estilosIds
-          }
-        }
+        where: { id: { in: estilosIds } }
       });
-  
-      const alumno = await prisma.$transaction(async (prisma) => {
+
+      // Una única transacción para todas las operaciones
+      const resultado = await prisma.$transaction(async (tx) => {
         // Crear el alumno
-        const nuevoAlumno = await prisma.alumno.create({
+        const nuevoAlumno = await tx.alumno.create({
           data: {
             nombre: alumnoSueltoExistente?.nombre || nombre,
             apellido: alumnoSueltoExistente?.apellido || apellido,
@@ -100,64 +98,67 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 connect: { id: alumnoSueltoExistente.id }
               }
             })
-          },
-          include: {
-            alumnoEstilos: {
-              include: {
-                estilo: true
-              }
-            },
-            alumnosSueltosAnteriores: true
           }
         });
-  
+
         // Crear cuenta corriente
-        await prisma.ctaCte.create({
+        await tx.ctaCte.create({
           data: {
             alumnoId: nuevoAlumno.id,
             saldo: 0
           }
         });
-  
-        // Crear deudas iniciales
-        const currentDate = new Date();
-    // Dentro de la transacción donde creamos las deudas
-await Promise.all(estilos.map(estilo => 
-  prisma.deuda.create({
-    data: {
+
+        // Generar y crear deudas
+// Generar y crear deudas desde el mes actual
+const fechaActual = new Date();
+const deudasACrear = [];
+
+// Usar el primer día del mes actual como fecha de inicio
+const fechaInicio = new Date(fechaActual.getFullYear(), fechaActual.getMonth(), 1);
+let fechaIteracion = new Date(fechaInicio);
+
+// Solo generamos para el mes actual
+while (fechaIteracion <= fechaActual) {
+  for (const estilo of estilos) {
+    deudasACrear.push({
       alumnoId: nuevoAlumno.id,
       estiloId: estilo.id,
-      monto: estilo.importe || 0,        // Usamos importe en lugar de monto
-      montoOriginal: estilo.importe || 0, // Aquí también
-      mes: (currentDate.getMonth() + 1).toString(),
-      anio: currentDate.getFullYear(),
+      monto: estilo.importe || 0,
+      montoOriginal: estilo.importe || 0,
+      mes: (fechaIteracion.getMonth() + 1).toString(),
+      anio: fechaIteracion.getFullYear(),
       fechaVencimiento: new Date(
-        currentDate.getFullYear(),
-        currentDate.getMonth(),
-        10
+        fechaIteracion.getFullYear(),
+        fechaIteracion.getMonth(),
+        10  // Vencimiento el día 10 de cada mes
       ),
       pagada: false
-    }
-  })
-));
-  
-        // Aplicar descuento automático si corresponde
+    });
+  }
+  // Solo avanzamos al siguiente mes si la fecha actual es después del día 10
+  if (fechaActual.getDate() > 15) {
+    fechaIteracion.setMonth(fechaIteracion.getMonth() + 1);
+  } else {
+    break;
+  }
+}
+
+await tx.deuda.createMany({ data: deudasACrear });
+
+        // Aplicar descuentos si corresponde
         if (estilosIds.length >= 2) {
-          const descuentoAutomatico = await prisma.descuento.findFirst({
+          const descuentoAutomatico = await tx.descuento.findFirst({
             where: {
               esAutomatico: true,
-              minEstilos: {
-                lte: estilosIds.length
-              },
+              minEstilos: { lte: estilosIds.length },
               activo: true
             },
-            orderBy: {
-              porcentaje: 'desc'
-            }
+            orderBy: { porcentaje: 'desc' }
           });
-  
+
           if (descuentoAutomatico) {
-            await prisma.descuentoAplicado.create({
+            await tx.descuentoAplicado.create({
               data: {
                 alumnoId: nuevoAlumno.id,
                 descuentoId: descuentoAutomatico.id,
@@ -167,10 +168,9 @@ await Promise.all(estilos.map(estilo =>
             });
           }
         }
-  
-        // Aplicar descuento manual si existe
+
         if (descuentoManual) {
-          const descuentoManualCreado = await prisma.descuento.create({
+          const descuentoCreado = await tx.descuento.create({
             data: {
               nombre: `Descuento Manual - ${nombre} ${apellido}`,
               porcentaje: descuentoManual,
@@ -178,144 +178,149 @@ await Promise.all(estilos.map(estilo =>
               activo: true
             }
           });
-  
-          await prisma.descuentoAplicado.create({
+
+          await tx.descuentoAplicado.create({
             data: {
               alumnoId: nuevoAlumno.id,
-              descuentoId: descuentoManualCreado.id,
+              descuentoId: descuentoCreado.id,
               fechaInicio: new Date(),
               activo: true
             }
           });
         }
-  
-        return nuevoAlumno;
-      });
-  
-      // Si existía como alumno suelto, actualizar su referencia fuera de la transacción
-      if (alumno.alumnosSueltosAnteriores?.length > 0) {
-        await prisma.alumnoSuelto.update({
-          where: { id: alumno.alumnosSueltosAnteriores[0].id },
-          data: { alumnoRegularId: alumno.id }
-        });
-      }
-  
-      // Obtener el alumno actualizado con toda la información
-      const alumnoCompleto = await prisma.alumno.findUnique({
-        where: { id: alumno.id },
-        include: {
-          alumnoEstilos: {
-            include: {
-              estilo: true
-            }
-          },
-          descuentosVigentes: {
-            where: {
-              activo: true
+
+        // Actualizar alumno suelto si existe
+        if (alumnoSueltoExistente) {
+          await tx.alumnoSuelto.update({
+            where: { id: alumnoSueltoExistente.id },
+            data: { alumnoRegularId: nuevoAlumno.id }
+          });
+        }
+
+        // Retornar alumno completo
+        return await tx.alumno.findUnique({
+          where: { id: nuevoAlumno.id },
+          include: {
+            alumnoEstilos: {
+              include: { estilo: true }
             },
-            include: {
-              descuento: true
-            }
-          },
-          deudas: {
-            include: {
-              estilo: true
+            alumnosSueltosAnteriores: true,
+            deudas: {
+              include: { estilo: true }
+            },
+            descuentosVigentes: {
+              where: { activo: true },
+              include: { descuento: true }
             }
           }
-        }
+        });
       });
-  
-      res.status(201).json(alumnoCompleto);
+
+      return res.status(201).json(resultado);
+
     } catch (error) {
       console.error('Error al crear alumno:', error);
-      if (error instanceof Error && error.message === 'Ya existe un alumno con ese DNI') {
-        res.status(400).json({ error: error.message });
-      } else {
-        res.status(400).json({ error: 'Error al crear alumno' });
-      }
+      return res.status(400).json({ 
+        error: error instanceof Error ? error.message : 'Error al crear alumno' 
+      });
     }
   }
-  
+  // PATCH
   else if (req.method === 'PATCH') {
     try {
       const { id, activo, motivoBaja } = req.body;
 
-      const alumno = await prisma.alumno.update({
-        where: { id: parseInt(id) },
-        data: { 
-          activo,
-          ...(activo === false && {
-            fechaBaja: new Date(),
-            motivoBaja
-          }),
-          ...(activo === true && {
-            fechaBaja: null,
-            motivoBaja: null
-          })
-        },
-        include: { 
-          alumnoEstilos: {
-            include: {
-              estilo: {
-                select: {
-                  id: true,
-                  nombre: true,
-                  monto: true,
-                  descripcion: true,
-                  importe: true
-                }
-              }
-            }
-          },
-          descuentosVigentes: {
-            where: {
-              activo: true
-            },
-            include: {
-              descuento: true
-            }
-          },
-          deudas: {
-            include: {
-              estilo: true
-            }
-          }
-        }
-      });
-
-      // Si se está dando de baja, desactivar todos los estilos
-      if (!activo) {
-        await prisma.alumnoEstilos.updateMany({
+      // Actualizar alumno en una transacción
+      const resultado = await prisma.$transaction(async (tx) => {
+        // Actualizar alumno principal
+        const alumno = await tx.alumno.update({
           where: { 
-            alumnoId: parseInt(id),
-            activo: true
+            id: parseInt(id) 
           },
           data: { 
-            activo: false,
-            fechaFin: new Date()
-          }
-        });
-
-        // Desactivar descuentos vigentes
-        await prisma.descuentoAplicado.updateMany({
-          where: {
-            alumnoId: parseInt(id),
-            activo: true
+            activo,
+            ...(activo === false && {
+              fechaBaja: new Date(),
+              motivoBaja
+            }),
+            ...(activo === true && {
+              fechaBaja: null,
+              motivoBaja: null
+            })
           },
-          data: {
-            activo: false,
-            fechaFin: new Date()
+          include: { 
+            alumnoEstilos: {
+              include: {
+                estilo: {
+                  select: {
+                    id: true,
+                    nombre: true,
+                    monto: true,
+                    descripcion: true,
+                    importe: true
+                  }
+                }
+              }
+            },
+            descuentosVigentes: {
+              where: {
+                activo: true
+              },
+              include: {
+                descuento: true
+              }
+            },
+            deudas: {
+              include: {
+                estilo: true
+              }
+            }
           }
         });
-      }
 
-      res.status(200).json(alumno);
+        // Si se está dando de baja
+        if (!activo) {
+          // Desactivar estilos
+          await tx.alumnoEstilos.updateMany({
+            where: { 
+              alumnoId: parseInt(id),
+              activo: true
+            },
+            data: { 
+              activo: false,
+              fechaFin: new Date()
+            }
+          });
+
+          // Desactivar descuentos vigentes
+          await tx.descuentoAplicado.updateMany({
+            where: {
+              alumnoId: parseInt(id),
+              activo: true
+            },
+            data: {
+              activo: false,
+              fechaFin: new Date()
+            }
+          });
+        }
+
+        return alumno;
+      });
+
+      return res.status(200).json(resultado);
+
     } catch (error) {
       console.error('Error al actualizar alumno:', error);
-      res.status(400).json({ error: 'Error al actualizar alumno' });
+      return res.status(400).json({ 
+        error: error instanceof Error ? error.message : 'Error al actualizar alumno' 
+      });
     }
-  } else {
+  }
+
+  // Método no permitido
+  else {
     res.setHeader('Allow', ['GET', 'POST', 'PATCH']);
-    res.status(405).end(`Method ${req.method} Not Allowed`);
+    return res.status(405).end(`Method ${req.method} Not Allowed`);
   }
 }

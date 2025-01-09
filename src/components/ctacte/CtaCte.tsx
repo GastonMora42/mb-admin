@@ -29,17 +29,24 @@ interface Alumno {
 interface Deuda {
   id: number;
   monto: number;
+  montoOriginal: number;
   mes: string;
   anio: number;
   pagada: boolean;
+  fechaPago: string | null;
   estilo: {
+    id: number;
     nombre: string;
   };
   pagos: {
+    id: number;
     monto: number;
+    fecha: string;
     recibo: {
+      id: number;
       numeroRecibo: number;
       fecha: string;
+      monto: number;
     };
   }[];
 }
@@ -312,6 +319,7 @@ const CtaCte: React.FC = () => {
       const res = await fetch(`/api/ctacte?alumnoId=${alumnoId}`);
       if (res.ok) {
         const data = await res.json();
+        console.log('Data recibida:', data); // Para debug
         setSelectedAlumno(data.alumnoInfo);
         setRecibos(data.recibos);
         setEstadisticas(data.estadisticas);
@@ -455,12 +463,22 @@ const CtaCte: React.FC = () => {
 const renderDeudasTable = () => {
   if (!selectedAlumno?.deudas) return null;
 
-  const deudasPendientes = selectedAlumno.deudas.filter(d => !d.pagada);
-  const deudasPagadas = selectedAlumno.deudas.filter(d => d.pagada);
+  // Ordenar deudas por fecha
+  const ordenarDeudas = (deudas: Deuda[]) => {
+    return deudas.sort((a, b) => {
+      if (a.anio !== b.anio) return a.anio - b.anio;
+      return parseInt(a.mes) - parseInt(b.mes);
+    });
+  };
+
+  const deudasPendientes = ordenarDeudas(selectedAlumno.deudas.filter(d => !d.pagada));
+  const deudasPagadas = ordenarDeudas(selectedAlumno.deudas.filter(d => d.pagada));
+
+  console.log('Deudas pagadas:', deudasPagadas); // Para debug
 
   return (
     <>
-      <h3>Deudas Pendientes</h3>
+      <h3>Deudas Pendientes ({deudasPendientes.length})</h3>
       <Table>
         <thead>
           <Tr>
@@ -486,14 +504,15 @@ const renderDeudasTable = () => {
         </tbody>
       </Table>
 
-      <h3 style={{ marginTop: '30px' }}>Deudas Pagadas</h3>
+      <h3 style={{ marginTop: '30px' }}>Deudas Pagadas ({deudasPagadas.length})</h3>
       <Table>
         <thead>
           <Tr>
             <Th>Estilo</Th>
             <Th>Período</Th>
-            <Th>Monto</Th>
+            <Th>Monto Original</Th>
             <Th>Pagos</Th>
+            <Th>Fecha Pago</Th>
             <Th>Estado</Th>
           </Tr>
         </thead>
@@ -502,16 +521,17 @@ const renderDeudasTable = () => {
             <Tr key={deuda.id}>
               <Td>{deuda.estilo.nombre}</Td>
               <Td>{`${deuda.mes}/${deuda.anio}`}</Td>
-              <Td>{formatCurrency(deuda.monto)}</Td>
+              <Td>{formatCurrency(deuda.montoOriginal)}</Td>
               <Td>
                 {deuda.pagos.map((pago, index) => (
                   <div key={index}>
-                    Recibo #{pago.recibo.numeroRecibo}: {formatCurrency(pago.monto)}
-                    <br />
-                    <small>Fecha: {formatFecha(pago.recibo.fecha)}</small>
+                    <div>Recibo #{pago.recibo.numeroRecibo}</div>
+                    <div>{formatCurrency(pago.monto)}</div>
+                    <small>{formatFecha(pago.recibo.fecha)}</small>
                   </div>
                 ))}
               </Td>
+              <Td>{deuda.fechaPago ? formatFecha(deuda.fechaPago) : '-'}</Td>
               <Td>
                 <StatusBadge status="success">
                   Pagada
@@ -521,6 +541,12 @@ const renderDeudasTable = () => {
           ))}
         </tbody>
       </Table>
+
+      {deudasPagadas.length === 0 && (
+        <div style={{ textAlign: 'center', padding: '20px', color: '#666' }}>
+          No hay deudas pagadas
+        </div>
+      )}
     </>
   );
 };

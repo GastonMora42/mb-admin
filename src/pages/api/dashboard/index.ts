@@ -15,7 +15,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         alumnosNuevos,
         alumnosInactivos,
         clasesDelMes,
+        
         asistenciasDelMes,
+        
         
         // Métricas financieras
         ingresosDelMes,
@@ -47,6 +49,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         prisma.alumno.count({
           where: { activo: false }
         }),
+        
 
         // Clases del mes
         prisma.clase.count({
@@ -57,6 +60,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             }
           }
         }),
+
+        
 
         // Asistencias del mes
         prisma.asistencia.count({

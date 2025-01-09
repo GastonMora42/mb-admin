@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, ChangeEvent } from 'react';
 import styled from 'styled-components';
 
 const Container = styled.div`
@@ -11,6 +11,33 @@ const Container = styled.div`
 const Title = styled.h2`
   color: #000000;
   margin-bottom: 20px;
+`;
+
+const FormSection = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 20px;
+  margin-bottom: 20px;
+`;
+
+const FormGroup = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+`;
+
+const Label = styled.label`
+  font-weight: 500;
+  color: #555;
+`;
+
+const Message = styled.div<{ isError: boolean }>`
+  padding: 15px;
+  margin-bottom: 20px;
+  border-radius: 4px;
+  background-color: ${props => props.isError ? '#ffebee' : '#e8f5e9'};
+  color: ${props => props.isError ? '#c62828' : '#2e7d32'};
+  border-left: 4px solid ${props => props.isError ? '#c62828' : '#2e7d32'};
 `;
 
 const Form = styled.form`
@@ -79,6 +106,11 @@ const CheckboxLabel = styled.label`
 interface Estilo {
   id: number;
   nombre: string;
+  profesor?: {
+    id: number;
+    nombre: string;
+    apellido: string;
+  };
 }
 
 interface Concepto {
@@ -86,114 +118,219 @@ interface Concepto {
   nombre: string;
   descripcion: string | null;
   monto: number;
-  estiloId: number;
-  estilo: Estilo;
-  fueraDeTermino: boolean;
+  estiloId: number | null;
+  estilo: Estilo | null;
+}
+
+interface NuevoConcepto {
+  nombre: string;
+  descripcion: string;
+  monto: string;
+  estiloId: string;
+  esClaseSuelta: boolean;
 }
 
 const Conceptos: React.FC = () => {
   const [conceptos, setConceptos] = useState<Concepto[]>([]);
   const [estilos, setEstilos] = useState<Estilo[]>([]);
-  const [nuevoConcepto, setNuevoConcepto] = useState({
+  const [nuevoConcepto, setNuevoConcepto] = useState<NuevoConcepto>({
     nombre: '',
     descripcion: '',
     monto: '',
     estiloId: '',
-    fueraDeTermino: false
+    esClaseSuelta: false
   });
-  
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState<{ text: string; isError: boolean } | null>(null);
+
   useEffect(() => {
     fetchConceptos();
     fetchEstilos();
   }, []);
 
   const fetchConceptos = async () => {
+    setLoading(true);
     try {
       const res = await fetch('/api/conceptos');
-      if (res.ok) {
-        const data = await res.json();
-        setConceptos(data);
-      }
+      if (!res.ok) throw new Error('Error al obtener conceptos');
+      const data = await res.json();
+      setConceptos(data);
     } catch (error) {
-      console.error('Error fetching conceptos:', error);
+      console.error('Error:', error);
+      setMessage({ text: 'Error al cargar conceptos', isError: true });
+    } finally {
+      setLoading(false);
     }
   };
 
   const fetchEstilos = async () => {
     try {
       const res = await fetch('/api/estilos');
-      if (res.ok) {
-        const data = await res.json();
-        setEstilos(data);
-      }
+      if (!res.ok) throw new Error('Error al obtener estilos');
+      const data = await res.json();
+      setEstilos(data);
     } catch (error) {
-      console.error('Error fetching estilos:', error);
+      console.error('Error:', error);
+      setMessage({ text: 'Error al cargar estilos', isError: true });
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      // Si es clase suelta, asegurarnos que el nombre sea consistente
+      const conceptoData = {
+        ...nuevoConcepto,
+        nombre: nuevoConcepto.esClaseSuelta ? 'Clase Suelta' : nuevoConcepto.nombre,
+        monto: parseFloat(nuevoConcepto.monto),
+        estiloId: nuevoConcepto.estiloId ? parseInt(nuevoConcepto.estiloId) : null,
+        esClaseSuelta: nuevoConcepto.esClaseSuelta
+      };
+  
+
+      const res = await fetch('/api/conceptos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(conceptoData),
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error);
+      }
+
+      const conceptoCreado = await res.json();
+      setConceptos(prev => [...prev, conceptoCreado]);
+      setNuevoConcepto({
+        nombre: '',
+        descripcion: '',
+        monto: '',
+        estiloId: '',
+        esClaseSuelta: false
+      });
+      setMessage({ text: 'Concepto creado exitosamente', isError: false });
+    } catch (error) {
+      console.error('Error:', error);
+      setMessage({ 
+        text: error instanceof Error ? error.message : 'Error al crear concepto', 
+        isError: true 
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
+    
+    // Para checkboxes
+    if (type === 'checkbox') {
+      setNuevoConcepto(prev => ({
+        ...prev,
+        [name]: (e.target as HTMLInputElement).checked
+      }));
+      return;
+    }
+  
+    // Para todos los demás tipos de inputs
     setNuevoConcepto(prev => ({
       ...prev,
-      [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value
+      [name]: value
     }));
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      const res = await fetch('/api/conceptos', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(nuevoConcepto),
-      });
-      if (res.ok) {
-        const conceptoCreado = await res.json();
-        setConceptos(prev => [...prev, conceptoCreado]);
-        setNuevoConcepto({ nombre: '', descripcion: '', monto: '', estiloId: '', fueraDeTermino: false });
-      }
-    } catch (error) {
-      console.error('Error creating concepto:', error);
-    }
   };
 
   return (
     <Container>
       <Title>Conceptos</Title>
+      
+      {message && (
+        <Message isError={message.isError}>{message.text}</Message>
+      )}
+
       <Form onSubmit={handleSubmit}>
-        <Input
-          type="text"
-          name="nombre"
-          value={nuevoConcepto.nombre}
-          onChange={handleInputChange}
-          placeholder="Nombre"
-          required
-        />
-        <Input
-          type="text"
-          name="descripcion"
-          value={nuevoConcepto.descripcion}
-          onChange={handleInputChange}
-          placeholder="Descripción"
-        />
-        <Input
-          type="number"
-          name="monto"
-          value={nuevoConcepto.monto}
-          onChange={handleInputChange}
-          placeholder="Monto"
-          required
-          step="0.01"
-        />
-        <Button type="submit">Agregar Concepto</Button>
+        <FormSection>
+          <FormGroup>
+            <Label>Nombre:</Label>
+            <Input
+              type="text"
+              name="nombre"
+              value={nuevoConcepto.nombre}
+              onChange={handleInputChange}
+              placeholder="Nombre del concepto"
+              required
+            />
+          </FormGroup>
+
+          <FormGroup>
+            <Label>Descripción:</Label>
+            <Input
+              type="text"
+              name="descripcion"
+              value={nuevoConcepto.descripcion}
+              onChange={handleInputChange}
+              placeholder="Descripción (opcional)"
+            />
+          </FormGroup>
+
+          <FormGroup>
+            <Label>Monto:</Label>
+            <Input
+              type="number"
+              name="monto"
+              value={nuevoConcepto.monto}
+              onChange={handleInputChange}
+              placeholder="Monto"
+              required
+              step="0.01"
+              min="0"
+            />
+          </FormGroup>
+
+          <FormGroup>
+            <Label>Estilo:</Label>
+            <Select
+              name="estiloId"
+              value={nuevoConcepto.estiloId}
+              onChange={handleInputChange}
+            >
+              <option value="">Seleccione un estilo</option>
+              {estilos.map(estilo => (
+                <option key={estilo.id} value={estilo.id}>
+                  {estilo.nombre} 
+                  {estilo.profesor && ` - Prof. ${estilo.profesor.apellido}`}
+                </option>
+              ))}
+            </Select>
+          </FormGroup>
+
+          <FormGroup>
+            <CheckboxLabel>
+              <input
+                type="checkbox"
+                name="esClaseSuelta"
+                checked={nuevoConcepto.esClaseSuelta}
+                onChange={handleInputChange}
+              />
+              Es Clase Suelta
+            </CheckboxLabel>
+          </FormGroup>
+        </FormSection>
+
+        <Button type="submit" disabled={loading}>
+          {loading ? 'Guardando...' : 'Crear Concepto'}
+        </Button>
       </Form>
 
       <Table>
         <thead>
           <Tr>
-            <Th>Titulo</Th>
+            <Th>Nombre</Th>
             <Th>Descripción</Th>
             <Th>Monto</Th>
+            <Th>Estilo</Th>
+            <Th>Profesor</Th>
+            <Th>Tipo</Th>
           </Tr>
         </thead>
         <tbody>
@@ -202,6 +339,12 @@ const Conceptos: React.FC = () => {
               <Td>{concepto.nombre}</Td>
               <Td>{concepto.descripcion}</Td>
               <Td>${concepto.monto.toFixed(2)}</Td>
+              <Td>{concepto.estilo?.nombre || '-'}</Td>
+              <Td>{concepto.estilo?.profesor ? 
+                `${concepto.estilo.profesor.apellido}, ${concepto.estilo.profesor.nombre}` : 
+                '-'}
+              </Td>
+              <Td>{concepto.nombre === 'Clase Suelta' ? 'Clase Suelta' : 'Regular'}</Td>
             </Tr>
           ))}
         </tbody>
