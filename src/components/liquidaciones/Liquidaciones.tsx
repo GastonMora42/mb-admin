@@ -240,6 +240,17 @@ const TotalGeneral = styled.div`
   border-top: 2px solid #ddd;
 `;
 
+const EditableInput = styled.input`
+  border: 1px solid #ddd;
+  padding: 4px 8px;
+  border-radius: 4px;
+  width: 120px;
+  &:focus {
+    border-color: #FFC001;
+    outline: none;
+  }
+`;
+
 const LoadingSpinner = styled.div`
   display: inline-block;
   width: 20px;
@@ -318,6 +329,14 @@ const Liquidaciones: React.FC = () => {
     periodo: new Date().toISOString().slice(0, 7)
   });
 
+  const [valoresEditables, setValoresEditables] = useState({
+    regularCount: 0,
+    totalRegular: 0,
+    sueltasCount: 0,
+    totalSueltas: 0
+  });
+
+
   // Nuevos estados
   const [liquidacionData, setLiquidacionData] = useState<LiquidacionData | null>(null);
   const [showPreview, setShowPreview] = useState(false);
@@ -352,6 +371,18 @@ const Liquidaciones: React.FC = () => {
       });
     }
   }, [filtros.profesorId, profesores]);
+
+  useEffect(() => {
+    if (liquidacionData) {
+      setValoresEditables({
+        regularCount: liquidacionData.regularCount,
+        totalRegular: liquidacionData.totalRegular,
+        sueltasCount: liquidacionData.sueltasCount,
+        totalSueltas: liquidacionData.totalSueltas
+      });
+    }
+  }, [liquidacionData]);
+
   // Funciones existentes actualizadas
  const fetchProfesores = async () => {
   try {
@@ -510,23 +541,65 @@ return (
       <>
         <ResumenContainer>
           <h3>Resumen de Liquidación</h3>
-          <ResumenGrid>
-            <ResumenItem>
-              <h4>Cursos Regulares</h4>
-              <div>Cantidad de alumnos: {liquidacionData.regularCount}</div>
-              <div>Total recaudado: ${liquidacionData.totalRegular.toFixed(2)}</div>
-              <div>Porcentaje profesor: {porcentajesPersonalizados.porcentajeCursos}%</div>
-              <div>Monto liquidación: ${(liquidacionData.totalRegular * porcentajesPersonalizados.porcentajeCursos / 100).toFixed(2)}</div>
-            </ResumenItem>
+<ResumenGrid>
+  <ResumenItem>
+    <h4>Cursos Regulares</h4>
+    <div>
+      <label>Cantidad de alumnos: </label>
+      <EditableInput
+        type="number"
+        value={valoresEditables.regularCount}
+        onChange={(e) => setValoresEditables(prev => ({
+          ...prev,
+          regularCount: parseInt(e.target.value) || 0
+        }))}
+      />
+    </div>
+    <div>
+      <label>Total recaudado: $</label>
+      <EditableInput
+        type="number"
+        step="0.01"
+        value={valoresEditables.totalRegular}
+        onChange={(e) => setValoresEditables(prev => ({
+          ...prev,
+          totalRegular: parseFloat(e.target.value) || 0
+        }))}
+      />
+    </div>
+    <div>Porcentaje profesor: {porcentajesPersonalizados.porcentajeCursos}%</div>
+    <div>Monto liquidación: ${(valoresEditables.totalRegular * porcentajesPersonalizados.porcentajeCursos / 100).toFixed(2)}</div>
+  </ResumenItem>
 
-            <ResumenItem>
-              <h4>Clases Sueltas</h4>
-              <div>Cantidad de alumnos: {liquidacionData.sueltasCount}</div>
-              <div>Total recaudado: ${liquidacionData.totalSueltas.toFixed(2)}</div>
-              <div>Porcentaje profesor: {porcentajesPersonalizados.porcentajeClasesSueltas}%</div>
-              <div>Monto liquidación: ${(liquidacionData.totalSueltas * porcentajesPersonalizados.porcentajeClasesSueltas / 100).toFixed(2)}</div>
-            </ResumenItem>
-          </ResumenGrid>
+  <ResumenItem>
+    <h4>Clases Sueltas</h4>
+    <div>
+      <label>Cantidad de alumnos: </label>
+      <EditableInput
+        type="number"
+        value={valoresEditables.sueltasCount}
+        onChange={(e) => setValoresEditables(prev => ({
+          ...prev,
+          sueltasCount: parseInt(e.target.value) || 0
+        }))}
+      />
+    </div>
+    <div>
+      <label>Total recaudado: $</label>
+      <EditableInput
+        type="number"
+        step="0.01"
+        value={valoresEditables.totalSueltas}
+        onChange={(e) => setValoresEditables(prev => ({
+          ...prev,
+          totalSueltas: parseFloat(e.target.value) || 0
+        }))}
+      />
+    </div>
+    <div>Porcentaje profesor: {porcentajesPersonalizados.porcentajeClasesSueltas}%</div>
+    <div>Monto liquidación: ${(valoresEditables.totalSueltas * porcentajesPersonalizados.porcentajeClasesSueltas / 100).toFixed(2)}</div>
+  </ResumenItem>
+</ResumenGrid>
 
           <ButtonContainer>
             <PreviewButton onClick={() => setShowPreview(true)}>
@@ -537,14 +610,22 @@ return (
       </>
     )}
 
-    {showPreview && liquidacionData && (
-      <PreviewModal
-        liquidacionData={liquidacionData}
-        profesor={profesorSeleccionado}
-        porcentajesPersonalizados={porcentajesPersonalizados}
-        onClose={() => setShowPreview(false)}
-      />
-    )}
+{showPreview && liquidacionData && (
+  <PreviewModal
+    liquidacionData={{
+      ...liquidacionData,
+      regularCount: valoresEditables.regularCount,
+      totalRegular: valoresEditables.totalRegular,
+      sueltasCount: valoresEditables.sueltasCount,
+      totalSueltas: valoresEditables.totalSueltas,
+      montoLiquidacionRegular: valoresEditables.totalRegular * porcentajesPersonalizados.porcentajeCursos / 100,
+      montoLiquidacionSueltas: valoresEditables.totalSueltas * porcentajesPersonalizados.porcentajeClasesSueltas / 100
+    }}
+    profesor={profesorSeleccionado}
+    porcentajesPersonalizados={porcentajesPersonalizados}
+    onClose={() => setShowPreview(false)}
+  />
+)}
   </Container>
 );
 };

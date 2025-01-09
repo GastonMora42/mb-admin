@@ -1,0 +1,320 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Alumno {
+  id                       Int             @id @default(autoincrement())
+  nombre                   String
+  apellido                 String
+  dni                      String          @unique
+  activo                   Boolean         @default(true)
+  fechaNacimiento          DateTime
+  email                    String?
+  telefono                 String?
+  numeroEmergencia         String?
+  direccion                String?
+  obraSocial               String?
+  nombreTutor              String?
+  dniTutor                 String?
+  notas                    String?
+  fechaIngreso             DateTime        @default(now())
+  fechaBaja                DateTime?
+  motivoBaja               String?
+  recibos                  Recibo[]
+  alumnosSueltosAnteriores AlumnoSuelto[]  @relation("AlumnoSueltoRegular")
+  ctaCte                   CtaCte?
+  estilos                  Estilo[]        @relation("AlumnoEstilos")
+  asistencias              Asistencia[]
+  alumnoEstilos            AlumnoEstilos[]
+  deudas                   Deuda[]
+  descuentosVigentes       DescuentoAplicado[]
+  configuracionPago        ConfiguracionPagoAlumno?
+  createdAt                DateTime        @default(now())
+  updatedAt                DateTime        @updatedAt
+}
+
+model ConfiguracionPagoAlumno {
+  id              Int      @id @default(autoincrement())
+  alumno          Alumno   @relation(fields: [alumnoId], references: [id])
+  alumnoId        Int      @unique
+  diaPago         Int?
+  metodoPago      TipoPago @default(EFECTIVO)
+  descuentoFijo   Float?
+  observaciones   String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Descuento {
+  id                Int                @id @default(autoincrement())
+  nombre            String
+  porcentaje        Float
+  activo            Boolean            @default(true)
+  esAutomatico      Boolean            @default(false)
+  minEstilos        Int?
+  aplicadoA         DescuentoAplicado[]
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+}
+
+model DescuentoAplicado {
+  id          Int       @id @default(autoincrement())
+  descuento   Descuento @relation(fields: [descuentoId], references: [id])
+  descuentoId Int
+  alumno      Alumno    @relation(fields: [alumnoId], references: [id])
+  alumnoId    Int
+  fechaInicio DateTime  @default(now())
+  fechaFin    DateTime?
+  activo      Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Deuda {
+  id            Int         @id @default(autoincrement())
+  alumno        Alumno      @relation(fields: [alumnoId], references: [id])
+  alumnoId      Int
+  monto         Float
+  montoOriginal Float
+  mes           String
+  anio          Int
+  estilo        Estilo      @relation(fields: [estiloId], references: [id])
+  estiloId      Int
+  pagada        Boolean     @default(false)
+  fechaPago     DateTime?
+  fechaVencimiento DateTime
+  pagos         PagoDeuda[]
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([alumnoId, mes, anio])
+}
+
+model PagoDeuda {
+  id        Int      @id @default(autoincrement())
+  deuda     Deuda    @relation(fields: [deudaId], references: [id])
+  deudaId   Int
+  recibo    Recibo   @relation(fields: [reciboId], references: [id])
+  reciboId  Int
+  monto     Float
+  fecha     DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([deudaId])
+}
+
+model Concepto {
+  id          Int      @id @default(autoincrement())
+  nombre      String
+  descripcion String?
+  monto       Float
+  estiloId    Int?
+  estilo      Estilo?  @relation(fields: [estiloId], references: [id])
+  recibos     Recibo[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+enum TipoPago {
+  EFECTIVO
+  MERCADO_PAGO
+  TRANSFERENCIA
+  DEBITO_AUTOMATICO
+  OTRO
+}
+
+model Recibo {
+  id                Int           @id @default(autoincrement())
+  numeroRecibo      Int           @unique @default(autoincrement())
+  fecha             DateTime      @default(now())
+  fechaEfecto       DateTime      @default(now())
+  monto             Float
+  montoOriginal     Float
+  descuento         Float?
+  periodoPago       String
+  tipoPago          TipoPago
+  fueraDeTermino    Boolean       @default(false)
+  esClaseSuelta     Boolean       @default(false)
+  esMesCompleto     Boolean       @default(false)
+  alumno            Alumno?       @relation(fields: [alumnoId], references: [id])
+  alumnoId          Int?
+  alumnoSuelto      AlumnoSuelto? @relation(fields: [alumnoSueltoId], references: [id])
+  alumnoSueltoId    Int?
+  concepto          Concepto      @relation(fields: [conceptoId], references: [id])
+  conceptoId        Int
+  pagosDeuda        PagoDeuda[]
+  detallesLiquidacion DetalleLiquidacion[]
+  claseId           Int?
+  clase             Clase?        @relation(fields: [claseId], references: [id])
+  anulado           Boolean       @default(false)
+  motivoAnulacion   String?
+  referenciaRecibo  Int?
+  reciboAnulado     Recibo?      @relation("ReciboAnulado", fields: [referenciaRecibo], references: [id])
+  recibosAnulados   Recibo[]     @relation("ReciboAnulado")
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  @@index([fecha])
+  @@index([alumnoId, fecha])
+}
+
+model Estilo {
+  id            Int             @id @default(autoincrement())
+  nombre        String
+  monto         Float           @default(0)
+  deudas        Deuda[]
+  conceptos     Concepto[]
+  clases        Clase[]
+  descripcion   String?
+  importe       Float           @default(0)
+  profesorId    Int?
+  alumnoEstilos AlumnoEstilos[]
+  profesor      Profesor?       @relation(fields: [profesorId], references: [id])
+  alumnos       Alumno[]        @relation("AlumnoEstilos")
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+}
+
+model AlumnoEstilos {
+  id                   Int       @id @default(autoincrement())
+  alumno               Alumno    @relation(fields: [alumnoId], references: [id])
+  alumnoId             Int
+  estilo               Estilo    @relation(fields: [estiloId], references: [id])
+  estiloId             Int
+  activo               Boolean   @default(true)
+  fechaInicio          DateTime  @default(now())
+  fechaFin             DateTime?
+  montoPersonalizado   Float?
+  descuentoPersonalizado Float?
+  observaciones        String?
+
+  @@unique([alumnoId, estiloId])
+  @@index([activo])
+}
+
+model Profesor {
+  id                Int           @id @default(autoincrement())
+  nombre            String
+  apellido          String
+  dni               String        @unique
+  fechaNacimiento   DateTime?
+  direccion         String?
+  cuit              String?
+  email             String?
+  telefono          String?
+  clases            Clase[]
+  fechaIngreso      DateTime      @default(now())
+  estilos           Estilo[]
+  liquidaciones     Liquidacion[]
+  porcentajePorDefecto Float     @default(0.60)
+  porcentajeClasesSueltasPorDefecto Float @default(0.80)
+  activo            Boolean       @default(true)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+}
+
+model CtaCte {
+  id        Int      @id @default(autoincrement())
+  saldo     Float
+  alumno    Alumno   @relation(fields: [alumnoId], references: [id])
+  alumnoId  Int      @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model CajaDiaria {
+  id         Int      @id @default(autoincrement())
+  fecha      DateTime @unique @default(now())
+  apertura   Float
+  cierre     Float
+  diferencia Float
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Clase {
+  id             Int            @id @default(autoincrement())
+  fecha          DateTime       @default(now())
+  profesorId     Int
+  profesor       Profesor       @relation(fields: [profesorId], references: [id])
+  estiloId       Int
+  estilo         Estilo         @relation(fields: [estiloId], references: [id])
+  asistencias    Asistencia[]
+  alumnosSueltos AlumnoSuelto[]
+  recibos        Recibo[]
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+}
+
+model Asistencia {
+  id        Int      @id @default(autoincrement())
+  claseId   Int
+  clase     Clase    @relation(fields: [claseId], references: [id])
+  alumnoId  Int
+  alumno    Alumno   @relation(fields: [alumnoId], references: [id])
+  asistio   Boolean
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model AlumnoSuelto {
+  id              Int      @id @default(autoincrement())
+  nombre          String
+  apellido        String
+  dni             String   @unique
+  telefono        String?
+  email           String?
+  recibos         Recibo[]
+  clases          Clase[]
+  alumnoRegularId Int?
+  alumnoRegular   Alumno?  @relation("AlumnoSueltoRegular", fields: [alumnoRegularId], references: [id])
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+enum EstadoLiquidacion {
+  PENDIENTE
+  PAGADA
+  ANULADA
+}
+
+model Liquidacion {
+  id              Int               @id @default(autoincrement())
+  fecha           DateTime          @default(now())
+  mes             Int
+  anio            Int
+  profesor        Profesor?         @relation(fields: [profesorId], references: [id])
+  profesorId      Int?
+  montoTotal      Float
+  montoCursos     Float
+  montoClasesSueltas Float
+  porcentajeCursos Float           @default(0.60)
+  porcentajeClasesSueltas Float    @default(0.80)
+  estado          EstadoLiquidacion @default(PENDIENTE)
+  metodoPago      TipoPago?
+  fechaPago       DateTime?
+  observaciones   String?
+  detalles        DetalleLiquidacion[]
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+}
+
+model DetalleLiquidacion {
+  id            Int         @id @default(autoincrement())
+  liquidacion   Liquidacion @relation(fields: [liquidacionId], references: [id])
+  liquidacionId Int
+  reciboId      Int?       
+  recibo        Recibo?     @relation(fields: [reciboId], references: [id])
+  montoOriginal Float
+  porcentaje    Float
+  montoLiquidado Float
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
