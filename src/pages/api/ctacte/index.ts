@@ -50,13 +50,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 estilo: true,
                 pagos: {
                   include: {
-                    recibo: true
+                    recibo: {
+                      select: {
+                        id: true,
+                        numeroRecibo: true,
+                        fecha: true,
+                        monto: true,
+                        periodoPago: true,
+                        anulado: true,
+                        tipoPago: true
+                      }
+                    }
                   }
                 }
               },
               orderBy: [
-                { anio: 'desc' },
-                { mes: 'desc' }
+                { anio: 'asc' }, // Cambiar a ascendente
+                { mes: 'asc' }   // Cambiar a ascendente
               ]
             },
             alumnoEstilos: {
@@ -118,15 +128,56 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const todosLosRecibos = [...recibosRegulares, ...recibosSueltos]
           .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
 
+          // Antes de procesar las deudas
+console.log('Deudas sin procesar:', alumnoInfo.deudas);
+
+const deudasProcesadas = alumnoInfo.deudas.map(deuda => {
+  // Log para cada deuda
+  console.log(`Procesando deuda ID ${deuda.id}:`, {
+    monto: deuda.monto,
+    pagos: deuda.pagos
+  });
+
+  const pagosValidos = deuda.pagos.filter(pago => !pago.recibo.anulado);
+  const montoPagado = pagosValidos.reduce((sum, pago) => sum + pago.monto, 0);
+  const estaPagada = montoPagado >= deuda.monto;
+
+  // Log del resultado
+  console.log(`Resultado deuda ID ${deuda.id}:`, {
+    montoPagado,
+    estaPagada
+  });
+
+  return {
+    ...deuda,
+    montoPagado,
+    saldoPendiente: deuda.monto - montoPagado,
+    pagada: estaPagada,
+    pagosDetalle: pagosValidos.map(pago => ({
+      id: pago.id,
+      monto: pago.monto,
+      fecha: pago.recibo.fecha,
+      numeroRecibo: pago.recibo.numeroRecibo
+    }))
+  };
+});
+
+// Log final
+console.log('Deudas procesadas:', deudasProcesadas);
+  
+
         // Calcular estadísticas y totales
         const estadisticas = {
-          totalPagado: todosLosRecibos.reduce((sum, recibo) => sum + recibo.monto, 0),
-          deudaTotal: alumnoInfo.deudas
+          totalPagado: todosLosRecibos
+            .filter(r => !r.anulado)
+            .reduce((sum, recibo) => sum + recibo.monto, 0),
+          deudaTotal: deudasProcesadas
             .filter(d => !d.pagada)
-            .reduce((sum, deuda) => sum + deuda.monto, 0),
-          cantidadDeudas: alumnoInfo.deudas.filter(d => !d.pagada).length,
+            .reduce((sum, deuda) => sum + deuda.saldoPendiente, 0),
+          cantidadDeudas: deudasProcesadas.filter(d => !d.pagada).length,
+          deudasPagadas: deudasProcesadas.filter(d => d.pagada).length,
           estilosActivos: alumnoInfo.alumnoEstilos.length,
-          ultimoPago: todosLosRecibos[0]?.fecha || null,
+          ultimoPago: todosLosRecibos.find(r => !r.anulado)?.fecha || null,
           descuentosActivos: alumnoInfo.descuentosVigentes.map(dv => ({
             tipo: dv.descuento.esAutomatico ? 'Automático' : 'Manual',
             porcentaje: dv.descuento.porcentaje
@@ -140,14 +191,29 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           d => d.mes === mesActual.toString() && d.anio === anioActual && !d.pagada
         );
         const estadoPagos = {
-          alDia: deudasMesActual.length === 0,
-          mesesAdeudados: [...new Set(alumnoInfo.deudas
+          alDia: deudasProcesadas.every(deuda => 
+            deuda.pagada || (
+              new Date(deuda.fechaVencimiento) > new Date()
+            )
+          ),
+          mesesAdeudados: deudasProcesadas
             .filter(d => !d.pagada)
-            .map(d => `${d.mes}/${d.anio}`))]
+            .map(d => ({
+              periodo: `${d.mes}/${d.anio}`,
+              monto: d.saldoPendiente,
+              vencida: new Date(d.fechaVencimiento) < new Date()
+            }))
+            .sort((a, b) => {
+              const [mesA, anioA] = a.periodo.split('/').map(Number);
+              const [mesB, anioB] = b.periodo.split('/').map(Number);
+              return anioA - anioB || mesA - mesB;
+            })
         };
-
         return res.status(200).json({
-          alumnoInfo,
+          alumnoInfo: {
+            ...alumnoInfo,
+            deudas: deudasProcesadas
+          },
           recibos: todosLosRecibos,
           estadisticas,
           estadoPagos

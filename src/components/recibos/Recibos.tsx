@@ -45,6 +45,13 @@ const FilterToggleButton = styled.button<{ isOpen?: boolean }>`
   }
 `;
 
+const NoDeudas = styled.div`
+  text-align: center;
+  padding: 1rem;
+  color: #666;
+  font-style: italic;
+`;
+
 // Agreguemos estilos para los grupos de inputs
 const InputGroup = styled.div`
   display: flex;
@@ -257,27 +264,6 @@ const FilterInput = styled(Input)`
   }
 `;
 
-const FilterSelect = styled(Select)`
-  background-color: white;
-  border: 1px solid #ddd;
-  transition: all 0.3s ease;
-
-  &:focus {
-    border-color: #FFC001;
-    box-shadow: 0 0 0 2px rgba(255, 192, 1, 0.2);
-  }
-`;
-
-const FilterButtons = styled.div`
-  display: flex;
-  gap: 10px;
-  margin-top: 20px;
-  
-  button {
-    flex: 1;
-  }
-`;
-
 const CloseFiltersButton = styled.button`
   position: absolute;
   top: 10px;
@@ -364,6 +350,8 @@ interface Filtros {
 
 
 interface DeudaSeleccionada {
+  estiloId: any;
+  periodo: any;
   deudaId: number;
   monto: number;
   montoOriginal: number;
@@ -412,7 +400,9 @@ const Recibos: React.FC = () => {
   const [deudasAlumno, setDeudasAlumno] = useState<Deuda[]>([]);
   const [deudasSeleccionadas, setDeudasSeleccionadas] = useState<{[key: number]: DeudaSeleccionada}>({});
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [conceptosFiltrados, setConceptosFiltrados] = useState<Concepto[]>([]); // Nuevo estado
   const [vistaPrevia, setVistaPrevia] = useState<VistaPrevia>(initialVistaPrevia);
+  const [estiloSeleccionado, setEstiloSeleccionado] = useState<string>('');
   
   const [nuevoRecibo, setNuevoRecibo] = useState({
     monto: '',
@@ -449,9 +439,6 @@ const [filtros, setFiltros] = useState<Filtros>({
 
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ text: string; isError: boolean } | null>(null);
-  const [mostrarRecibos, setMostrarRecibos] = useState(true);
-
-  // ... (después del estado inicial)
 
   useEffect(() => {
     fetchRecibos();
@@ -463,6 +450,20 @@ const [filtros, setFiltros] = useState<Filtros>({
   useEffect(() => {
     calcularVistaPrevia();
   }, [nuevoRecibo, deudasSeleccionadas]);
+
+  useEffect(() => {
+    if (estiloSeleccionado) {
+      const conceptosFiltrados = conceptos.filter(concepto => 
+        nuevoRecibo.esClaseSuelta 
+          ? concepto.nombre === 'Clase Suelta' && concepto.estiloId === parseInt(estiloSeleccionado)
+          : concepto.nombre !== 'Clase Suelta' && concepto.estiloId === parseInt(estiloSeleccionado)
+      );
+      setConceptosFiltrados(conceptosFiltrados);
+    } else {
+      setConceptosFiltrados([]);
+    }
+  }, [estiloSeleccionado, nuevoRecibo.esClaseSuelta, conceptos]);
+
 
   const fetchRecibos = async () => {
     setLoading(true);
@@ -535,27 +536,24 @@ const crearRecibosPendientes = async () => {
   setLoading(true);
   try {
     for (const recibo of recibosPendientes) {
-      const montoOriginal = recibo.monto; // Guardamos el monto original
-      const montoFinal = recibo.descuento ? 
-        montoOriginal * (1 - recibo.descuento) : 
-        montoOriginal;
-
       const reciboData = {
-        monto: montoFinal,
-        montoOriginal: montoOriginal, // Agregamos el monto original
+        monto: recibo.monto,
+        montoOriginal: recibo.monto,
         descuento: recibo.descuento,
         periodoPago: recibo.periodoPago,
         tipoPago: recibo.tipoPago,
         fechaEfecto: recibo.fechaEfecto,
         fueraDeTermino: false,
         esClaseSuelta: false,
-        esMesCompleto: false,
+        esMesCompleto: true, // Importante: esto debe ser true
         alumnoId: recibo.alumno?.id,
         alumnoSueltoId: recibo.alumnoSuelto?.id,
         conceptoId: recibo.concepto.id,
         deudasAPagar: Object.entries(recibo.deudasSeleccionadas || {}).map(([deudaId, deuda]) => ({
           deudaId: parseInt(deudaId),
-          monto: deuda.monto
+          monto: deuda.monto,
+          estiloId: deuda.estiloId,
+          periodo: deuda.periodo
         }))
       };
 
@@ -566,16 +564,19 @@ const crearRecibosPendientes = async () => {
       });
 
       if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.error || 'Error al crear recibo');
+        throw new Error('Error al crear el recibo');
       }
     }
     
     setRecibosPendientes([]);
     fetchRecibos();
+    // Importante: recargar las deudas del alumno
+    if (nuevoRecibo.alumnoId) {
+      fetchDeudasAlumno(nuevoRecibo.alumnoId);
+    }
     setMessage({ text: 'Recibos creados exitosamente', isError: false });
   } catch (error) {
-    console.error('Error creating recibos:', error);
+    console.error('Error:', error);
     setMessage({ text: 'Error al crear los recibos', isError: true });
   } finally {
     setLoading(false);
@@ -621,15 +622,20 @@ const crearRecibosPendientes = async () => {
       setDeudasAlumno([]);
       return;
     }
+    
     try {
-      const res = await fetch(`/api/deudas?alumnoId=${alumnoId}&pagada=false`);
-      if (!res.ok) throw new Error('Error al obtener deudas');
-      const deudas = await res.json();
-      setDeudasAlumno(deudas);
+      const response = await fetch(`/api/deudas?alumnoId=${alumnoId}&pagada=false`);
+      if (!response.ok) throw new Error('Error al obtener deudas');
+      
+      const data = await response.json();
+      // Asegurarnos de que estamos usando el array de deudas de la respuesta
+      setDeudasAlumno(data.deudas || []);
     } catch (error) {
       console.error('Error al cargar deudas:', error);
+      setDeudasAlumno([]);
     }
   };
+  
 
   const calcularVistaPrevia = () => {
     const montoBase = parseFloat(nuevoRecibo.monto) || 0;
@@ -659,9 +665,11 @@ const crearRecibosPendientes = async () => {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
     const checked = type === 'checkbox' ? (e.target as HTMLInputElement).checked : undefined;
-
+  
     if (name === 'alumnoId' && value) {
       fetchDeudasAlumno(value);
+      // Limpiar deudas seleccionadas al cambiar de alumno
+      setDeudasSeleccionadas({});
     }
 
     setNuevoRecibo(prev => {
@@ -700,7 +708,9 @@ const crearRecibosPendientes = async () => {
           [deudaId]: {
             deudaId,
             monto: deuda.monto,
-            montoOriginal: deuda.montoOriginal
+            montoOriginal: deuda.montoOriginal,
+            estiloId: deuda.estilo.id,  // Agregar esto
+            periodo: `${deuda.mes}-${deuda.anio}` // Agregar esto
           }
         }));
       }
@@ -739,6 +749,35 @@ const crearRecibosPendientes = async () => {
           deudaId: parseInt(deudaId),
           monto: deuda.monto
         }))
+      };
+
+      const handleClaseSueltaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const checked = e.target.checked;
+        
+        if (checked) {
+          const conceptoClaseSuelta = conceptos.find(
+            c => c.nombre === 'Clase Suelta' && 
+            (estiloSeleccionado ? c.estiloId === parseInt(estiloSeleccionado) : true)
+          );
+    
+          if (conceptoClaseSuelta) {
+            setNuevoRecibo(prev => ({
+              ...prev,
+              esClaseSuelta: true,
+              conceptoId: conceptoClaseSuelta.id.toString(),
+              monto: conceptoClaseSuelta.monto.toString(),
+              alumnoId: '',
+            }));
+          }
+        } else {
+          setNuevoRecibo(prev => ({
+            ...prev,
+            esClaseSuelta: false,
+            conceptoId: '',
+            monto: '',
+            alumnoSueltoId: ''
+          }));
+        }
       };
 
       const res = await fetch('/api/recibos', {
@@ -940,44 +979,59 @@ const crearRecibosPendientes = async () => {
               Fuera de término
             </CheckboxLabel>
             <CheckboxLabel>
-              <input
-                type="checkbox"
-                name="esMesCompleto"
-                checked={nuevoRecibo.esMesCompleto}
-                onChange={handleInputChange}
-              />
-              Mes Completo
-            </CheckboxLabel>
+  <input
+    type="checkbox"
+    name="esMesCompleto"
+    checked={nuevoRecibo.esMesCompleto}
+    onChange={(e) => {
+      handleInputChange(e);
+      if (e.target.checked && nuevoRecibo.alumnoId) {
+        // Si se marca "Mes Completo", seleccionar automáticamente todas las deudas del período
+        const periodo = nuevoRecibo.periodoPago;
+        const [anio, mes] = periodo.split('-');
+        const deudasDelPeriodo = deudasAlumno.filter(
+          d => d.mes === mes && d.anio === parseInt(anio)
+        );
+        deudasDelPeriodo.forEach(deuda => handleDeudaSelect(deuda.id, true));
+      }
+    }}
+  />
+  Mes Completo
+</CheckboxLabel>
           </InputGroup>
           {/* Sección de Deudas */}
-        {nuevoRecibo.alumnoId && !nuevoRecibo.esClaseSuelta && (
-          <DeudaSection>
-            <InputLabel>Deudas Pendientes</InputLabel>
-            {deudasAlumno.map(deuda => (
-              <DeudaItem key={deuda.id}>
-                <CheckboxLabel>
-                  <input
-                    type="checkbox"
-                    checked={!!deudasSeleccionadas[deuda.id]}
-                    onChange={(e) => handleDeudaSelect(deuda.id, e.target.checked)}
-                  />
-                  {`${deuda.estilo.nombre} - ${deuda.mes}/${deuda.anio} - $${deuda.monto}`}
-                </CheckboxLabel>
-                {deudasSeleccionadas[deuda.id] && (
-                  <Input
-                    type="number"
-                    value={deudasSeleccionadas[deuda.id].monto}
-                    onChange={(e) => handleDeudaMontoChange(deuda.id, e.target.value)}
-                    placeholder="Monto a pagar"
-                    step="0.01"
-                    min="0"
-                    max={deuda.monto}
-                  />
-                )}
-              </DeudaItem>
-            ))}
-          </DeudaSection>
-        )}
+          {nuevoRecibo.alumnoId && !nuevoRecibo.esClaseSuelta && (
+    <DeudaSection>
+      <InputLabel>Deudas Pendientes</InputLabel>
+      {Array.isArray(deudasAlumno) && deudasAlumno.length > 0 ? (
+        deudasAlumno.map(deuda => (
+          <DeudaItem key={deuda.id}>
+            <CheckboxLabel>
+              <input
+                type="checkbox"
+                checked={!!deudasSeleccionadas[deuda.id]}
+                onChange={(e) => handleDeudaSelect(deuda.id, e.target.checked)}
+              />
+              {`${deuda.estilo.nombre} - ${deuda.mes}/${deuda.anio} - $${deuda.monto}`}
+            </CheckboxLabel>
+            {deudasSeleccionadas[deuda.id] && (
+              <Input
+                type="number"
+                value={deudasSeleccionadas[deuda.id].monto}
+                onChange={(e) => handleDeudaMontoChange(deuda.id, e.target.value)}
+                placeholder="Monto a pagar"
+                step="0.01"
+                min="0"
+                max={deuda.monto}
+              />
+            )}
+          </DeudaItem>
+        ))
+      ) : (
+        <NoDeudas>No hay deudas pendientes</NoDeudas>
+      )}
+    </DeudaSection>
+  )}
 
         <Button type="submit" disabled={loading}>
           {loading ? 'Agregando...' : 'Agregar a Vista Previa'}

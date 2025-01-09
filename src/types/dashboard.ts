@@ -13,6 +13,7 @@ export interface DashboardData {
       nuevos: number;
       inactivos: number;
       sueltos: number;
+      bajas: number;  // Nueva línea agregada
       tasaCrecimiento: string;
     };
     clases: {
