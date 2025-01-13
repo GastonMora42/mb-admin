@@ -20,6 +20,7 @@ export async function generarDeudaMensual(alumnoId: number) {
   const fechaActual = new Date();
   const mes = fechaActual.getMonth() + 1;
   const anio = fechaActual.getFullYear();
+  const fechaVencimiento = new Date(anio, mes, 0); // Último día del mes
 
   for (const alumnoEstilo of alumno.alumnoEstilos) {
     const deudaExistente = await prisma.deuda.findFirst({
@@ -38,9 +39,12 @@ export async function generarDeudaMensual(alumnoId: number) {
           alumnoId,
           estiloId: alumnoEstilo.estiloId,
           monto: alumnoEstilo.estilo.importe,
+          montoOriginal: alumnoEstilo.estilo.importe,
           mes: mes.toString(),
           anio,
-        }
+          fechaVencimiento,
+          pagada: false
+        },
       });
     }
   }
@@ -50,20 +54,20 @@ export async function generarRecibo(
   alumnoId: number, 
   conceptoId: number, 
   monto: number, 
-  tipoPago: TipoPago  // Cambiado de string a TipoPago
+  tipoPago: TipoPago
 ) {
   const recibo = await prisma.recibo.create({
     data: {
       alumnoId,
       conceptoId,
       monto,
+      montoOriginal: monto, // Agregamos este campo
       periodoPago: `${new Date().getMonth() + 1}/${new Date().getFullYear()}`,
-      tipoPago, // Ahora tipoPago debe ser uno de los valores del enum
+      tipoPago,
       fecha: new Date(),
     }
   });
 
-  // Obtener todas las deudas pendientes del alumno
   const deudasPendientes = await prisma.deuda.findMany({
     where: {
       alumnoId,
@@ -77,7 +81,6 @@ export async function generarRecibo(
 
   let montoRestante = monto;
 
-  // Saldar deudas
   for (const deuda of deudasPendientes) {
     if (montoRestante >= deuda.monto) {
       await prisma.deuda.update({
@@ -86,7 +89,6 @@ export async function generarRecibo(
       });
       montoRestante -= deuda.monto;
     } else if (montoRestante > 0) {
-      // Si queda un monto parcial, actualizamos la deuda
       await prisma.deuda.update({
         where: { id: deuda.id },
         data: { monto: deuda.monto - montoRestante }
@@ -106,7 +108,6 @@ export async function darDeBajaAlumno(alumnoId: number) {
     data: { activo: false }
   });
 
-  // Desactivar todos los estilos del alumno
   await prisma.alumnoEstilos.updateMany({
     where: { alumnoId },
     data: { activo: false }
