@@ -23,8 +23,6 @@ function AppContent({ Component, pageProps }: AppProps) {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   
   useEffect(() => {
-    // Aquí deberías implementar tu lógica de verificación de autenticación
-    // Por ejemplo, usando Amplify Auth o tu método de autenticación preferido
     const checkAuth = async () => {
       try {
         // Ejemplo con Amplify Auth:
@@ -38,17 +36,13 @@ function AppContent({ Component, pageProps }: AppProps) {
     checkAuth();
   }, []);
 
-  if (isAuthenticated === null) {
-    // Aún no sabemos si el usuario está autenticado, mostramos un loader o nada
-    return null;
-  }
-
-  if (!isAuthenticated && !publicPaths.includes(router.pathname)) {
-    // Usuario no autenticado intentando acceder a una ruta protegida
-    // Redirigimos al login
-    useEffect(() => {
+  useEffect(() => {
+    if (!isAuthenticated && !publicPaths.includes(router.pathname)) {
       router.push('/login');
-    }, [router]);
+    }
+  }, [isAuthenticated, router, router.pathname]);
+
+  if (isAuthenticated === null) {
     return null;
   }
 

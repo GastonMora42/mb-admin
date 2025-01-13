@@ -289,14 +289,6 @@ const CtaCte: React.FC = () => {
   const [loading, setLoading] = useState(false);
 
   // Effects
-  useEffect(() => {
-    if (searchTerm.length > 2) {
-      fetchAlumnos();
-    } else {
-      setAlumnos([]);
-    }
-  }, [searchTerm]);
-
   // Funciones de fetch
   const fetchAlumnos = async () => {
     try {
@@ -312,6 +304,19 @@ const CtaCte: React.FC = () => {
       console.error('Error fetching alumnos:', error);
     }
   };
+
+  useEffect(() => {
+    const handleSearch = async () => {
+      if (searchTerm.length > 2) {
+        await fetchAlumnos();
+      } else {
+        setAlumnos([]);
+      }
+    };
+    
+    handleSearch();
+  }, [searchTerm, fetchAlumnos]); // incluimos fetchAlumnos como dependencia
+  
 
   const fetchAlumnoInfo = async (alumnoId: number) => {
     setLoading(true);
