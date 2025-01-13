@@ -73,7 +73,7 @@ const cajaDiaria = await prisma.cajaDiaria.findFirst({
   });
 
   // Generar el HTML del reporte
-  let reportHtml = `
+  const reportHtml = `
   <html>
   <head>
     <style>

@@ -75,7 +75,7 @@ export async function generateMonthlyReport(year: number, month: number) {
   }, { totalClases: 0, porEstilo: {}, porProfesor: {} } as { totalClases: number, porEstilo: Record<string, number>, porProfesor: Record<string, number> });
 
   // Generar el HTML del reporte
-  let reportHtml = `
+  const reportHtml = `
     <html>
     <head>
       <style>

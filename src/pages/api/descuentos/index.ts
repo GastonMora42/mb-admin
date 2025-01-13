@@ -6,7 +6,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (req.method === 'GET') {
     const { activo, esAutomatico } = req.query;
     
-    let whereClause: any = {};
+    const whereClause: Record<string, unknown> = {};
     if (activo !== undefined) whereClause.activo = activo === 'true';
     if (esAutomatico !== undefined) whereClause.esAutomatico = esAutomatico === 'true';
 

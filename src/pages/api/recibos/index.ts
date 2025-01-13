@@ -17,23 +17,72 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       anulado
     } = req.query;
     
-    let whereClause: any = {};
-    if (numero) whereClause.numeroRecibo = parseInt(numero as string);
-    if (alumnoId) whereClause.alumnoId = parseInt(alumnoId as string);
-    if (alumnoSueltoId) whereClause.alumnoSueltoId = parseInt(alumnoSueltoId as string);
-    if (conceptoId) whereClause.conceptoId = parseInt(conceptoId as string);
-    if (periodo) whereClause.periodoPago = periodo as string;
-    if (fueraDeTermino) whereClause.fueraDeTermino = fueraDeTermino === 'true';
-    if (esClaseSuelta) whereClause.esClaseSuelta = esClaseSuelta === 'true';
-    if (esMesCompleto) whereClause.esMesCompleto = esMesCompleto === 'true';
-    if (anulado !== undefined) whereClause.anulado = anulado === 'true';
+    interface DateRange {
+      gte?: Date;
+      lte?: Date;
+    }
+    
+    interface WhereClause {
+      numeroRecibo?: number;
+      alumnoId?: number;
+      alumnoSueltoId?: number;
+      conceptoId?: number;
+      periodoPago?: string;
+      fueraDeTermino?: boolean;
+      esClaseSuelta?: boolean;
+      esMesCompleto?: boolean;
+      anulado?: boolean;
+      fecha?: DateRange;
+    }
+    
+    const whereClause: WhereClause = {};
+    
+    if (numero) {
+      whereClause.numeroRecibo = parseInt(numero.toString(), 10);
+    }
+    
+    if (alumnoId) {
+      whereClause.alumnoId = parseInt(alumnoId.toString(), 10);
+    }
+    
+    if (alumnoSueltoId) {
+      whereClause.alumnoSueltoId = parseInt(alumnoSueltoId.toString(), 10);
+    }
+    
+    if (conceptoId) {
+      whereClause.conceptoId = parseInt(conceptoId.toString(), 10);
+    }
+    
+    if (periodo) {
+      whereClause.periodoPago = periodo.toString();
+    }
+    
+    if (fueraDeTermino) {
+      whereClause.fueraDeTermino = fueraDeTermino === 'true';
+    }
+    
+    if (esClaseSuelta) {
+      whereClause.esClaseSuelta = esClaseSuelta === 'true';
+    }
+    
+    if (esMesCompleto) {
+      whereClause.esMesCompleto = esMesCompleto === 'true';
+    }
+    
+    if (anulado !== undefined) {
+      whereClause.anulado = anulado === 'true';
+    }
     
     if (fechaDesde || fechaHasta) {
       whereClause.fecha = {};
-      if (fechaDesde) whereClause.fecha.gte = new Date(fechaDesde as string);
-      if (fechaHasta) whereClause.fecha.lte = new Date(fechaHasta as string);
+      if (fechaDesde) {
+        whereClause.fecha.gte = new Date(fechaDesde.toString());
+      }
+      if (fechaHasta) {
+        whereClause.fecha.lte = new Date(fechaHasta.toString());
+      }
     }
-
+    
     try {
       const recibos = await prisma.recibo.findMany({
         where: whereClause,
