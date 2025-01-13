@@ -182,9 +182,11 @@ const CajaDiaria = () => {
   }, [userRole]);
 
   useEffect(() => {
-    fetchCajaDiaria()
-  }, []) // <-- Agregar fetchCajaDiaria al array de dependencias
-  
+    const getCaja = async () => {
+      await fetchCajaDiaria();
+    };
+    getCaja();
+  }, []);
 
   const fetchAlumnos = async () => {
     try {

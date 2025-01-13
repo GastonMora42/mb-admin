@@ -122,7 +122,7 @@ if (req.method === 'POST') {
 
         // Usar el primer día del mes actual como fecha de inicio
         const fechaInicio = new Date(fechaActual.getFullYear(), fechaActual.getMonth(), 1);
-        let fechaIteracion = new Date(fechaInicio);
+        const fechaIteracion = new Date(fechaInicio);
 
         // Solo generamos para el mes actual
         while (fechaIteracion <= fechaActual) {

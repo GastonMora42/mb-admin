@@ -1,58 +1,124 @@
-import type { NextApiRequest, NextApiResponse } from 'next'
-import prisma from '@/lib/prisma'
+import type { NextApiRequest, NextApiResponse } from 'next';
+import prisma from '@/lib/prisma';
+import { Prisma } from '@prisma/client';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method === 'GET') {
-    const { fechaInicio, fechaFin, numeroRecibo, alumnoId, conceptoId, periodoPago, fueraDeTermino, tipoPago } = req.query;
+// Tipos para la respuesta de la API
+interface ApiResponse {
+  recibos: ReciboWithRelations[];
+  totalMonto: number;
+  totalPorTipoPago: Record<string, number>;
+}
 
-    try {
-      let whereClause: any = {};
+interface ApiError {
+  error: string;
+}
 
-      if (fechaInicio && fechaFin) {
-        whereClause.fecha = {
-          gte: new Date(fechaInicio as string),
-          lte: new Date(fechaFin as string + 'T23:59:59.999Z'),
-        };
-      } else {
-        // Si no se proporcionan fechas, usa la fecha actual
-        const hoy = new Date();
-        hoy.setHours(0, 0, 0, 0);
-        whereClause.fecha = {
-          gte: hoy,
-          lte: new Date(hoy.getTime() + 24 * 60 * 60 * 1000),
-        };
-      }
+// Tipos para Prisma
+type ReciboWithRelations = Prisma.ReciboGetPayload<{
+  include: {
+    alumno: true;
+    concepto: true;
+  };
+}>;
 
-      if (numeroRecibo) whereClause.numeroRecibo = parseInt(numeroRecibo as string);
-      if (alumnoId) whereClause.alumnoId = parseInt(alumnoId as string);
-      if (conceptoId) whereClause.conceptoId = parseInt(conceptoId as string);
-      if (periodoPago) whereClause.periodoPago = periodoPago as string;
-      if (fueraDeTermino) whereClause.fueraDeTermino = fueraDeTermino === 'true';
-      if (tipoPago) whereClause.tipoPago = tipoPago as string;
+interface DateRange {
+  gte: Date;
+  lte: Date;
+}
 
-      const recibos = await prisma.recibo.findMany({
-        where: whereClause,
-        include: {
-          alumno: true,
-          concepto: true
-        },
-        orderBy: { fecha: 'desc' }
-      });
+interface WhereClauseType {
+  fecha?: DateRange;
+  numeroRecibo?: number;
+  alumnoId?: number;
+  conceptoId?: number;
+  periodoPago?: string;
+  fueraDeTermino?: boolean;
+  tipoPago?: string;
+}
 
-      const totalMonto = recibos.reduce((sum, recibo) => sum + recibo.monto, 0);
-
-      const totalPorTipoPago = recibos.reduce((acc, recibo) => {
-        acc[recibo.tipoPago] = (acc[recibo.tipoPago] || 0) + recibo.monto;
-        return acc;
-      }, {} as Record<string, number>);
-
-      res.status(200).json({ recibos, totalMonto, totalPorTipoPago });
-    } catch (error) {
-      console.error('Error al obtener recibos:', error);
-      res.status(500).json({ error: 'Error al obtener recibos' });
-    }
-  } else {
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse<ApiResponse | ApiError>
+) {
+  if (req.method !== 'GET') {
     res.setHeader('Allow', ['GET']);
     res.status(405).end(`Method ${req.method} Not Allowed`);
+    return;
+  }
+
+  try {
+    const {
+      fechaInicio,
+      fechaFin,
+      numeroRecibo,
+      alumnoId,
+      conceptoId,
+      periodoPago,
+      fueraDeTermino,
+      tipoPago
+    } = req.query;
+
+    const whereClause: WhereClauseType = {};
+
+    if (fechaInicio && fechaFin) {
+      whereClause.fecha = {
+        gte: new Date(String(fechaInicio)),
+        lte: new Date(String(fechaFin) + 'T23:59:59.999Z'),
+      };
+    } else {
+      const hoy = new Date();
+      hoy.setHours(0, 0, 0, 0);
+      whereClause.fecha = {
+        gte: hoy,
+        lte: new Date(hoy.getTime() + 24 * 60 * 60 * 1000),
+      };
+    }
+
+    if (numeroRecibo) {
+      whereClause.numeroRecibo = parseInt(String(numeroRecibo), 10);
+    }
+    if (alumnoId) {
+      whereClause.alumnoId = parseInt(String(alumnoId), 10);
+    }
+    if (conceptoId) {
+      whereClause.conceptoId = parseInt(String(conceptoId), 10);
+    }
+    if (periodoPago) {
+      whereClause.periodoPago = String(periodoPago);
+    }
+    if (fueraDeTermino) {
+      whereClause.fueraDeTermino = fueraDeTermino === 'true';
+    }
+    if (tipoPago) {
+      whereClause.tipoPago = String(tipoPago);
+    }
+
+    const recibos = await prisma.recibo.findMany({
+      where: whereClause as Prisma.ReciboWhereInput,
+      include: {
+        alumno: true,
+        concepto: true,
+      },
+      orderBy: {
+        fecha: 'desc'
+      } as Prisma.ReciboOrderByWithRelationInput,
+    });
+
+    const totalMonto = recibos.reduce((sum, recibo) => sum + recibo.monto, 0);
+
+    const totalPorTipoPago = recibos.reduce<Record<string, number>>((acc, recibo) => {
+      const tipo = recibo.tipoPago || 'sin_tipo';
+      acc[tipo] = (acc[tipo] || 0) + recibo.monto;
+      return acc;
+    }, {});
+
+    res.status(200).json({
+      recibos,
+      totalMonto,
+      totalPorTipoPago
+    });
+  } catch (error) {
+    console.error('Error al obtener recibos:', error);
+    res.status(500).json({ error: 'Error al obtener recibos' });
   }
 }

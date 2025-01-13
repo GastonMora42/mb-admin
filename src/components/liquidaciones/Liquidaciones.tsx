@@ -1,16 +1,7 @@
 
 // components/Liquidaciones/index.tsx
 import React, { useState, useEffect } from 'react';
-import { 
-  Document, 
-  Page, 
-  Text, 
-  View, 
-  StyleSheet, 
-  PDFViewer 
-} from '@react-pdf/renderer';
 import PreviewModal from './PreviewModal';
-import LiquidacionPDF from './LiquidacionPDF';
 import { styled } from 'styled-components';
 
 
