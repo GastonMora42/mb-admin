@@ -1,6 +1,7 @@
 import { ReactNode } from "react";
 
 export type Alumno = {
+    tipoAlumno: string;
     descuentosVigentes: any;
     id: number;
     nombre: string;

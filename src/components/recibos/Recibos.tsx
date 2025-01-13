@@ -447,6 +447,8 @@ const [filtros, setFiltros] = useState<Filtros>({
     fetchConceptos();
   }, []);
 
+  
+
   useEffect(() => {
     calcularVistaPrevia();
   }, [nuevoRecibo, deudasSeleccionadas]);
@@ -484,6 +486,11 @@ const [filtros, setFiltros] = useState<Filtros>({
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchRecibos()
+  }, [fetchRecibos]) // <-- Agregar la dependencia
+  
 
   const handleAnularRecibo = async (id: number) => {
     if (!confirm('¿Está seguro que desea anular este recibo?')) return;
