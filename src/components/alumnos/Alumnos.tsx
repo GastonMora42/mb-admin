@@ -1,27 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { Alumno, Estilo } from '@/types/alumnos-estilos';
-import { generarDeudaMensual, darDeBajaAlumno, reactivarAlumno } from '@/utils/alumnoUtils';
 import EstilosComponent from './EstilosXAlumnos';
+import EditAlumnoModal from '@/pages/api/alumnos/EditAlumnoModal';
 
 const PageContainer = styled.div`
   max-width: 1200px;
   margin: 0 auto;
   padding: 20px;
-`;
-
-const ScrollableContainer = styled.div`
-  max-height: 600px;
-  overflow-y: auto;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  padding: 20px;
-  margin-bottom: 20px;
-`;
-
-const HorizontalScrollContainer = styled.div`
-  overflow-x: auto;
-  white-space: nowrap;
 `;
 
 const Container = styled.div`
@@ -54,6 +40,7 @@ const TextArea = styled.textarea`
   border: 1px solid #ccc;
   border-radius: 4px;
   resize: vertical;
+  min-height: 100px;
 `;
 
 const Select = styled.select`
@@ -108,9 +95,54 @@ const Message = styled.div<{ isError?: boolean }>`
   color: ${props => props.isError ? '#cc0000' : '#006600'};
 `;
 
-const Alumnos = () => {
+const ScrollableContainer = styled.div`
+  max-height: 600px;
+  overflow-y: auto;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 20px;
+  margin-bottom: 20px;
+`;
+
+const HorizontalScrollContainer = styled.div`
+  overflow-x: auto;
+  white-space: nowrap;
+`;
+
+const ButtonGroup = styled.div`
+  display: flex;
+  gap: 10px;
+`;
+
+const FilterContainer = styled.div`
+  margin-bottom: 20px;
+  display: flex;
+  gap: 20px;
+  align-items: center;
+`;
+
+const RadioGroup = styled.div`
+  display: flex;
+  gap: 15px;
+  align-items: center;
+`;
+
+const SearchInput = styled(Input)`
+  min-width: 300px;
+`;
+
+function Alumnos() {
   const [alumnos, setAlumnos] = useState<Alumno[]>([]);
   const [estilos, setEstilos] = useState<Estilo[]>([]);
+  const [editandoAlumno, setEditandoAlumno] = useState<Alumno | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState<{ text: string; isError: boolean } | null>(null);
+  const [mostrarListado, setMostrarListado] = useState(false);
+  const [filtro, setFiltro] = useState('');
+  const [alumnosFiltrados, setAlumnosFiltrados] = useState<Alumno[]>([]);
+  const [tipoAlumno, setTipoAlumno] = useState<'regular' | 'suelto'>('regular');
+  const [descuentoAutomatico, setDescuentoAutomatico] = useState<number | null>(null);
+  const [mostrarFormulario, setMostrarFormulario] = useState(false);
   const [nuevoAlumno, setNuevoAlumno] = useState({
     nombre: '',
     apellido: '',
@@ -125,387 +157,638 @@ const Alumnos = () => {
     dniTutor: '',
     notas: '',
     estilosIds: [] as string[],
-    descuentoManual: '', // Nuevo campo
+    descuentoManual: ''
   });
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState<{ text: string; isError: boolean } | null>(null);
-  const [mostrarListado, setMostrarListado] = useState(false);
-  const [descuentoAutomatico, setDescuentoAutomatico] = useState<number | null>(null);
+  // Effects
+useEffect(() => {
+  fetchAlumnos();
+  fetchEstilos();
+}, []);
 
-  useEffect(() => {
-    fetchAlumnos();
-    fetchEstilos();
-  }, []);
+useEffect(() => {
+  const filtered = alumnos.filter(alumno => 
+    alumno.nombre.toLowerCase().includes(filtro.toLowerCase()) ||
+    alumno.apellido.toLowerCase().includes(filtro.toLowerCase()) ||
+    alumno.dni.includes(filtro)
+  );
+  setAlumnosFiltrados(filtered);
+}, [filtro, alumnos]);
 
-  const fetchAlumnos = async () => {
+// Functions
+const fetchAlumnos = async () => {
+  setLoading(true);
+  try {
+    const res = await fetch('/api/alumnos');
+    if (!res.ok) throw new Error('Error al obtener alumnos');
+    const data = await res.json();
+    setAlumnos(data);
+    setMessage({ text: 'Alumnos cargados correctamente', isError: false });
+  } catch (error) {
+    console.error('Error fetching alumnos:', error);
+    setMessage({ text: 'Error al cargar alumnos', isError: true });
+  } finally {
+    setLoading(false);
+  }
+};
+
+const fetchEstilos = async () => {
+  try {
+    const res = await fetch('/api/estilos');
+    if (!res.ok) throw new Error('Error al obtener estilos');
+    const data = await res.json();
+    setEstilos(data);
+  } catch (error) {
+    console.error('Error fetching estilos:', error);
+    setMessage({ text: 'Error al cargar estilos', isError: true });
+  }
+};
+
+const calcularDescuentoAutomatico = (estilosSeleccionados: string[]) => {
+  if (estilosSeleccionados.length >= 2) {
+    const porcentaje = estilosSeleccionados.length >= 3 ? 15 : 10;
+    setDescuentoAutomatico(porcentaje);
+  } else {
+    setDescuentoAutomatico(null);
+  }
+};
+
+const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+  const { name, value } = e.target;
+  if (name === 'estilosIds') {
+    const selectedOptions = Array.from(
+      (e.target as HTMLSelectElement).selectedOptions,
+      option => option.value
+    );
+    setNuevoAlumno(prev => ({ ...prev, [name]: selectedOptions }));
+    calcularDescuentoAutomatico(selectedOptions);
+  } else {
+    setNuevoAlumno(prev => ({ ...prev, [name]: value }));
+  }
+};
+
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  setLoading(true);
+  try {
+    const alumnoData = {
+      ...nuevoAlumno,
+      fechaNacimiento: tipoAlumno === 'regular' ? new Date(nuevoAlumno.fechaNacimiento).toISOString() : undefined,
+      activo: true,
+      estilosIds: nuevoAlumno.estilosIds.map(id => parseInt(id, 10)),
+      descuentoManual: nuevoAlumno.descuentoManual ? parseFloat(nuevoAlumno.descuentoManual) : undefined,
+      tipoAlumno
+    };
+
+    const res = await fetch('/api/alumnos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(alumnoData),
+    });
+
+    if (!res.ok) {
+      const error = await res.json();
+      throw new Error(error.error || 'Error al crear alumno');
+    }
+
+    const alumnoCreado = await res.json();
+    setNuevoAlumno({
+      nombre: '', apellido: '', dni: '', fechaNacimiento: '', 
+      email: '', telefono: '', numeroEmergencia: '', direccion: '', 
+      obraSocial: '', nombreTutor: '', dniTutor: '', notas: '',
+      estilosIds: [], descuentoManual: ''
+    });
+    setDescuentoAutomatico(null);
+    setMostrarFormulario(false);
+    await fetchAlumnos();
+    setMessage({ 
+      text: `${tipoAlumno === 'regular' ? 'Alumno' : 'Alumno suelto'} creado con éxito`, 
+      isError: false 
+    });
+  } catch (error) {
+    console.error('Error creating alumno:', error);
+    setMessage({ 
+      text: error instanceof Error ? error.message : 'Error al crear alumno', 
+      isError: true 
+    });
+  } finally {
+    setLoading(false);
+  }
+};
+
+const handleEstadoAlumno = async (alumnoId: number, nuevoEstado: boolean) => {
+  try {
+    const res = await fetch('/api/alumnos', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: alumnoId, activo: nuevoEstado }),
+    });
+    if (!res.ok) throw new Error('Error al actualizar estado');
+    await fetchAlumnos();
+    setMessage({ 
+      text: `Estado del alumno actualizado correctamente`, 
+      isError: false 
+    });
+  } catch (error) {
+    console.error('Error:', error);
+    setMessage({ 
+      text: 'Error al actualizar estado', 
+      isError: true 
+    });
+  }
+};
+
+const handleEstiloAlumno = async (alumnoId: number, estiloId: number) => {
+  try {
+    // Obtener el estado actual del estilo para este alumno
+    const alumno = alumnos.find(a => a.id === alumnoId);
+    const estiloActual = alumno?.alumnoEstilos.find(ae => ae.estilo.id === estiloId);
+    const nuevoEstado = !estiloActual?.activo; // Si estaba activo, lo desactivamos y viceversa
+
+    const res = await fetch('/api/alumnos/estilos', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        alumnoId,
+        estiloId,
+        activo: nuevoEstado
+      }),
+    });
+
+    if (!res.ok) {
+      throw new Error('Error al actualizar estilo del alumno');
+    }
+
+    await fetchAlumnos(); // Recargar los datos
+    setMessage({ 
+      text: `Estilo ${nuevoEstado ? 'activado' : 'desactivado'} correctamente`, 
+      isError: false 
+    });
+  } catch (error) {
+    console.error('Error al actualizar estilo:', error);
+    setMessage({ 
+      text: 'Error al actualizar estilo del alumno', 
+      isError: true 
+    });
+  }
+};
+
+const handleGuardarEdicion = async (alumnoData: any) => {
+  try {
     setLoading(true);
-    try {
-      const res = await fetch('/api/alumnos');
-      if (!res.ok) {
-        throw new Error('Error al obtener alumnos');
-      }
-      const data = await res.json();
-      setAlumnos(data);
-      setMessage({ text: `Se cargaron ${data.length} alumnos correctamente.`, isError: false });
-    } catch (error) {
-      console.error('Error fetching alumnos:', error);
-      setMessage({ text: 'Error al cargar alumnos. Por favor, intente nuevamente.', isError: true });
-    } finally {
-      setLoading(false);
-    }
-  };
+    const res = await fetch('/api/alumnos', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(alumnoData),
+    });
 
-  const fetchEstilos = async () => {
-    try {
-      const res = await fetch('/api/estilos');
-      if (!res.ok) {
-        throw new Error('Error al obtener estilos');
-      }
-      const data = await res.json();
-      setEstilos(data);
-    } catch (error) {
-      console.error('Error fetching estilos:', error);
-      setMessage({ text: 'Error al cargar estilos. Por favor, intente nuevamente.', isError: true });
+    if (!res.ok) {
+      const error = await res.json();
+      throw new Error(error.error || 'Error al actualizar alumno');
     }
-  };
 
-  const calcularDescuentoAutomatico = (estilosSeleccionados: string[]) => {
-    if (estilosSeleccionados.length >= 2) {
-      // Por ejemplo, 10% para 2 estilos, 15% para 3 o más
-      const porcentaje = estilosSeleccionados.length >= 3 ? 15 : 10;
-      setDescuentoAutomatico(porcentaje);
-    } else {
-      setDescuentoAutomatico(null);
-    }
-  };
+    const alumnoActualizado = await res.json();
+    await fetchAlumnos();
+    setEditandoAlumno(null);
+    setMessage({ 
+      text: 'Alumno actualizado correctamente', 
+      isError: false 
+    });
+  } catch (error) {
+    console.error('Error:', error);
+    setMessage({ 
+      text: error instanceof Error ? error.message : 'Error al actualizar alumno', 
+      isError: true 
+    });
+  } finally {
+    setLoading(false);
+  }
+};
+return (
+  <PageContainer>
+    <Container>
+      <Title>Gestión de Alumnos</Title>
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    if (name === 'estilosIds') {
-      const selectedOptions = Array.from(
-        (e.target as HTMLSelectElement).selectedOptions, 
-        option => option.value
-      );
-      setNuevoAlumno(prev => ({ ...prev, [name]: selectedOptions }));
-      calcularDescuentoAutomatico(selectedOptions);
-    } else if (name === 'descuentoManual') {
-      const numValue = parseFloat(value);
-      if (!isNaN(numValue) && numValue >= 0 && numValue <= 100) {
-        setNuevoAlumno(prev => ({ ...prev, [name]: value }));
-      }
-    } else {
-      setNuevoAlumno(prev => ({ ...prev, [name]: value }));
-    }
-  };
+      <FilterContainer>
+        {/* Selector de tipo de alumno */}
+        <RadioGroup>
+          <label>
+            <input
+              type="radio"
+              name="tipoAlumno"
+              value="regular"
+              checked={tipoAlumno === 'regular'}
+              onChange={(e) => setTipoAlumno(e.target.value as 'regular' | 'suelto')}
+            /> Alumno Regular
+          </label>
+          <label>
+            <input
+              type="radio"
+              name="tipoAlumno"
+              value="suelto"
+              checked={tipoAlumno === 'suelto'}
+              onChange={(e) => setTipoAlumno(e.target.value as 'regular' | 'suelto')}
+            /> Alumno Suelto
+          </label>
+        </RadioGroup>
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      const alumnoData = {
-        ...nuevoAlumno,
-        fechaNacimiento: new Date(nuevoAlumno.fechaNacimiento).toISOString(),
-        activo: true,
-        estilosIds: nuevoAlumno.estilosIds.map(id => parseInt(id, 10)),
-        descuentoManual: nuevoAlumno.descuentoManual ? 
-          parseFloat(nuevoAlumno.descuentoManual) : undefined
-      };
-  
-      const res = await fetch('/api/alumnos', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(alumnoData),
-      });
-  
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.error || 'Error al crear alumno');
-      }
-  
-      const alumnoCreado = await res.json();
-      setNuevoAlumno({
-        nombre: '', apellido: '', dni: '', fechaNacimiento: '', 
-        email: '', telefono: '', numeroEmergencia: '', direccion: '', 
-        obraSocial: '', nombreTutor: '', dniTutor: '', notas: '',
-        estilosIds: [], descuentoManual: ''
-      });
-      setDescuentoAutomatico(null);
-      setAlumnos(prevAlumnos => [...prevAlumnos, alumnoCreado]);
-      setMessage({ 
-        text: `Alumno ${alumnoCreado.nombre} ${alumnoCreado.apellido} creado con éxito.`, 
-        isError: false 
-      });
-    } catch (error) {
-      console.error('Error creating alumno:', error);
-      setMessage({ 
-        text: error instanceof Error ? error.message : 'Error al crear alumno', 
-        isError: true 
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+        {/* Botón para mostrar/ocultar formulario */}
+        <Button onClick={() => setMostrarFormulario(!mostrarFormulario)}>
+          {mostrarFormulario ? 'Cancelar Registro' : 'Nuevo Alumno'}
+        </Button>
+      </FilterContainer>
 
-  const handleEstadoAlumno = async (alumnoId: number, nuevoEstado: boolean) => {
-    try {
-      const res = await fetch('/api/alumnos', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: alumnoId, activo: nuevoEstado }),
-      });
-      if (!res.ok) {
-        throw new Error('Error al actualizar estado del alumno');
-      }
-      await fetchAlumnos();
-      setMessage({ text: `Estado del alumno actualizado con éxito.`, isError: false });
-    } catch (error) {
-      console.error('Error al actualizar estado del alumno:', error);
-      setMessage({ text: 'Error al actualizar estado del alumno. Por favor, intente nuevamente.', isError: true });
-    }
-  };
-
-  const handleEstiloAlumno = async (alumnoId: number, estiloId: number, activo: boolean) => {
-    try {
-      const res = await fetch('/api/alumnos/estilos', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ alumnoId, estiloId, activo }),
-      });
-      if (!res.ok) {
-        throw new Error('Error al actualizar estilo del alumno');
-      }
-      await fetchAlumnos();
-      setMessage({ text: `Estilo del alumno actualizado con éxito.`, isError: false });
-    } catch (error) {
-      console.error('Error al actualizar estilo del alumno:', error);
-      setMessage({ text: 'Error al actualizar estilo del alumno. Por favor, intente nuevamente.', isError: true });
-    }
-  };
-
-  return (
-    <PageContainer>
-      <Container>
-        <Title>Alumnos</Title>
+      {/* Formulario de registro */}
+      {mostrarFormulario && (
         <ScrollableContainer>
           <Form onSubmit={handleSubmit}>
-            <label>Nombre:</label>
-            <Input
-              type="text"
-              name="nombre"
-              value={nuevoAlumno.nombre}
-              onChange={handleInputChange}
-              placeholder="Nombre"
-              required
-            />
-            <label>Apellido:</label>
-            <Input
-              type="text"
-              name="apellido"
-              value={nuevoAlumno.apellido}
-              onChange={handleInputChange}
-              placeholder="Apellido"
-              required
-            />
-            <label>DNI:</label>
-            <Input
-              type="text"
-              name="dni"
-              value={nuevoAlumno.dni}
-              onChange={handleInputChange}
-              placeholder="DNI"
-              required
-            />
-            <label>Fecha de Nacimiento:</label>
-            <Input
-              type="date"
-              name="fechaNacimiento"
-              value={nuevoAlumno.fechaNacimiento}
-              onChange={handleInputChange}
-              required
-            />
-            <label>Email:</label>
-            <Input
-              type="email"
-              name="email"
-              value={nuevoAlumno.email}
-              onChange={handleInputChange}
-              placeholder="Email"
-            />
-            <label>Teléfono:</label>
-            <Input
-              type="tel"
-              name="telefono"
-              value={nuevoAlumno.telefono}
-              onChange={handleInputChange}
-              placeholder="Teléfono"
-            />
-            <label>Número de Emergencia:</label>
-            <Input
-              type="tel"
-              name="numeroEmergencia"
-              value={nuevoAlumno.numeroEmergencia}
-              onChange={handleInputChange}
-              placeholder="Número de Emergencia"
-            />
-            <label>Dirección:</label>
-            <Input
-              type="text"
-              name="direccion"
-              value={nuevoAlumno.direccion}
-              onChange={handleInputChange}
-              placeholder="Dirección"
-            />
-            <label>Obra Social:</label>
-            <Input
-              type="text"
-              name="obraSocial"
-              value={nuevoAlumno.obraSocial}
-              onChange={handleInputChange}
-              placeholder="Obra Social"
-            />
-            <label>Nombre del Tutor:</label>
-            <Input
-              type="text"
-              name="nombreTutor"
-              value={nuevoAlumno.nombreTutor}
-              onChange={handleInputChange}
-              placeholder="Nombre del Tutor (Opcional)"
-            />
-            <label>DNI del Tutor:</label>
-            <Input
-              type="text"
-              name="dniTutor"
-              value={nuevoAlumno.dniTutor}
-              onChange={handleInputChange}
-              placeholder="DNI del Tutor (Opcional)"
-            />
-            <label>Notas:</label>
-            <TextArea
-              name="notas"
-              value={nuevoAlumno.notas}
-              onChange={handleInputChange}
-              placeholder="Notas (Opcional)"
-            />
-            <label>Estilos:</label>
-            <Select
-              name="estilosIds"
-              multiple
-              value={nuevoAlumno.estilosIds}
-              onChange={handleInputChange}
-            >
-              {estilos.map(estilo => (
-                <option key={estilo.id} value={estilo.id.toString()}>{estilo.nombre}</option>
-              ))}
-            </Select>
-            <Button type="submit" disabled={loading}>
-              {loading ? 'Agregando...' : 'Agregar Alumno'}
-            </Button>
-          </Form>
-
-          {/* Después de la selección de estilos */}
-<div style={{ marginTop: '20px', padding: '15px', backgroundColor: '#f9f9f9', borderRadius: '4px' }}>
-  <h3>Descuentos</h3>
+            {/* Campos comunes para ambos tipos de alumno */}
+        {/* Campos básicos */}
+<div style={{ marginBottom: '30px' }}>
+  <Title style={{ fontSize: '1.3em', marginBottom: '20px' }}>
+    {tipoAlumno === 'regular' ? 'Nuevo Alumno Regular' : 'Nuevo Alumno Suelto'}
+  </Title>
   
-  {descuentoAutomatico && (
-    <div style={{ marginBottom: '15px' }}>
-      <label style={{ color: '#006600' }}>
-        ¡Descuento automático por múltiples estilos!: {descuentoAutomatico}%
+  {/* Contenedor de datos básicos */}
+  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '20px' }}>
+    <div>
+      <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+        Nombre *
       </label>
+      <Input
+        type="text"
+        name="nombre"
+        value={nuevoAlumno.nombre}
+        onChange={handleInputChange}
+        required
+      />
     </div>
-  )}
-  
-  <div>
-    <label>Descuento Manual (%):</label>
-    <Input
-      type="number"
-      name="descuentoManual"
-      value={nuevoAlumno.descuentoManual}
-      onChange={handleInputChange}
-      placeholder="Ingrese descuento manual"
-      min="0"
-      max="100"
-      step="1"
-    />
+
+    <div>
+      <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+        Apellido *
+      </label>
+      <Input
+        type="text"
+        name="apellido"
+        value={nuevoAlumno.apellido}
+        onChange={handleInputChange}
+        required
+      />
+    </div>
+
+    <div>
+      <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+        DNI *
+      </label>
+      <Input
+        type="text"
+        name="dni"
+        value={nuevoAlumno.dni}
+        onChange={handleInputChange}
+        required
+      />
+    </div>
+
+    <div>
+      <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+        Email
+      </label>
+      <Input
+        type="email"
+        name="email"
+        value={nuevoAlumno.email}
+        onChange={handleInputChange}
+        placeholder="ejemplo@email.com"
+      />
+    </div>
+
+    <div style={{ gridColumn: tipoAlumno === 'suelto' ? 'span 2' : 'auto' }}>
+      <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+        Teléfono
+      </label>
+      <Input
+        type="tel"
+        name="telefono"
+        value={nuevoAlumno.telefono}
+        onChange={handleInputChange}
+        placeholder="+54 "
+      />
+    </div>
+
+    {tipoAlumno === 'regular' && (
+      <div>
+        <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+          Fecha de Nacimiento *
+        </label>
+        <Input
+          type="date"
+          name="fechaNacimiento"
+          value={nuevoAlumno.fechaNacimiento}
+          onChange={handleInputChange}
+          required
+        />
+      </div>
+    )}
+  </div>
+
+  <div style={{ 
+    borderTop: '1px solid #eee', 
+    paddingTop: '15px', 
+    marginTop: '15px', 
+    display: 'flex',
+    justifyContent: 'flex-end',
+    gap: '10px'
+  }}>
+    <Button 
+      type="button" 
+      onClick={() => setMostrarFormulario(false)}
+      style={{ backgroundColor: '#f0f0f0', color: '#333' }}
+    >
+      Cancelar
+    </Button>
+    {tipoAlumno === 'suelto' ? (
+      <Button type="submit" disabled={loading}>
+        {loading ? 'Guardando...' : 'Registrar Alumno Suelto'}
+      </Button>
+    ) : (
+      <Button type="submit" disabled={loading}>
+        {loading ? 'Guardando...' : 'Continuar con Registro'}
+      </Button>
+    )}
   </div>
 </div>
 
-        </ScrollableContainer>
-  
-        <Button onClick={() => setMostrarListado(!mostrarListado)}>
-          {mostrarListado ? 'Ocultar Listado' : 'Mostrar Listado'}
-        </Button>
-  
-        {mostrarListado && (
-          <ScrollableContainer>
-            <HorizontalScrollContainer>
-              <Table>
-                <thead>
-                  <Tr>
-                    <Th>Nombre</Th>
-                    <Th>Apellido</Th>
-                    <Th>DNI</Th>
-                    <Th>Email</Th>
-                    <Th>Teléfono</Th>
-                    <Th>Emergencia</Th>
-                    <Th>Dirección</Th>
-                    <Th>Obra Social</Th>
-                    <Th>Tutor</Th>
-                    <Th>DNI Tutor</Th>
-                    <Th>Estado</Th>
-                    <Th>Estilos</Th>
-                    <Th>Descuentos</Th>
+{/* Campos adicionales para alumno regular */}
+{tipoAlumno === 'regular' && (
+  <>
+    {/* Información de Contacto y Emergencia */}
+    <div style={{ marginTop: '30px', marginBottom: '30px' }}>
+      <Title style={{ fontSize: '1.2em', marginBottom: '20px' }}>
+        Información de Contacto y Emergencia
+      </Title>
+      
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+        <div>
+          <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+            Número de Emergencia
+          </label>
+          <Input
+            type="tel"
+            name="numeroEmergencia"
+            value={nuevoAlumno.numeroEmergencia}
+            onChange={handleInputChange}
+            placeholder="+54 "
+          />
+        </div>
 
-                    <Th>Acciones</Th>
-                  </Tr>
-                </thead>
-                <tbody>
-                  {alumnos.map((alumno) => (
-                    <Tr key={alumno.id}>
-                      <Td>{alumno.nombre}</Td>
-                      <Td>{alumno.apellido}</Td>
-                      <Td>{alumno.dni}</Td>
-                      <Td>{alumno.email}</Td>
-                      <Td>{alumno.telefono}</Td>
-                      <Td>{alumno.numeroEmergencia}</Td>
-                      <Td>{alumno.direccion}</Td>
-                      <Td>{alumno.obraSocial}</Td>
-                      <Td>{alumno.nombreTutor}</Td>
-                      <Td>{alumno.dniTutor}</Td>
-                      <Td>{alumno.activo ? 'Activo' : 'Inactivo'}</Td>
-                      <Td>
-                        <EstilosComponent
-                          alumnoEstilos={alumno.alumnoEstilos}
-                          onEstiloToggle={handleEstiloAlumno}
-                          alumnoId={alumno.id}
-                        />
-                      </Td>
-                      <Td>
-  {alumno.descuentosVigentes?.map((d: { id: React.Key | null | undefined; descuento: { esAutomatico: any; porcentaje: string | number | bigint | boolean | React.ReactElement<any, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | React.ReactPortal | Promise<React.AwaitedReactNode> | null | undefined; }; }) => (
-    <div key={d.id}>
-      {d.descuento.esAutomatico ? 'Auto: ' : 'Manual: '}
-      {d.descuento.porcentaje}%
+        <div>
+          <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+            Obra Social
+          </label>
+          <Input
+            type="text"
+            name="obraSocial"
+            value={nuevoAlumno.obraSocial}
+            onChange={handleInputChange}
+          />
+        </div>
+
+        <div style={{ gridColumn: 'span 2' }}>
+          <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+            Dirección
+          </label>
+          <Input
+            type="text"
+            name="direccion"
+            value={nuevoAlumno.direccion}
+            onChange={handleInputChange}
+            placeholder="Calle, Número, Ciudad"
+          />
+        </div>
+      </div>
     </div>
-  ))}
-</Td>
-                      <Td>
-                        <Button onClick={() => handleEstadoAlumno(alumno.id, !alumno.activo)}>
-                          {alumno.activo ? 'Dar de Baja' : 'Reactivar'}
-                        </Button>
-                      </Td>
-                    </Tr>
-                  ))}
-                </tbody>
-              </Table>
-            </HorizontalScrollContainer>
-          </ScrollableContainer>
+
+    {/* Información del Tutor */}
+    <div style={{ marginBottom: '30px' }}>
+      <Title style={{ fontSize: '1.2em', marginBottom: '20px' }}>
+        Información del Tutor
+      </Title>
+      
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+        <div>
+          <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+            Nombre del Tutor
+          </label>
+          <Input
+            type="text"
+            name="nombreTutor"
+            value={nuevoAlumno.nombreTutor}
+            onChange={handleInputChange}
+          />
+        </div>
+
+        <div>
+          <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+            DNI del Tutor
+          </label>
+          <Input
+            type="text"
+            name="dniTutor"
+            value={nuevoAlumno.dniTutor}
+            onChange={handleInputChange}
+          />
+        </div>
+      </div>
+    </div>
+
+    {/* Estilos y Descuentos */}
+    <div style={{ marginBottom: '30px' }}>
+      <Title style={{ fontSize: '1.2em', marginBottom: '20px' }}>
+        Estilos y Descuentos
+      </Title>
+      
+      <div style={{ display: 'grid', gap: '15px' }}>
+        <div>
+          <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+            Estilos *
+          </label>
+          <Select
+            name="estilosIds"
+            multiple
+            value={nuevoAlumno.estilosIds}
+            onChange={handleInputChange}
+            required
+            style={{ height: '120px' }}
+          >
+            {estilos.map(estilo => (
+              <option key={estilo.id} value={estilo.id.toString()}>
+                {estilo.nombre}
+              </option>
+            ))}
+          </Select>
+          <small style={{ display: 'block', marginTop: '5px', color: '#666' }}>
+            Mantén presionado Ctrl (Cmd en Mac) para seleccionar múltiples estilos
+          </small>
+        </div>
+
+        {descuentoAutomatico && (
+          <div style={{ 
+            padding: '10px', 
+            backgroundColor: '#e6f4ea', 
+            borderRadius: '4px',
+            color: '#1e4620'
+          }}>
+            Descuento automático por múltiples estilos: {descuentoAutomatico}%
+          </div>
         )}
-  
-        {message && (
-          <Message isError={message.isError}>{message.text}</Message>
-        )}
-      </Container>
-    </PageContainer>
-  );
-};
+
+        <div>
+          <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+            Descuento Manual (%)
+          </label>
+          <Input
+            type="number"
+            name="descuentoManual"
+            value={nuevoAlumno.descuentoManual}
+            onChange={handleInputChange}
+            min="0"
+            max="100"
+            step="1"
+          />
+        </div>
+      </div>
+    </div>
+
+    {/* Notas Adicionales */}
+    <div style={{ marginBottom: '30px' }}>
+      <Title style={{ fontSize: '1.2em', marginBottom: '20px' }}>
+        Notas Adicionales
+      </Title>
+      
+      <div>
+        <TextArea
+          name="notas"
+          value={nuevoAlumno.notas}
+          onChange={handleInputChange}
+          placeholder="Información adicional relevante sobre el alumno..."
+          style={{ width: '100%', minHeight: '100px' }}
+        />
+      </div>
+    </div>
+
+    {/* Botones de acción */}
+    <div style={{ 
+      borderTop: '1px solid #eee', 
+      paddingTop: '20px',
+      display: 'flex',
+      justifyContent: 'flex-end',
+      gap: '10px'
+    }}>
+      <Button 
+        type="button" 
+        onClick={() => setMostrarFormulario(false)}
+        style={{ backgroundColor: '#f0f0f0', color: '#333' }}
+      >
+        Cancelar
+      </Button>
+      <Button type="submit" disabled={loading}>
+        {loading ? 'Guardando...' : 'Registrar Alumno Regular'}
+      </Button>
+    </div>
+  </>
+)}
+          </Form>
+        </ScrollableContainer>
+      )}
+
+      {/* Buscador y listado */}
+      <FilterContainer>
+        <SearchInput
+          type="text"
+          placeholder="Buscar por nombre, apellido o DNI..."
+          value={filtro}
+          onChange={(e) => setFiltro(e.target.value)}
+        />
+      </FilterContainer>
+
+      <ScrollableContainer>
+        <HorizontalScrollContainer>
+          <Table>
+            <thead>
+              <tr>
+                <Th>Nombre</Th>
+                <Th>Apellido</Th>
+                <Th>DNI</Th>
+                <Th>Email</Th>
+                <Th>Teléfono</Th>
+                <Th>Tipo</Th>
+                <Th>Estado</Th>
+                <Th>Estilos</Th>
+                <Th>Descuentos</Th>
+                <Th>Acciones</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {alumnosFiltrados.map((alumno) => (
+                <Tr key={alumno.id}>
+                  <Td>{alumno.nombre}</Td>
+                  <Td>{alumno.apellido}</Td>
+                  <Td>{alumno.dni}</Td>
+                  <Td>{alumno.email}</Td>
+                  <Td>{alumno.telefono}</Td>
+                  <Td>{alumno.tipoAlumno || 'Regular'}</Td>
+                  <Td>{alumno.activo ? 'Activo' : 'Inactivo'}</Td>
+                  <Td>
+                    <EstilosComponent
+                      alumnoEstilos={alumno.alumnoEstilos}
+                      onEstiloToggle={(estiloId) => handleEstiloAlumno(alumno.id, estiloId)}
+                      alumnoId={alumno.id}
+                    />
+                  </Td>
+                  <Td>
+                    {alumno.descuentosVigentes?.map((d: any) => (
+                      <div key={d.id}>
+                        {d.descuento.esAutomatico ? 'Auto: ' : 'Manual: '}
+                        {d.descuento.porcentaje}%
+                      </div>
+                    ))}
+                  </Td>
+                  <Td>
+                    <ButtonGroup>
+                      <Button onClick={() => setEditandoAlumno(alumno)}>
+                        Editar
+                      </Button>
+                      <Button onClick={() => handleEstadoAlumno(alumno.id, !alumno.activo)}>
+                        {alumno.activo ? 'Dar de Baja' : 'Reactivar'}
+                      </Button>
+                    </ButtonGroup>
+                  </Td>
+                </Tr>
+              ))}
+            </tbody>
+          </Table>
+        </HorizontalScrollContainer>
+      </ScrollableContainer>
+
+      {/* Modal de edición */}
+      {editandoAlumno && (
+        <EditAlumnoModal
+          alumno={editandoAlumno}
+          estilos={estilos}
+          onClose={() => setEditandoAlumno(null)}
+          onSave={handleGuardarEdicion}
+        />
+      )}
+
+      {/* Mensajes de feedback */}
+      {message && (
+        <Message isError={message.isError}>
+          {message.text}
+        </Message>
+      )}
+    </Container>
+  </PageContainer>
+);
+}
 
 export default Alumnos;
