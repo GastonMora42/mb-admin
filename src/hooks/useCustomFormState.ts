@@ -1,15 +1,25 @@
-// src/hooks/useCustomFormState.ts
 import { useState } from 'react';
 
-export function useCustomFormState(action: Function, initialState: any) {
-  const [state, setState] = useState(initialState);
+// Definir tipos para la acción y el estado
+type ActionFunction = (state: unknown, formData: FormData) => Promise<unknown>;
+
+interface FormState {
+  // Ajusta esto según la estructura real de tu estado
+  [key: string]: unknown;
+}
+
+export function useCustomFormState(
+  action: ActionFunction,
+  initialState: FormState
+) {
+  const [state, setState] = useState<FormState>(initialState);
   const [isPending, setIsPending] = useState(false);
 
   const dispatch = async (formData: FormData) => {
     setIsPending(true);
     try {
       const result = await action(null, formData);
-      setState(result);
+      setState(result as FormState);
     } finally {
       setIsPending(false);
     }
@@ -18,6 +28,10 @@ export function useCustomFormState(action: Function, initialState: any) {
   return [state, dispatch, isPending] as const;
 }
 
-export function useCustomFormStatus() {
-  return { pending: false };  // Por ahora, siempre retornamos false
+interface FormStatus {
+  pending: boolean;
+}
+
+export function useCustomFormStatus(): FormStatus {
+  return { pending: false };
 }
