@@ -9,7 +9,6 @@
     "lint": "next lint",
     "test-report": "node --loader ts-node/esm src/scripts/test-report.ts",
     "test-monthly-report": "node --loader ts-node/esm src/scripts/test-monthly-report.ts",
-    "vercel-build": "prisma generate && prisma migrate deploy && next build",
     "postinstall": "prisma generate"
   },
   "dependencies": {
