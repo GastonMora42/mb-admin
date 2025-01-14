@@ -4,11 +4,13 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "DISABLE_ESLINT_PLUGIN=true next build",
+    "build": "next build",
     "start": "next start",
     "lint": "next lint",
     "test-report": "node --loader ts-node/esm src/scripts/test-report.ts",
-    "test-monthly-report": "node --loader ts-node/esm src/scripts/test-monthly-report.ts"
+    "test-monthly-report": "node --loader ts-node/esm src/scripts/test-monthly-report.ts",
+    "postinstall": "prisma generate",
+    "vercel-build": "prisma generate && next build"
   },
   "dependencies": {
     "@auth0/nextjs-auth0": "^3.5.0",
