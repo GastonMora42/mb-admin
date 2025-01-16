@@ -4,8 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "start": "node server.js",
     "build": "next build",
-    "start": "next start",
     "lint": "next lint",
     "test-report": "node --loader ts-node/esm src/scripts/test-report.ts",
     "test-monthly-report": "node --loader ts-node/esm src/scripts/test-monthly-report.ts",
