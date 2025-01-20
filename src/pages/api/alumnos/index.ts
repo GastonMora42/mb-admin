@@ -30,7 +30,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           },
           deudas: {
             include: {
-              estilo: true
+              estilo: true,
+              concepto: {
+                select: {
+                  id: true,
+                  nombre: true,
+                  monto: true,
+                  esInscripcion: true
+                }
+              }
             }
           }
         },
@@ -42,7 +50,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(500).json({ error: 'Error al obtener alumnos' });
     }
   }
-  // POST
+  
 // POST
 if (req.method === 'POST') {
   try {
@@ -71,7 +79,6 @@ if (req.method === 'POST') {
 
     // Si es alumno regular
     if (tipoAlumno === 'regular') {
-      // Una única transacción para todas las operaciones
       const resultado = await prisma.$transaction(async (tx) => {
         // Crear el alumno
         const nuevoAlumno = await tx.alumno.create({
@@ -175,6 +182,31 @@ if (req.method === 'POST') {
           }
         }
 
+        const conceptoInscripcion = await tx.concepto.findFirst({
+          where: {
+            esInscripcion: true,
+            activo: true // Asumiendo que agregaremos este campo a Concepto
+          }
+        });
+
+
+        if (conceptoInscripcion) {
+          // Crear la deuda de inscripción
+          await tx.deuda.create({
+            data: {
+              alumnoId: nuevoAlumno.id,
+              monto: conceptoInscripcion.monto,
+              montoOriginal: conceptoInscripcion.monto,
+              mes: 'INSCRIPCION',
+              anio: new Date().getFullYear(),
+              estiloId: estilosIds[0], // Usar el primer estilo
+              pagada: false,
+              fechaVencimiento: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 días desde hoy
+              conceptoId: conceptoInscripcion.id
+            }
+          });
+        }
+
         if (descuentoManual) {
           const descuentoCreado = await tx.descuento.create({
             data: {
@@ -212,7 +244,10 @@ if (req.method === 'POST') {
             },
             alumnosSueltosAnteriores: true,
             deudas: {
-              include: { estilo: true }
+              include: { 
+                estilo: true,
+                concepto: true // Incluir concepto para identificar inscripción
+              }
             },
             descuentosVigentes: {
               where: { activo: true },
@@ -424,25 +459,35 @@ if (req.method === 'PUT') {
           });
         }
 
-        // Retornar alumno actualizado con todas sus relaciones
-        return await tx.alumno.findUnique({
-          where: { id: parseInt(id) },
-          include: {
-            alumnoEstilos: {
-              include: { estilo: true }
-            },
-            alumnosSueltosAnteriores: true,
-            deudas: {
-              include: { estilo: true }
-            },
-            descuentosVigentes: {
-              where: { activo: true },
-              include: { descuento: true }
-            }
+// Retornar alumno actualizado con todas sus relaciones
+return await tx.alumno.findUnique({
+  where: { id: parseInt(id) },
+  include: {
+    alumnoEstilos: {
+      include: { estilo: true }
+    },
+    alumnosSueltosAnteriores: true,
+    deudas: {
+      include: { 
+        estilo: true,
+        concepto: {
+          select: {
+            id: true,
+            nombre: true, 
+            monto: true,
+            esInscripcion: true
           }
-        });
+        }
+      }
+    },
+    descuentosVigentes: {
+      where: { activo: true },
+      include: { descuento: true }
+    }
+  }
+ });
       });
-
+ 
       return res.status(200).json(resultado);
     } 
     else {

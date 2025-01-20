@@ -128,6 +128,7 @@ interface NuevoConcepto {
   monto: string;
   estiloId: string;
   esClaseSuelta: boolean;
+  esInscripcion: false;
 }
 
 const Conceptos: React.FC = () => {
@@ -138,7 +139,8 @@ const Conceptos: React.FC = () => {
     descripcion: '',
     monto: '',
     estiloId: '',
-    esClaseSuelta: false
+    esClaseSuelta: false,
+    esInscripcion: false // Nuevo campo
   });
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ text: string; isError: boolean } | null>(null);
@@ -207,7 +209,8 @@ const Conceptos: React.FC = () => {
         descripcion: '',
         monto: '',
         estiloId: '',
-        esClaseSuelta: false
+        esClaseSuelta: false,
+        esInscripcion: false // Nuevo campo
       });
       setMessage({ text: 'Concepto creado exitosamente', isError: false });
     } catch (error) {
@@ -315,6 +318,17 @@ const Conceptos: React.FC = () => {
               Es Clase Suelta
             </CheckboxLabel>
           </FormGroup>
+          <FormGroup>
+  <CheckboxLabel>
+    <input
+      type="checkbox"
+      name="esInscripcion"
+      checked={nuevoConcepto.esInscripcion}
+      onChange={handleInputChange}
+    />
+    Es concepto de inscripción
+  </CheckboxLabel>
+</FormGroup>
         </FormSection>
 
         <Button type="submit" disabled={loading}>

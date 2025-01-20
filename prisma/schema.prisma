@@ -8,6 +8,17 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Inscripcion {
+  id        Int       @id @default(autoincrement())
+  alumnoId  Int       @unique
+  monto     Float
+  pagada    Boolean   @default(false)
+  fechaPago DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  alumno    Alumno    @relation(fields: [alumnoId], references: [id])
+}
+
 model Alumno {
   id                       Int                      @id @default(autoincrement())
   nombre                   String
@@ -32,11 +43,14 @@ model Alumno {
   alumnosSueltosAnteriores AlumnoSuelto[]           @relation("AlumnoSueltoRegular")
   asistencias              Asistencia[]
   configuracionPago        ConfiguracionPagoAlumno?
+  inscripcion Inscripcion?
   ctaCte                   CtaCte?
   descuentosVigentes       DescuentoAplicado[]
   deudas                   Deuda[]
   recibos                  Recibo[]
   estilos                  Estilo[]                 @relation("AlumnoEstilos")
+  inscripcionPagada      Boolean   @default(false)
+  fechaPagoInscripcion   DateTime?
 }
 
 model ConfiguracionPagoAlumno {
@@ -94,6 +108,9 @@ model Deuda {
   pagos            PagoDeuda[]
 
   @@index([alumnoId, mes, anio])
+  esInscripcion Boolean @default(false)
+  conceptoId    Int?
+  concepto      Concepto? @relation(fields: [conceptoId], references: [id])
 }
 
 model PagoDeuda {
@@ -120,6 +137,9 @@ model Concepto {
   estiloId    Int?
   estilo      Estilo?  @relation(fields: [estiloId], references: [id])
   recibos     Recibo[]
+  esInscripcion Boolean @default(false) 
+  activo        Boolean @default(true)
+  deudas        Deuda[]
 }
 
 model Recibo {

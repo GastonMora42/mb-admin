@@ -226,17 +226,31 @@ const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaE
   }
 };
 
+// En la función handleSubmit de la página Alumnos
 const handleSubmit = async (e: React.FormEvent) => {
   e.preventDefault();
   setLoading(true);
   try {
+    // Obtener el concepto de inscripción
+    const conceptoInscripcion = await fetch('/api/conceptos?esInscripcion=true')
+      .then(res => res.json())
+      .then(data => data[0]); // Asumimos que solo hay un concepto de inscripción
+
     const alumnoData = {
       ...nuevoAlumno,
       fechaNacimiento: tipoAlumno === 'regular' ? new Date(nuevoAlumno.fechaNacimiento).toISOString() : undefined,
       activo: true,
       estilosIds: nuevoAlumno.estilosIds.map(id => parseInt(id, 10)),
       descuentoManual: nuevoAlumno.descuentoManual ? parseFloat(nuevoAlumno.descuentoManual) : undefined,
-      tipoAlumno
+      tipoAlumno,
+      // Agregar la deuda de inscripción si existe el concepto
+      deudaInscripcion: conceptoInscripcion ? {
+        monto: conceptoInscripcion.monto,
+        montoOriginal: conceptoInscripcion.monto,
+        conceptoId: conceptoInscripcion.id,
+        fechaVencimiento: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 días desde hoy
+        pagada: false
+      } : undefined
     };
 
     const res = await fetch('/api/alumnos', {

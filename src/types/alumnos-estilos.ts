@@ -55,6 +55,7 @@ export type Alumno = {
   
  // Actualizar el tipo Deuda:
 export type Deuda = {
+  esInscripcion: boolean;
   id: number;
   alumno: Alumno;
   alumnoId: number;

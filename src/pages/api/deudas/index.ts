@@ -24,6 +24,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               descripcion: true
             }
           },
+          concepto: {
+            select: {
+              id: true,
+              nombre: true,
+              monto: true,
+              esInscripcion: true
+            }
+          },
           pagos: {
             include: {
               recibo: {
@@ -53,21 +61,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           }
         },
         orderBy: [
+          { esInscripcion: 'desc' }, // Mostrar inscripciones primero
           { anio: 'asc' },
           { mes: 'asc' }
         ]
       });
-
-      // Procesar las deudas para añadir información adicional
+      
+      // En el procesamiento de deudas, incluir la información de inscripción
       const deudasProcesadas = deudas.map(deuda => {
         const montoPagado = deuda.pagos.reduce((sum, pago) => sum + pago.monto, 0);
         
         return {
           ...deuda,
-          periodo: `${deuda.mes}/${deuda.anio}`,
+          periodo: deuda.concepto?.esInscripcion ? 'INSCRIPCIÓN' : `${deuda.mes}/${deuda.anio}`,
           montoPagado,
           montoPendiente: deuda.monto - montoPagado,
           estaVencida: new Date(deuda.fechaVencimiento) < new Date() && !deuda.pagada,
+          esInscripcion: deuda.concepto?.esInscripcion || false,
           pagosInfo: deuda.pagos.map(pago => ({
             fecha: pago.recibo.fecha,
             numeroRecibo: pago.recibo.numeroRecibo,
@@ -75,10 +85,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           }))
         };
       });
-
-      // Agrupar por período para mejor visualización
+      
+      // En el agrupamiento, manejar las inscripciones separadamente
       const deudasAgrupadas = deudasProcesadas.reduce((acc, deuda) => {
-        const periodo = `${deuda.mes}/${deuda.anio}`;
+        const periodo = deuda.esInscripcion ? 'INSCRIPCIÓN' : `${deuda.mes}/${deuda.anio}`;
         if (!acc[periodo]) {
           acc[periodo] = [];
         }

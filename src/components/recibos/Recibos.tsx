@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import styled from 'styled-components';
 import { format } from 'date-fns';
 import { 
@@ -18,6 +18,33 @@ const Container = styled.div`
   border-radius: 8px;
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
   position: relative;
+`;
+
+const DeudaItem = styled.div`
+  padding: 10px;
+  border: 1px solid #eee;
+  border-radius: 4px;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background-color: white; // Asegurar contraste
+`;
+
+const CheckboxLabel = styled.label`
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  width: 100%;
+
+  input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    margin-right: 8px;
+    visibility: visible;
+    cursor: pointer;
+  }
 `;
 
 const MainContent = styled.div<{ isFilterOpen: boolean }>`
@@ -167,19 +194,21 @@ const Tr = styled.tr`
   }
 `;
 
+const DeudaSection = styled.div`
+  margin: 15px 0;
+  padding: 15px;
+  background-color: #f9f9f9;
+  border-radius: 4px;
+  position: relative;
+  z-index: 1;
+`;
+
 const Message = styled.div<{ isError?: boolean }>`
   margin-top: 20px;
   padding: 10px;
   border-radius: 4px;
   background-color: ${props => props.isError ? '#ffcccc' : '#ccffcc'};
   color: ${props => props.isError ? '#cc0000' : '#006600'};
-`;
-
-const CheckboxLabel = styled.label`
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  cursor: pointer;
 `;
 
 const FiltersPanel = styled.div<{ isOpen: boolean }>`
@@ -246,24 +275,6 @@ const FiltersForm = styled(Form)`
   gap: 20px;
 `;
 
-const FilterInputLabel = styled(InputLabel)`
-  margin-bottom: 8px;
-  color: #666;
-  font-size: 0.9em;
-  font-weight: 600;
-`;
-
-const FilterInput = styled(Input)`
-  background-color: white;
-  border: 1px solid #ddd;
-  transition: all 0.3s ease;
-
-  &:focus {
-    border-color: #FFC001;
-    box-shadow: 0 0 0 2px rgba(255, 192, 1, 0.2);
-  }
-`;
-
 const CloseFiltersButton = styled.button`
   position: absolute;
   top: 10px;
@@ -307,21 +318,6 @@ const PreviewTotal = styled.div`
   border-top: 2px solid #FFC001;
   font-weight: bold;
 `;
-
-const DeudaItem = styled.div`
-  padding: 10px;
-  border: 1px solid #eee;
-  border-radius: 4px;
-  margin-bottom: 10px;
-`;
-
-const DeudaSection = styled.div`
-  margin: 15px 0;
-  padding: 15px;
-  background-color: #f9f9f9;
-  border-radius: 4px;
-`;
-
 
 interface VistaPrevia {
   subtotal: number;
@@ -439,6 +435,7 @@ const [filtros, setFiltros] = useState<Filtros>({
 
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ text: string; isError: boolean } | null>(null);
+  const [mostrarSoloInscripcion, setMostrarSoloInscripcion] = useState(false);
 
   useEffect(() => {
     fetchRecibos();
@@ -467,7 +464,7 @@ const [filtros, setFiltros] = useState<Filtros>({
   }, [estiloSeleccionado, nuevoRecibo.esClaseSuelta, conceptos]);
 
 
-  const fetchRecibos = async () => {
+  const fetchRecibos = useCallback(async () => {
     setLoading(true);
     try {
       const queryParams = new URLSearchParams();
@@ -485,12 +482,14 @@ const [filtros, setFiltros] = useState<Filtros>({
     } finally {
       setLoading(false);
     }
-  };
+  }, [filtros]); // Solo depende de filtros
 
   useEffect(() => {
-    fetchRecibos()
-  }, [fetchRecibos]) // <-- Agregar la dependencia
-  
+    fetchRecibos();
+    fetchAlumnos();
+    fetchAlumnosSueltos();
+    fetchConceptos();
+  }, []); // Sin dependencias
 
   const handleAnularRecibo = async (id: number) => {
     if (!confirm('¿Está seguro que desea anular este recibo?')) return;
@@ -516,10 +515,12 @@ const [filtros, setFiltros] = useState<Filtros>({
   };
 
   const agregarReciboPendiente = () => {
-    const descuento = nuevoRecibo.descuentoManual ? 
-      parseFloat(nuevoRecibo.descuentoManual.toString()) / 100 : 
-      undefined; // Cambiamos null por undefined
-  
+    setLoading(true); // Al inicio
+    try {
+      const descuento = nuevoRecibo.descuentoManual ? 
+        parseFloat(nuevoRecibo.descuentoManual.toString()) / 100 : 
+        undefined;
+    
     const reciboTemp: ReciboPendiente = {
       id: crypto.randomUUID(),
       alumno: alumnos.find(a => a.id === parseInt(nuevoRecibo.alumnoId)),
@@ -536,7 +537,12 @@ const [filtros, setFiltros] = useState<Filtros>({
     
     setRecibosPendientes(prev => [...prev, reciboTemp]);
     resetForm();
-  };
+    setLoading(false); // Importante: setear loading a false al terminar
+  } catch (error) {
+    console.error('Error:', error);
+    setLoading(false); // También en caso de error
+  }
+};
 
 // Función para crear todos los recibos pendientes
 const crearRecibosPendientes = async () => {
@@ -635,8 +641,25 @@ const crearRecibosPendientes = async () => {
       if (!response.ok) throw new Error('Error al obtener deudas');
       
       const data = await response.json();
-      // Asegurarnos de que estamos usando el array de deudas de la respuesta
-      setDeudasAlumno(data.deudas || []);
+      console.log('Deudas recibidas:', data); // Para debug
+      
+      // Ordenar las deudas para que la inscripción aparezca primero
+      const deudasOrdenadas = (data.deudas || []).sort((a: Deuda, b: Deuda) => {
+        if (a.concepto?.esInscripcion) return -1;
+        if (b.concepto?.esInscripcion) return 1;
+        return 0;
+      });
+  
+      setDeudasAlumno(deudasOrdenadas);
+  
+      // Si hay deuda de inscripción, mostrar mensaje
+      const deudaInscripcion = deudasOrdenadas.find((d: { concepto: { esInscripcion: any; }; }) => d.concepto?.esInscripcion);
+      if (deudaInscripcion) {
+        setMessage({
+          text: 'Este alumno tiene pendiente el pago de inscripción',
+          isError: true
+        });
+      }
     } catch (error) {
       console.error('Error al cargar deudas:', error);
       setDeudasAlumno([]);
@@ -675,8 +698,7 @@ const crearRecibosPendientes = async () => {
   
     if (name === 'alumnoId' && value) {
       fetchDeudasAlumno(value);
-      // Limpiar deudas seleccionadas al cambiar de alumno
-      setDeudasSeleccionadas({});
+      setDeudasSeleccionadas({}); // Limpiar las deudas seleccionadas
     }
 
     setNuevoRecibo(prev => {
@@ -743,72 +765,6 @@ const crearRecibosPendientes = async () => {
     }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      const reciboData = {
-        ...nuevoRecibo,
-        monto: vistaPrevia.total,
-        montoOriginal: vistaPrevia.subtotal,
-        descuento: nuevoRecibo.descuentoManual > 0 ? nuevoRecibo.descuentoManual / 100 : null,
-        deudasAPagar: Object.entries(deudasSeleccionadas).map(([deudaId, deuda]) => ({
-          deudaId: parseInt(deudaId),
-          monto: deuda.monto
-        }))
-      };
-
-      const handleClaseSueltaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const checked = e.target.checked;
-        
-        if (checked) {
-          const conceptoClaseSuelta = conceptos.find(
-            c => c.nombre === 'Clase Suelta' && 
-            (estiloSeleccionado ? c.estiloId === parseInt(estiloSeleccionado) : true)
-          );
-    
-          if (conceptoClaseSuelta) {
-            setNuevoRecibo(prev => ({
-              ...prev,
-              esClaseSuelta: true,
-              conceptoId: conceptoClaseSuelta.id.toString(),
-              monto: conceptoClaseSuelta.monto.toString(),
-              alumnoId: '',
-            }));
-          }
-        } else {
-          setNuevoRecibo(prev => ({
-            ...prev,
-            esClaseSuelta: false,
-            conceptoId: '',
-            monto: '',
-            alumnoSueltoId: ''
-          }));
-        }
-      };
-
-      const res = await fetch('/api/recibos', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(reciboData),
-      });
-
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.error || 'Error al crear recibo');
-      }
-
-      const reciboCreado = await res.json();
-      setRecibos(prev => [reciboCreado, ...prev]);
-      resetForm();
-      setMessage({ text: `Recibo #${reciboCreado.numeroRecibo} creado con éxito.`, isError: false });
-    } catch (error) {
-      console.error('Error creating recibo:', error);
-      setMessage({ text: 'Error al crear recibo', isError: true });
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const resetForm = () => {
     setNuevoRecibo({
@@ -1006,39 +962,91 @@ const crearRecibosPendientes = async () => {
   Mes Completo
 </CheckboxLabel>
           </InputGroup>
-          {/* Sección de Deudas */}
-          {nuevoRecibo.alumnoId && !nuevoRecibo.esClaseSuelta && (
-    <DeudaSection>
-      <InputLabel>Deudas Pendientes</InputLabel>
-      {Array.isArray(deudasAlumno) && deudasAlumno.length > 0 ? (
-        deudasAlumno.map(deuda => (
-          <DeudaItem key={deuda.id}>
-            <CheckboxLabel>
-              <input
-                type="checkbox"
-                checked={!!deudasSeleccionadas[deuda.id]}
-                onChange={(e) => handleDeudaSelect(deuda.id, e.target.checked)}
-              />
-              {`${deuda.estilo.nombre} - ${deuda.mes}/${deuda.anio} - $${deuda.monto}`}
-            </CheckboxLabel>
-            {deudasSeleccionadas[deuda.id] && (
-              <Input
-                type="number"
-                value={deudasSeleccionadas[deuda.id].monto}
-                onChange={(e) => handleDeudaMontoChange(deuda.id, e.target.value)}
-                placeholder="Monto a pagar"
-                step="0.01"
-                min="0"
-                max={deuda.monto}
-              />
-            )}
-          </DeudaItem>
-        ))
-      ) : (
-        <NoDeudas>No hay deudas pendientes</NoDeudas>
+{/* Sección de Deudas */}
+{nuevoRecibo.alumnoId && !nuevoRecibo.esClaseSuelta && (
+  <DeudaSection>
+    <InputLabel>Deudas Pendientes</InputLabel>
+    <CheckboxLabel style={{ marginBottom: '10px' }}>
+      <input
+        type="checkbox"
+        checked={mostrarSoloInscripcion}
+        onChange={(e) => setMostrarSoloInscripcion(e.target.checked)}
+      />
+      Mostrar solo deudas de inscripción
+    </CheckboxLabel>
+    
+    {Array.isArray(deudasAlumno) && deudasAlumno.length > 0 ? (
+  deudasAlumno
+    .filter(deuda => !mostrarSoloInscripcion || deuda.esInscripcion)
+    .map(deuda => (
+      <DeudaItem 
+      key={deuda.id}
+      style={{
+        backgroundColor: deuda.concepto?.esInscripcion ? '#fff3cd' : 'white',
+        border: deuda.concepto?.esInscripcion ? '2px solid #ffc107' : '1px solid #eee'
+      }}
+    >
+      <CheckboxLabel>
+        <input
+          type="checkbox"
+          checked={!!deudasSeleccionadas[deuda.id]}
+          onChange={(e) => handleDeudaSelect(deuda.id, e.target.checked)}
+        />
+        <span style={{
+          fontWeight: deuda.concepto?.esInscripcion ? 'bold' : 'normal',
+          color: deuda.concepto?.esInscripcion ? '#856404' : 'inherit'
+        }}>
+          {deuda.concepto?.esInscripcion 
+            ? `INSCRIPCIÓN - $${deuda.monto}`
+            : `${deuda.estilo.nombre} - ${deuda.mes}/${deuda.anio} - $${deuda.monto}`}
+        </span>
+      </CheckboxLabel>
+      {deudasSeleccionadas[deuda.id] && (
+        <Input
+          type="number"
+          value={deudasSeleccionadas[deuda.id].monto}
+          onChange={(e) => handleDeudaMontoChange(deuda.id, e.target.value)}
+          placeholder="Monto a pagar"
+          step="0.01"
+          min="0"
+          max={deuda.monto}
+        />
       )}
-    </DeudaSection>
-  )}
+    </DeudaItem>
+    ))
+) : (
+  <NoDeudas>No hay deudas pendientes</NoDeudas>
+)}
+
+    {/* Vista previa del total seleccionado */}
+    {Object.keys(deudasSeleccionadas).length > 0 && (
+      <PreviewSection style={{ marginTop: '20px' }}>
+        <PreviewTitle>Deudas Seleccionadas</PreviewTitle>
+        {Object.entries(deudasSeleccionadas).map(([deudaId, deuda]) => (
+          <PreviewDetail key={deudaId}>
+            <span>
+              {deudasAlumno.find(d => d.id === parseInt(deudaId))?.esInscripcion
+                ? 'INSCRIPCIÓN'
+                : `${deudasAlumno.find(d => d.id === parseInt(deudaId))?.estilo.nombre} - 
+                   ${deudasAlumno.find(d => d.id === parseInt(deudaId))?.mes}/
+                   ${deudasAlumno.find(d => d.id === parseInt(deudaId))?.anio}`
+              }
+            </span>
+            <span>${deuda.monto}</span>
+          </PreviewDetail>
+        ))}
+        <PreviewTotal>
+          <span>Total Deudas:</span>
+          <span>
+            ${Object.values(deudasSeleccionadas)
+              .reduce((sum, deuda) => sum + deuda.monto, 0)
+              .toFixed(2)}
+          </span>
+        </PreviewTotal>
+      </PreviewSection>
+    )}
+  </DeudaSection>
+)}
 
         <Button type="submit" disabled={loading}>
           {loading ? 'Agregando...' : 'Agregar a Vista Previa'}

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { lusitana } from "@/components/fonts";
 import {
   AtSymbolIcon,
@@ -9,17 +9,34 @@ import {
   LockClosedIcon
 } from "@heroicons/react/24/outline";
 import { Button } from "@/components/button";
-import { handleSignIn } from "@/lib/cognito-actions";
+import { handleSignIn, checkAuthStatus, signOut } from "@/lib/cognito-actions";
 import Link from "next/link";
 import { useRouter } from 'next/router';
 import Image from 'next/image';
 
 const LoginForm: React.FC = () => {
-
   const [errorMessage, setErrorMessage] = useState<string | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const router = useRouter();
+
+  // Verificar el estado de autenticación al cargar el componente
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const authStatus = await checkAuthStatus();
+        if (authStatus.isAuthenticated) {
+          setIsAuthenticated(true);
+          router.push('/dashboard');
+        }
+      } catch (error) {
+        console.error('Error checking auth status:', error);
+      }
+    };
+
+    checkAuth();
+  }, [router]);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -27,22 +44,65 @@ const LoginForm: React.FC = () => {
     setErrorMessage(undefined);
 
     const formData = new FormData(event.currentTarget);
+    const email = formData.get('email') as string;
+    const password = formData.get('password') as string;
 
     try {
-      const result = await handleSignIn(undefined, formData);
+      // Si ya hay una sesión activa, cerrarla primero
+      if (isAuthenticated) {
+        await signOut();
+      }
+
+      const result = await handleSignIn(email, password);
+      
       if (result.success) {
-        router.push(result.redirectTo);
+        setIsAuthenticated(true);
+        // Guardar token en localStorage o en un estado global (context/redux)
+        localStorage.setItem('authToken', result.token);
+        
+        // Redirigir al dashboard o a la página anterior si existe
+        const returnUrl = router.query.returnUrl as string;
+        router.push(returnUrl || '/dashboard');
       } else if (result.redirectTo) {
         router.push(result.redirectTo);
       } else {
         setErrorMessage('Inicio de sesión fallido. Por favor, verifica tus credenciales.');
       }
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Ocurrió un error durante el inicio de sesión');
+      let errorMsg = 'Ocurrió un error durante el inicio de sesión';
+      
+      if (error instanceof Error) {
+        // Manejar diferentes tipos de errores
+        switch (error.name) {
+          case 'NotAuthorizedException':
+            errorMsg = 'Credenciales incorrectas';
+            break;
+          case 'UserNotFoundException':
+            errorMsg = 'El usuario no existe';
+            break;
+          case 'UserNotConfirmedException':
+            errorMsg = 'Por favor, verifica tu cuenta de correo electrónico';
+            break;
+          default:
+            errorMsg = error.message;
+        }
+      }
+      
+      setErrorMessage(errorMsg);
     } finally {
       setIsLoading(false);
     }
   };
+
+  // Si ya está autenticado, mostrar loading mientras redirecciona
+  if (isAuthenticated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-purple-600"></div>
+      </div>
+    );
+  }
+
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-r from-blue-500 to-purple-600 py-12 px-4 sm:px-6 lg:px-8">
@@ -191,4 +251,28 @@ const LoginForm: React.FC = () => {
   );
 }
 
-export default LoginForm
+// Agregar protección de ruta HOC
+export const getServerSideProps = async (context: any) => {
+  try {
+    const authStatus = await checkAuthStatus(context);
+    
+    if (authStatus.isAuthenticated) {
+      return {
+        redirect: {
+          destination: '/dashboard',
+          permanent: false,
+        },
+      };
+    }
+    
+    return {
+      props: {},
+    };
+  } catch (error) {
+    return {
+      props: {},
+    };
+  }
+};
+
+export default LoginForm;

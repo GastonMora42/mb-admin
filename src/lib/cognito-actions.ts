@@ -5,109 +5,233 @@ import {
   signIn,
   signOut,
   resendSignUpCode,
- } from "aws-amplify/auth";
- import { getErrorMessage } from "@/utils/get-error-message";
+  getCurrentUser,
+  fetchUserAttributes
+} from "aws-amplify/auth";
+import { Amplify } from 'aws-amplify';
+import { getErrorMessage } from "@/utils/get-error-message";
 
- import { Amplify } from 'aws-amplify';
+// Interfaces
+interface AuthResponse {
+  success: boolean;
+  redirectTo: string;
+  error?: string;
+  user?: any;
+}
 
-export async function handleSignUp(undefined: undefined, formData: FormData) {
-  console.log('Amplify Config:', Amplify.getConfig());
+interface VerificationResponse {
+  message: string;
+  errorMessage: string;
+}
+
+interface SignUpFormData {
+  email: string;
+  password: string;
+  name: string;
+  role: string;
+}
+
+// Verificar estado de autenticación
+export async function checkAuthStatus(): Promise<AuthResponse> {
   try {
+    const currentUser = await getCurrentUser();
+    const userAttributes = await fetchUserAttributes();
+    
+    return {
+      success: true,
+      redirectTo: "/dashboard",
+      user: {
+        ...currentUser,
+        attributes: userAttributes
+      }
+    };
+  } catch (error) {
+    return {
+      success: false,
+      redirectTo: "/login"
+    };
+  }
+}
+
+// Registro de usuario
+export async function handleSignUp(formData: SignUpFormData): Promise<AuthResponse> {
+  console.log('Amplify Config:', Amplify.getConfig());
+  
+  try {
+    const { email, password, name, role } = formData;
+
+    // Validaciones
+    if (!email || !password || !name || !role) {
+      throw new Error("Todos los campos son requeridos");
+    }
+
+    if (password.length < 8) {
+      throw new Error("La contraseña debe tener al menos 8 caracteres");
+    }
+
     const { isSignUpComplete, userId, nextStep } = await signUp({
-      username: String(formData.get("email")),
-      password: String(formData.get("password")),
+      username: email,
+      password,
       options: {
         userAttributes: {
-          email: String(formData.get("email")),
-          name: String(formData.get("name")),
-          'custom:role': String(formData.get("role")), // Asegúrate de que este campo exista en tu formulario
+          email,
+          name,
+          'custom:role': role,
         },
         autoSignIn: true,
       }
     });
-    console.log("Sign up complete:", isSignUpComplete, "User ID:", userId, "Next step:", nextStep);
-    return { success: true, redirectTo: "/confirm-register" as const };
+
+    return { 
+      success: true, 
+      redirectTo: "/confirm-register",
+      user: { userId, email }
+    };
   } catch (error) {
     console.error('Sign up error:', error);
-    return { success: false, error: getErrorMessage(error), redirectTo: "/signup" as const };
+    return { 
+      success: false, 
+      redirectTo: "/signup",
+      error: getErrorMessage(error)
+    };
   }
 }
-  
-export async function handleSendEmailVerificationCode(
-  prevState: { message: string; errorMessage: string },
-  formData: FormData
-) {
-  try {
-    console.log('Attempting to resend code to:', String(formData.get("email")));
-    await resendSignUpCode({
-      username: String(formData.get("email")),
-    });
-    console.log('Resend code successful');
+
+// Reenvío de código de verificación
+export async function handleSendEmailVerificationCode(email: string): Promise<VerificationResponse> {
+  if (!email) {
     return {
-      ...prevState,
-      message: "Código enviado con éxito",
-      errorMessage: "",
+      message: "",
+      errorMessage: "El correo electrónico es requerido"
+    };
+  }
+
+  try {
+    await resendSignUpCode({ username: email });
+    
+    return {
+      message: "Código enviado con éxito. Por favor revisa tu correo.",
+      errorMessage: ""
     };
   } catch (error) {
     console.error('Error resending code:', error);
     return {
-      ...prevState,
       message: "",
-      errorMessage: getErrorMessage(error),
+      errorMessage: getErrorMessage(error)
     };
   }
 }
-  
-export async function handleConfirmSignUp(
-  _prevState: string | undefined,
-  formData: FormData
-) {
+
+// Confirmación de registro
+export async function handleConfirmSignUp(email: string, code: string): Promise<AuthResponse> {
+  if (!email || !code) {
+    return {
+      success: false,
+      redirectTo: "/confirm-register",
+      error: "El correo y el código son requeridos"
+    };
+  }
+
   try {
     const { isSignUpComplete, nextStep } = await confirmSignUp({
-      username: String(formData.get("email")),
-      confirmationCode: String(formData.get("code")),
+      username: email,
+      confirmationCode: code
     });
-    console.log("Confirmation complete:", isSignUpComplete, "Next step:", nextStep);
-    return { success: true, redirectTo: "/login" as const };
+
+    return { 
+      success: true, 
+      redirectTo: "/login"
+    };
   } catch (error) {
     console.error('Confirmation error:', error);
     return { 
       success: false, 
-      error: getErrorMessage(error), 
-      redirectTo: "/confirm-register" as const 
+      error: getErrorMessage(error),
+      redirectTo: "/confirm-register"
     };
   }
 }
 
-export async function handleSignIn(
-  _prevState: string | undefined,
-  formData: FormData
-) {
+// Inicio de sesión
+export async function handleSignIn(email: string, password: string): Promise<AuthResponse> {
+  if (!email || !password) {
+    throw new Error("El correo y la contraseña son requeridos");
+  }
+
   try {
+    // Cerrar sesión existente si la hay
+    try {
+      await handleSignOut();
+    } catch (error) {
+      console.log("No había sesión activa");
+    }
+
     const { isSignedIn, nextStep } = await signIn({
-      username: String(formData.get("email")),
-      password: String(formData.get("password")),
+      username: email,
+      password
     });
 
     if (isSignedIn) {
-      return { success: true, redirectTo: "/dashboard" };
-    } else if (nextStep.signInStep === "CONFIRM_SIGN_UP") {
-      return { success: false, redirectTo: "/confirm-register" };
+      const userAttributes = await fetchUserAttributes();
+      
+      return { 
+        success: true, 
+        redirectTo: "/dashboard",
+        user: userAttributes
+      };
     }
-    throw new Error("No se pudo iniciar sesión. Por favor, verifica tus credenciales.");
+
+    if (nextStep.signInStep === "CONFIRM_SIGN_UP") {
+      return { 
+        success: false, 
+        redirectTo: "/confirm-register",
+        error: "Por favor confirma tu correo electrónico"
+      };
+    }
+
+    throw new Error("No se pudo iniciar sesión. Verifica tus credenciales.");
   } catch (error) {
-    console.error("Ocurrió un error durante el inicio de sesión:", error);
-    throw error;
+    console.error("Error durante el inicio de sesión:", error);
+    return {
+      success: false,
+      redirectTo: "/login",
+      error: getErrorMessage(error)
+    };
   }
 }
 
-export async function handleSignOut() {
+// Cierre de sesión
+export async function handleSignOut(): Promise<AuthResponse> {
   try {
     await signOut({ global: true });
-    return { success: true, redirectTo: "/login" };
+    
+    localStorage.removeItem('user');
+    sessionStorage.clear();
+    
+    return { 
+      success: true, 
+      redirectTo: "/login" 
+    };
   } catch (error) {
-    console.error("Error durante el cierre de sesión:", getErrorMessage(error));
-    return { success: false, error: getErrorMessage(error) };
+    console.error("Error durante el cierre de sesión:", error);
+    return { 
+      success: false, 
+      redirectTo: "/dashboard",
+      error: getErrorMessage(error)
+    };
+  }
+}
+
+// Función auxiliar para verificar sesión en rutas protegidas
+export async function requireAuth() {
+  try {
+    const authStatus = await checkAuthStatus();
+    if (!authStatus.success) {
+      redirect('/login');
+    }
+    return authStatus.user;
+  } catch (error) {
+    redirect('/login');
   }
 }
 

@@ -87,16 +87,44 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const recibos = await prisma.recibo.findMany({
         where: whereClause,
         include: { 
-          alumno: true,
+          alumno: {
+            select: {
+              id: true,
+              nombre: true,
+              apellido: true,
+              dni: true,
+              email: true,
+              telefono: true,
+              activo: true,
+              inscripcionPagada: true,
+              fechaPagoInscripcion: true
+            }
+          },
           alumnoSuelto: {
             include: {
               alumnoRegular: true
             }
           },
-          concepto: true,
+          concepto: {
+            include: {
+              estilo: true
+            }
+          },
           pagosDeuda: {
             include: {
-              deuda: true
+              deuda: {
+                include: {
+                  estilo: true,
+                  concepto: {
+                    select: {
+                      id: true,
+                      nombre: true,
+                      monto: true,
+                      esInscripcion: true
+                    }
+                  }
+                }
+              }
             }
           }
         },
@@ -178,9 +206,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         });
   
         // 2. Si hay deudas a pagar, procesarlas
-        if (alumnoId && esMesCompleto && deudasAPagar?.length > 0) {
+        if (alumnoId && deudasAPagar?.length > 0) {
           // Crear los pagos de deuda y actualizar estados
           for (const deuda of deudasAPagar) {
+            // Obtener la deuda original para verificar si es de inscripción
+            const deudaOriginal = await tx.deuda.findUnique({
+              where: { id: deuda.deudaId },
+              include: {
+                concepto: true // Incluir el concepto para verificar si es inscripción
+              }
+            });
+        
             // Crear el pago
             await tx.pagoDeuda.create({
               data: {
