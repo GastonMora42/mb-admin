@@ -55,6 +55,7 @@ export type Alumno = {
   
  // Actualizar el tipo Deuda:
 export type Deuda = {
+  concepto: any;
   esInscripcion: boolean;
   id: number;
   alumno: Alumno;

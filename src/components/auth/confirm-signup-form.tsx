@@ -1,3 +1,4 @@
+//confirm-signup-form.tsx
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { lusitana } from "@/components/fonts";
@@ -9,6 +10,7 @@ import {
 import { ArrowRightIcon } from "@heroicons/react/20/solid";
 import { Button } from "@/components/button";
 import { handleConfirmSignUp } from "@/lib/cognito-actions";
+import { resendSignUpCode } from '@aws-amplify/auth';
 
 
 
@@ -26,7 +28,10 @@ const ConfirmSignUpForm: React.FC = () => {
     setErrorMessage('');
   
     try {
-      const result = await handleConfirmSignUp(undefined, new FormData(e.currentTarget));
+      const result = await handleConfirmSignUp(
+        email, // Usar el email del estado
+        code,  // Usar el código del estado
+      );
       if (result.success) {
         router.push(result.redirectTo || '/login');
       } else {
@@ -39,6 +44,19 @@ const ConfirmSignUpForm: React.FC = () => {
       setIsLoading(false);
     }
   };
+
+  const resendConfirmationCode = async () => {
+    try {
+      await resendSignUpCode({
+        username: email,
+      });
+      setErrorMessage('Código reenviado. Por favor revisa tu email.');
+    } catch (error) {
+      console.error('Error al reenviar código:', error);
+      setErrorMessage('Error al reenviar el código de confirmación.');
+    }
+  };
+  
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-100 py-12 px-4 sm:px-6 lg:px-8">
@@ -86,6 +104,13 @@ const ConfirmSignUpForm: React.FC = () => {
                 />
                 <KeyIcon className="pointer-events-none absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
               </div>
+              <Button
+  type="button"
+  onClick={resendConfirmationCode}
+  className="text-indigo-600 hover:text-indigo-500"
+>
+  Reenviar código de confirmación
+</Button>
             </div>
           </div>
 

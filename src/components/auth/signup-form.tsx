@@ -11,6 +11,13 @@ import { ArrowRightIcon } from "@heroicons/react/20/solid";
 import { Button } from "@/components/button";
 import { handleSignUp } from "@/lib/cognito-actions";
 
+interface SignUpFormData {
+  email: string;
+  password: string;
+  name: string;
+  role: string;
+}
+
 const SignUpForm: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -22,7 +29,15 @@ const SignUpForm: React.FC = () => {
     setErrorMessage('');
   
     try {
-      const result = await handleSignUp(undefined, new FormData(e.currentTarget));
+      const formData = new FormData(e.currentTarget);
+      const signUpData: SignUpFormData = {
+        email: formData.get('email') as string,
+        password: formData.get('password') as string,
+        name: formData.get('name') as string,
+        role: formData.get('role') as string
+      };
+      
+      const result = await handleSignUp(undefined, formData, signUpData);
       if (result.success) {
         router.push(result.redirectTo || '/confirm-register');
       } else {

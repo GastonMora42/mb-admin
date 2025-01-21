@@ -514,6 +514,11 @@ const [filtros, setFiltros] = useState<Filtros>({
     }
   };
 
+  const handleMostrarInscripcion = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setMostrarSoloInscripcion(e.target.checked);
+    console.log("Deudas actuales:", deudasAlumno); // Para debug
+  };
+  
   const agregarReciboPendiente = () => {
     setLoading(true); // Al inicio
     try {

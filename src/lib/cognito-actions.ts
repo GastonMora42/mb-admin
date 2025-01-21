@@ -13,6 +13,7 @@ import { getErrorMessage } from "@/utils/get-error-message";
 
 // Interfaces
 interface AuthResponse {
+  [x: string]: any;
   success: boolean;
   redirectTo: string;
   error?: string;
@@ -32,7 +33,7 @@ interface SignUpFormData {
 }
 
 // Verificar estado de autenticación
-export async function checkAuthStatus(): Promise<AuthResponse> {
+export async function checkAuthStatus(_context?: any): Promise<AuthResponse> {
   try {
     const currentUser = await getCurrentUser();
     const userAttributes = await fetchUserAttributes();
@@ -54,7 +55,7 @@ export async function checkAuthStatus(): Promise<AuthResponse> {
 }
 
 // Registro de usuario
-export async function handleSignUp(formData: SignUpFormData): Promise<AuthResponse> {
+export async function handleSignUp(_undefined: undefined, _p0: FormData, formData: SignUpFormData): Promise<AuthResponse> {
   console.log('Amplify Config:', Amplify.getConfig());
   
   try {
@@ -235,4 +236,4 @@ export async function requireAuth() {
   }
 }
 
-export { confirmSignUp };
+export { confirmSignUp, signOut };
