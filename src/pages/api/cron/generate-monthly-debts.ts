@@ -64,6 +64,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       
+      
       if (deudasACrear.length > 0) {
         await tx.deuda.createMany({
           data: deudasACrear
