@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import styled from 'styled-components';
@@ -17,9 +17,10 @@ const Content = styled.div`
   display: flex;
   flex: 1;
   overflow-y: auto;
+  position: relative;
 `;
 
-const Sidebar = styled.div`
+const Sidebar = styled.div<{ isOpen: boolean }>`
   width: 280px;
   background-color: #1a202c;
   color: #ffffff;
@@ -27,18 +28,42 @@ const Sidebar = styled.div`
   display: flex;
   flex-direction: column;
   box-shadow: 4px 0 10px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+  position: relative;
+
+  @media (max-width: 1024px) {
+    position: fixed;
+    left: ${props => props.isOpen ? '0' : '-280px'};
+    height: 100vh;
+    z-index: 1000;
+    padding-top: 60px;
+  }
 `;
 
-const Main = styled.main`
+const Main = styled.main<{ sidebarOpen: boolean }>`
   flex: 1;
   padding: 32px;
   background-color: #F7FAFC;
   overflow-y: auto;
+  transition: margin-left 0.3s ease;
+
+  @media (max-width: 1024px) {
+    margin-left: ${props => props.sidebarOpen ? '280px' : '0'};
+    width: 100%;
+  }
+
+  @media (max-width: 768px) {
+    padding: 16px;
+  }
 `;
 
 const LogoContainer = styled.div`
   margin-bottom: 40px;
   text-align: center;
+
+  @media (max-width: 768px) {
+    margin-bottom: 20px;
+  }
 `;
 
 const StyledLink = styled.a<{ isActive: boolean }>`
@@ -51,6 +76,7 @@ const StyledLink = styled.a<{ isActive: boolean }>`
   display: flex;
   align-items: center;
   margin-bottom: 8px;
+  font-size: 0.9rem;
 
   &:hover {
     background-color: #2D3748;
@@ -65,11 +91,66 @@ const StyledLink = styled.a<{ isActive: boolean }>`
 
   svg {
     margin-right: 12px;
+    min-width: 20px;
+  }
+
+  @media (max-width: 768px) {
+    padding: 10px 12px;
+    margin-bottom: 4px;
+  }
+`;
+
+const MenuButton = styled.button`
+  display: none;
+  position: fixed;
+  top: 70px;
+  left: 20px;
+  z-index: 1001;
+  background-color: #FFC001;
+  border: none;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  cursor: pointer;
+  color: #1a202c;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+
+  @media (max-width: 1024px) {
+    display: flex;
+  }
+`;
+
+const Overlay = styled.div<{ isOpen: boolean }>`
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 999;
+  opacity: ${props => props.isOpen ? 1 : 0};
+  pointer-events: ${props => props.isOpen ? 'auto' : 'none'};
+  transition: opacity 0.3s ease;
+
+  @media (max-width: 1024px) {
+    display: block;
   }
 `;
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const router = useRouter();
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  const toggleSidebar = () => {
+    setIsSidebarOpen(!isSidebarOpen);
+  };
+
+  const closeSidebar = () => {
+    setIsSidebarOpen(false);
+  };
 
   const isLinkActive = (path: string) => {
     return router.pathname === path || router.pathname.startsWith(`${path}/`);
@@ -79,7 +160,11 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     <Container>
       <Navbar />
       <Content>
-        <Sidebar>
+        <MenuButton onClick={toggleSidebar}>
+          {isSidebarOpen ? '×' : '☰'}
+        </MenuButton>
+        <Overlay isOpen={isSidebarOpen} onClick={closeSidebar} />
+        <Sidebar isOpen={isSidebarOpen}>
           <LogoContainer>
             <Image src="/mb-logo.png" alt="MB Admin Logo" width={180} height={60} />
           </LogoContainer>
@@ -149,8 +234,10 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               Info Clases
             </StyledLink>
           </Link>
-        </Sidebar>
-        <Main>{children}</Main>
+          </Sidebar>
+        <Main sidebarOpen={isSidebarOpen} onClick={() => isSidebarOpen && closeSidebar()}>
+          {children}
+        </Main>
       </Content>
     </Container>
   );
