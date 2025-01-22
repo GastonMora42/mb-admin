@@ -1,4 +1,4 @@
-import { Alumno, AlumnoSuelto, Concepto, Deuda, TipoPago } from "@prisma/client";
+import { Alumno, AlumnoSuelto, Concepto, Deuda, Prisma, TipoPago } from "@prisma/client";
 import { format } from "date-fns";
 import { useEffect, useState } from "react";
 
@@ -112,3 +112,20 @@ export interface DeudaSeleccionada {
   
     return { deudasAlumno, loading, error };
   };
+
+  export type ReciboWithRelations = Prisma.ReciboGetPayload<{
+    include: {
+      alumno: true;
+      alumnoSuelto: true;
+      concepto: true;
+      pagosDeuda: {
+        include: {
+          deuda: {
+            include: {
+              estilo: true;
+            }
+          }
+        }
+      }
+    }
+  }>;

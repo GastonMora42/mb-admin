@@ -6,6 +6,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (req.method === 'GET') {
     const { query, alumnoId } = req.query;
 
+
+    
     try {
       if (query) {
         // Buscar alumnos regulares y sueltos
@@ -48,6 +50,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             deudas: {
               include: {
                 estilo: true,
+                concepto: {
+                  select: {
+                    id: true,
+                    nombre: true,
+                    monto: true,
+                    esInscripcion: true,
+                    activo: true
+                  }
+                },
                 pagos: {
                   include: {
                     recibo: {
@@ -65,8 +76,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 }
               },
               orderBy: [
-                { anio: 'asc' }, // Cambiar a ascendente
-                { mes: 'asc' }   // Cambiar a ascendente
+                { concepto: { esInscripcion: 'desc' } }, // Inscripciones primero
+                { anio: 'asc' },
+                { mes: 'asc' }
               ]
             },
             alumnoEstilos: {
@@ -82,8 +94,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               }
             }
           }
-        });
-
+         });
+         
         if (!alumnoInfo) {
           return res.status(404).json({ error: 'Alumno no encontrado' });
         }

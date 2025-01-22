@@ -205,18 +205,42 @@ const Message = styled.div<{ isError?: boolean }>`
   border-left: 4px solid ${props => props.isError ? '#c62828' : '#2e7d32'};
 `;
 
-const EstilosList = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
+const SearchInput = styled.input`
+  width: 100%;
+  padding: 12px;
+  margin-bottom: 20px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+  transition: all 0.3s ease;
+  &:focus {
+    border-color: #FFC001;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(255, 192, 1, 0.1);
+  }
 `;
 
-const EstiloTag = styled.span`
-  background-color: #e0e0e0;
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 0.9em;
-  color: #333;
+const ProfesoresList = styled.ul`
+  list-style-type: none;
+  padding: 0;
+  margin-bottom: 20px;
+  border: 1px solid #eee;
+  border-radius: 6px;
+  max-height: 300px;
+  overflow-y: auto;
+`;
+
+const ProfesorItem = styled.li`
+  padding: 12px 15px;
+  border-bottom: 1px solid #eee;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  &:last-child {
+    border-bottom: none;
+  }
+  &:hover {
+    background-color: #f5f5f5;
+  }
 `;
 
 interface ProfesorForm {
@@ -250,6 +274,7 @@ const Profesores = () => {
     porcentajeClasesSueltasPorDefecto: '80',
     estilosIds: []
   });
+  
   
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ text: string; isError: boolean } | null>(null);

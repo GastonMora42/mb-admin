@@ -172,7 +172,7 @@ const LiquidacionPDF: React.FC<LiquidacionPDFProps> = ({
        <View style={styles.infoRow}>
          <Text style={styles.label}>Cursos Regulares:</Text>
          <Text style={styles.value}>
-           {liquidacionData.regularCount} alumnos - Total: ${liquidacionData.totalRegular.toFixed(2)}
+           {liquidacionData.regularCount} alumnos
          </Text>
        </View>
        <View style={styles.infoRow}>
@@ -193,7 +193,7 @@ const LiquidacionPDF: React.FC<LiquidacionPDFProps> = ({
        <View style={{...styles.infoRow, marginTop: 10}}>
          <Text style={styles.label}>Clases Sueltas:</Text>
          <Text style={styles.value}>
-           {liquidacionData.sueltasCount} alumnos - Total: ${liquidacionData.totalSueltas.toFixed(2)}
+           {liquidacionData.sueltasCount} alumnos
          </Text>
        </View>
        <View style={styles.infoRow}>
@@ -219,8 +219,6 @@ const LiquidacionPDF: React.FC<LiquidacionPDFProps> = ({
          <Text style={{...styles.tableColHeader, ...styles.colFecha}}>Fecha</Text>
          <Text style={{...styles.tableColHeader, ...styles.colAlumno}}>Alumno</Text>
          <Text style={{...styles.tableColHeader, ...styles.colConcepto}}>Concepto</Text>
-         <Text style={{...styles.tableColHeader, ...styles.colTipoPago}}>Tipo Pago</Text>
-         <Text style={{...styles.tableColHeader, ...styles.colMonto}}>Monto</Text>
          <Text style={{...styles.tableColHeader, ...styles.colLiquidacion}}>A Liquidar</Text>
        </View>
        
@@ -236,10 +234,6 @@ const LiquidacionPDF: React.FC<LiquidacionPDFProps> = ({
                'Sin alumno'}
            </Text>
            <Text style={{...styles.tableCol, ...styles.colConcepto}}>{recibo.concepto.nombre}</Text>
-           <Text style={{...styles.tableCol, ...styles.colTipoPago}}>{recibo.tipoPago}</Text>
-           <Text style={{...styles.tableCol, ...styles.colMonto}}>
-             ${recibo.monto.toFixed(2)}
-           </Text>
            <Text style={{...styles.tableCol, ...styles.colLiquidacion}}>
              ${(recibo.montoLiquidacion || 0).toFixed(2)}
            </Text>

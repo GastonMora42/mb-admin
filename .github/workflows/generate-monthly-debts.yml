@@ -1,0 +1,25 @@
+# .github/workflows/generate-monthly-debts.yml
+name: Generate Monthly Debts
+
+on:
+  schedule:
+    # Ejecutar el primer día de cada mes a las 00:00 UTC
+    - cron: '0 0 1 * *'
+  
+  # Opcional: permitir ejecución manual desde GitHub
+  workflow_dispatch:
+
+jobs:
+  generate-debts:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Generate Monthly Debts
+        run: |
+          curl -X POST ${{ secrets.APP_URL }}/api/cron/generate-monthly-debts \
+          -H "Authorization: Bearer ${{ secrets.CRON_SECRET_KEY }}" \
+          -H "Content-Type: application/json"
+
+    env:
+      APP_URL: ${{ secrets.APP_URL }}
+      CRON_SECRET_KEY: ${{ secrets.CRON_SECRET_KEY }}

@@ -10,6 +10,10 @@ import {
   Deuda,
   PagoDeuda 
 } from '@/types/alumnos-estilos';
+import { usePrinter } from '@/hooks/usePrinter';
+import PrinterIcon from '@heroicons/react/24/outline/PrinterIcon';
+import { PrinterService } from '@/lib/printer/printer.service';
+import { PrinterStatus } from '../PrinterStatus';
 
 // Styled Components
 const Container = styled.div`
@@ -399,7 +403,9 @@ const Recibos: React.FC = () => {
   const [conceptosFiltrados, setConceptosFiltrados] = useState<Concepto[]>([]); // Nuevo estado
   const [vistaPrevia, setVistaPrevia] = useState<VistaPrevia>(initialVistaPrevia);
   const [estiloSeleccionado, setEstiloSeleccionado] = useState<string>('');
-  
+  const [recibosPendientes, setRecibosPendientes] = useState<ReciboPendiente[]>([]);
+  const { isPrinterAvailable, printReceipt } = usePrinter();
+
   const [nuevoRecibo, setNuevoRecibo] = useState({
     monto: '',
     periodoPago: format(new Date(), 'yyyy-MM'),
@@ -414,10 +420,6 @@ const Recibos: React.FC = () => {
     fechaEfecto: format(new Date(), 'yyyy-MM-dd'),
     descuentoManual: 0,
 });
-
-// Nuevo estado
-const [recibosPendientes, setRecibosPendientes] = useState<ReciboPendiente[]>([]);
-
 
 const [filtros, setFiltros] = useState<Filtros>({
   numero: '',
@@ -436,6 +438,7 @@ const [filtros, setFiltros] = useState<Filtros>({
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ text: string; isError: boolean } | null>(null);
   const [mostrarSoloInscripcion, setMostrarSoloInscripcion] = useState(false);
+  const [showPrinterAlert, setShowPrinterAlert] = useState(true);
 
   useEffect(() => {
     fetchRecibos();
@@ -443,8 +446,6 @@ const [filtros, setFiltros] = useState<Filtros>({
     fetchAlumnosSueltos();
     fetchConceptos();
   }, []);
-
-  
 
   useEffect(() => {
     calcularVistaPrevia();
@@ -514,11 +515,6 @@ const [filtros, setFiltros] = useState<Filtros>({
     }
   };
 
-  const handleMostrarInscripcion = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setMostrarSoloInscripcion(e.target.checked);
-    console.log("Deudas actuales:", deudasAlumno); // Para debug
-  };
-  
   const agregarReciboPendiente = () => {
     setLoading(true); // Al inicio
     try {
@@ -574,32 +570,49 @@ const crearRecibosPendientes = async () => {
           periodo: deuda.periodo
         }))
       };
-
-      const res = await fetch('/api/recibos', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(reciboData),
-      });
-
-      if (!res.ok) {
-        throw new Error('Error al crear el recibo');
-      }
-    }
-    
-    setRecibosPendientes([]);
-    fetchRecibos();
-    // Importante: recargar las deudas del alumno
-    if (nuevoRecibo.alumnoId) {
-      fetchDeudasAlumno(nuevoRecibo.alumnoId);
-    }
-    setMessage({ text: 'Recibos creados exitosamente', isError: false });
-  } catch (error) {
-    console.error('Error:', error);
-    setMessage({ text: 'Error al crear los recibos', isError: true });
-  } finally {
-    setLoading(false);
-  }
-};
+      
+            const res = await fetch('/api/recibos', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(reciboData),
+            });
+      
+            if (!res.ok) {
+              throw new Error('Error al crear el recibo');
+            }
+      
+            const reciboCreado = await res.json();
+      
+            // Intentar imprimir si la impresora está disponible
+            if (isPrinterAvailable) {
+              try {
+                const printResult = await printReceipt(reciboCreado);
+                if (!printResult.success) {
+                  console.warn('No se pudo imprimir el recibo:', printResult.message);
+                }
+              } catch (printError) {
+                console.error('Error al imprimir:', printError);
+              }
+            }
+          }
+          
+          setRecibosPendientes([]);
+          fetchRecibos();
+          if (nuevoRecibo.alumnoId) {
+            fetchDeudasAlumno(nuevoRecibo.alumnoId);
+          }
+          setMessage({ 
+            text: 'Recibos creados exitosamente' + 
+              (!isPrinterAvailable ? ' (Impresora no disponible)' : ''), 
+            isError: false 
+          });
+        } catch (error) {
+          console.error('Error:', error);
+          setMessage({ text: 'Error al crear los recibos', isError: true });
+        } finally {
+          setLoading(false);
+        }
+      };
 
 
   const fetchAlumnos = async () => {
@@ -639,7 +652,7 @@ const crearRecibosPendientes = async () => {
     if (!alumnoId) {
       setDeudasAlumno([]);
       return;
-    }
+    } 
     
     try {
       const response = await fetch(`/api/deudas?alumnoId=${alumnoId}&pagada=false`);
@@ -770,7 +783,6 @@ const crearRecibosPendientes = async () => {
     }));
   };
 
-
   const resetForm = () => {
     setNuevoRecibo({
       monto: '',
@@ -790,11 +802,37 @@ const crearRecibosPendientes = async () => {
 };
 
 
-  return (
-    <Container>
-      <MainContent isFilterOpen={isFilterOpen}>
+return (
+  <Container>
+    <MainContent isFilterOpen={isFilterOpen}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
         <Title>Recibos</Title>
-  
+        {showPrinterAlert && (
+        <PrinterStatus 
+          isAvailable={isPrinterAvailable}
+          onClose={() => setShowPrinterAlert(false)}
+        />
+      )}
+          <Button
+            onClick={async () => {
+              const service = new PrinterService();
+              const isAvailable = await service.detectPrinter();
+              setMessage({
+                text: isAvailable ? 'Impresora detectada y lista' : 'Impresora no encontrada',
+                isError: !isAvailable
+              });
+            }}
+            style={{ 
+              padding: '5px 10px',
+              fontSize: '0.9em',
+              backgroundColor: 'transparent',
+              color: isPrinterAvailable ? '#2e7d32' : '#856404',
+              border: `1px solid ${isPrinterAvailable ? '#4caf50' : '#ffc107'}`
+            }}
+          >
+            Verificar
+          </Button>
+        </div>
         {/* Formulario Principal */}
         <Form onSubmit={(e) => { e.preventDefault(); agregarReciboPendiente(); }}>
           <InputGroup>
@@ -1058,54 +1096,125 @@ const crearRecibosPendientes = async () => {
         </Button>
       </Form>
 
-      {/* Vista previa de recibos pendientes */}
-      {recibosPendientes.length > 0 && (
-        <PreviewSection>
-          <PreviewTitle>Recibos Pendientes de Crear</PreviewTitle>
-          {recibosPendientes.map(recibo => (
-            <PreviewReciboItem key={recibo.id}>
-              <div>
-                <strong>
-                  {recibo.alumno 
-                    ? `${recibo.alumno.nombre} ${recibo.alumno.apellido}`
-                    : `${recibo.alumnoSuelto?.nombre} ${recibo.alumnoSuelto?.apellido} (Suelto)`}
-                </strong>
-                <div>{recibo.concepto.nombre}</div>
-                <div>Período: {recibo.periodoPago}</div>
-              </div>
-              <div>
-                <div>Monto Original: ${recibo.monto}</div>
-                {recibo.descuento && <div>Descuento: {recibo.descuento}%</div>}
-                <div>Monto Final: ${(recibo.monto * (1 - (recibo.descuento || 0) / 100)).toFixed(2)}</div>
-              </div>
-              <Button 
-                onClick={() => {
-                  setRecibosPendientes(prev => prev.filter(r => r.id !== recibo.id));
-                }}
-              >
-                Eliminar
-              </Button>
-            </PreviewReciboItem>
-          ))}
-          
-          <PreviewTotal>
-            <span>Total a Crear:</span>
-            <span>
-              ${recibosPendientes.reduce((sum, r) => 
-                sum + (r.monto * (1 - (r.descuento || 0) / 100)), 0
-              ).toFixed(2)}
-            </span>
-          </PreviewTotal>
-          
+{/* Vista previa de recibos pendientes con mejoras visuales */}
+{recibosPendientes.length > 0 && (
+  <PreviewSection>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+      <PreviewTitle>Recibos Pendientes de Crear</PreviewTitle>
+      <span style={{ color: '#666' }}>
+        {recibosPendientes.length} {recibosPendientes.length === 1 ? 'recibo' : 'recibos'} pendiente{recibosPendientes.length !== 1 && 's'}
+      </span>
+    </div>
+
+    {recibosPendientes.map(recibo => (
+      <PreviewReciboItem key={recibo.id}>
+        <div style={{ flex: 1 }}>
+          <strong style={{ fontSize: '1.1em' }}>
+            {recibo.alumno 
+              ? `${recibo.alumno.nombre} ${recibo.alumno.apellido}`
+              : `${recibo.alumnoSuelto?.nombre} ${recibo.alumnoSuelto?.apellido} (Suelto)`}
+          </strong>
+          <div style={{ color: '#666', marginTop: '5px' }}>
+            <div>{recibo.concepto.nombre}</div>
+            <div>Período: {recibo.periodoPago}</div>
+          </div>
+        </div>
+
+        <div style={{ 
+          display: 'flex', 
+          flexDirection: 'column', 
+          alignItems: 'flex-end',
+          minWidth: '200px'
+        }}>
+          <div>Monto Original: ${recibo.monto.toFixed(2)}</div>
+          {recibo.descuento && (
+            <div style={{ color: '#4caf50' }}>
+              Descuento: {recibo.descuento}%
+            </div>
+          )}
+          <div style={{ 
+            fontWeight: 'bold', 
+            fontSize: '1.1em', 
+            marginTop: '5px' 
+          }}>
+            Monto Final: ${(recibo.monto * (1 - (recibo.descuento || 0) / 100)).toFixed(2)}
+          </div>
+          {isPrinterAvailable && (
+            <div style={{ 
+              color: '#666', 
+              fontSize: '0.9em', 
+              marginTop: '5px' 
+            }}>
+              ✓ Se imprimirá automáticamente
+            </div>
+          )}
+        </div>
+
+        <div style={{ display: 'flex', gap: '10px' }}>
           <Button 
-            onClick={crearRecibosPendientes} 
-            disabled={loading}
-            style={{ width: '100%', marginTop: '20px' }}
+            onClick={() => {
+              setRecibosPendientes(prev => prev.filter(r => r.id !== recibo.id));
+            }}
+            style={{
+              backgroundColor: '#ff4444',
+              color: 'white'
+            }}
           >
-            {loading ? 'Creando Recibos...' : 'Crear Todos los Recibos'}
+            Eliminar
           </Button>
-        </PreviewSection>
-      )}
+        </div>
+      </PreviewReciboItem>
+    ))}
+
+    <PreviewTotal>
+      <div>
+        <span>Total a Crear:</span>
+        <div style={{ color: '#666', fontSize: '0.9em', marginTop: '5px' }}>
+          {recibosPendientes.length} {recibosPendientes.length === 1 ? 'recibo' : 'recibos'}
+        </div>
+      </div>
+      <div style={{ textAlign: 'right' }}>
+        <span style={{ fontSize: '1.2em', fontWeight: 'bold' }}>
+          ${recibosPendientes.reduce((sum, r) => 
+            sum + (r.monto * (1 - (r.descuento || 0) / 100)), 0
+          ).toFixed(2)}
+        </span>
+      </div>
+    </PreviewTotal>
+
+    <div style={{ marginTop: '20px', display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+      <Button 
+        onClick={() => setRecibosPendientes([])}
+        style={{ 
+          backgroundColor: '#f5f5f5', 
+          color: '#666'
+        }}
+      >
+        Cancelar Todo
+      </Button>
+      <Button 
+        onClick={crearRecibosPendientes} 
+        disabled={loading}
+        style={{ 
+          width: 'auto',
+          backgroundColor: '#4CAF50',
+          color: 'white',
+          padding: '15px 30px'
+        }}
+      >
+        {loading ? (
+          <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <PrinterIcon /> Creando Recibos...
+          </span>
+        ) : (
+          <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            {isPrinterAvailable ? '🖨️' : '💾'} Crear y {isPrinterAvailable ? 'Imprimir' : 'Guardar'} Recibos
+          </span>
+        )}
+      </Button>
+    </div>
+  </PreviewSection>
+)}
 
       {/* Botón y Panel de Filtros */}
       <FilterToggleButton 
@@ -1194,62 +1303,121 @@ const crearRecibosPendientes = async () => {
         </FiltersForm>
       </FiltersPanel>
 
-      {/* Tabla de Recibos */}
-      <TableContainer>
-        <Table>
-          <thead>
-            <Tr>
-              <Th>Número</Th>
-              <Th>Fecha</Th>
-              <Th>Fecha Efecto</Th>
-              <Th>Alumno</Th>
-              <Th>Concepto</Th>
-              <Th>Monto Original</Th>
-              <Th>Descuento</Th>
-              <Th>Monto Final</Th>
-              <Th>Tipo de Pago</Th>
-              <Th>Estado</Th>
-              <Th>Acciones</Th>
-            </Tr>
-          </thead>
-          <tbody>
-            {recibos.map(recibo => (
-              <Tr key={recibo.id}>
-                <Td>{recibo.numeroRecibo}</Td>
-                <Td>{new Date(recibo.fecha).toLocaleDateString()}</Td>
-                <Td>{new Date(recibo.fechaEfecto).toLocaleDateString()}</Td>
-                <Td>
-                  {recibo.alumno 
-                    ? `${recibo.alumno.nombre} ${recibo.alumno.apellido}`
-                    : `${recibo.alumnoSuelto?.nombre} ${recibo.alumnoSuelto?.apellido} (Suelto)`}
-                </Td>
-                <Td>{recibo.concepto.nombre}</Td>
-                <Td>${recibo.montoOriginal.toFixed(2)}</Td>
-                <Td>{recibo.descuento ? `${(recibo.descuento * 100).toFixed(0)}%` : '-'}</Td>
-                <Td>${recibo.monto.toFixed(2)}</Td>
-                <Td>{recibo.tipoPago}</Td>
-                <Td>{recibo.anulado ? 'Anulado' : 'Activo'}</Td>
-                <Td>
-                  {!recibo.anulado && (
-                    <Button 
-                      onClick={() => handleAnularRecibo(recibo.id)}
-                      disabled={loading}
-                    >
-                      Anular
-                    </Button>
-                  )}
-                </Td>
-              </Tr>
-            ))}
-          </tbody>
-        </Table>
-      </TableContainer>
+{/* Tabla de Recibos Mejorada */}
+<TableContainer>
+  <div style={{ 
+    display: 'flex', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    marginBottom: '20px' 
+  }}>
+    <h3>Recibos Generados</h3>
+    <div style={{ color: '#666' }}>
+      Total: {recibos.length} recibos
+    </div>
+  </div>
 
-      {message && (
-        <Message isError={message.isError}>{message.text}</Message>
-      )}
-    </MainContent>
-  </Container>
+  <Table>
+    <thead>
+      <Tr>
+        <Th>Número</Th>
+        <Th>Fecha</Th>
+        <Th>Fecha Efecto</Th>
+        <Th>Alumno</Th>
+        <Th>Concepto</Th>
+        <Th>Monto Original</Th>
+        <Th>Descuento</Th>
+        <Th>Monto Final</Th>
+        <Th>Tipo de Pago</Th>
+        <Th>Estado</Th>
+        <Th>Acciones</Th>
+      </Tr>
+    </thead>
+    <tbody>
+      {recibos.map(recibo => (
+        <Tr key={recibo.id}>
+          <Td>{recibo.numeroRecibo}</Td>
+          <Td>{new Date(recibo.fecha).toLocaleDateString()}</Td>
+          <Td>{new Date(recibo.fechaEfecto).toLocaleDateString()}</Td>
+          <Td>
+            {recibo.alumno 
+              ? `${recibo.alumno.nombre} ${recibo.alumno.apellido}`
+              : `${recibo.alumnoSuelto?.nombre} ${recibo.alumnoSuelto?.apellido} (Suelto)`}
+          </Td>
+          <Td>{recibo.concepto.nombre}</Td>
+          <Td>${recibo.montoOriginal.toFixed(2)}</Td>
+          <Td>{recibo.descuento ? `${(recibo.descuento * 100).toFixed(0)}%` : '-'}</Td>
+          <Td>${recibo.monto.toFixed(2)}</Td>
+          <Td>{recibo.tipoPago}</Td>
+          <Td>
+            <span style={{
+              padding: '4px 8px',
+              borderRadius: '12px',
+              fontSize: '0.85em',
+              backgroundColor: recibo.anulado ? '#ffebee' : '#e8f5e9',
+              color: recibo.anulado ? '#c62828' : '#2e7d32'
+            }}>
+              {recibo.anulado ? 'Anulado' : 'Activo'}
+            </span>
+          </Td>
+          <Td style={{ display: 'flex', gap: '5px' }}>
+            {!recibo.anulado && (
+              <>
+                <Button 
+                  onClick={() => handleAnularRecibo(recibo.id)}
+                  disabled={loading}
+                  style={{
+                    backgroundColor: '#ff4444',
+                    color: 'white',
+                    padding: '5px 10px',
+                    fontSize: '0.9em'
+                  }}
+                >
+                  Anular
+                </Button>
+                {isPrinterAvailable && (
+                  <Button
+                    onClick={() => printReceipt(recibo)}
+                    disabled={loading}
+                    style={{
+                      backgroundColor: '#4CAF50',
+                      color: 'white',
+                      padding: '5px 10px',
+                      fontSize: '0.9em'
+                    }}
+                  >
+                    Reimprimir
+                  </Button>
+                )}
+              </>
+            )}
+          </Td>
+        </Tr>
+      ))}
+    </tbody>
+  </Table>
+</TableContainer>
+
+{/* Mensajes de Estado */}
+{message && (
+  <Message 
+    isError={message.isError}
+    style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: '10px',
+      position: 'fixed',
+      bottom: '20px',
+      right: '20px',
+      zIndex: 1000,
+      boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+    }}
+  >
+    {message.isError ? '❌' : '✅'} {message.text}
+  </Message>
+)}
+</MainContent>
+</Container>
 );
 }
 

@@ -34,9 +34,15 @@ interface Deuda {
   anio: number;
   pagada: boolean;
   fechaPago: string | null;
+  fechaVencimiento: string; // Agregamos este campo
   estilo: {
     id: number;
     nombre: string;
+  };
+  concepto?: {  // Agregamos el concepto también
+    id: number;
+    nombre: string;
+    esInscripcion: boolean;
   };
   pagos: {
     id: number;
@@ -255,6 +261,36 @@ const TotalContainer = styled.div`
   justify-content: space-between;
 `;
 
+interface StatusProps {
+  status: 'success' | 'warning' | 'danger';
+}
+
+const InscripcionCard = styled(DashboardCard)<StatusProps>`
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  background: ${props => props.status === 'success' ? '#e8f5e9' : '#fff3cd'};
+`;
+
+const InscripcionInfo = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+`;
+
+const InscripcionEstado = styled.div<StatusProps>`
+  font-size: 1.2em;
+  font-weight: bold;
+  color: ${props => props.status === 'success' ? '#2e7d32' : '#f57c00'};
+`;
+
+const InscripcionFecha = styled.div`
+  font-size: 0.9em;
+  color: #666;
+`;
+
 const StatusBadge = styled.span<{ status: 'success' | 'warning' | 'danger' }>`
   padding: 4px 8px;
   border-radius: 12px;
@@ -363,20 +399,62 @@ const CtaCte: React.FC = () => {
   const renderDashboard = () => {
     if (!estadisticas || !estadoPagos) return null;
 
+    const deudaInscripcion = selectedAlumno?.deudas?.find(d => d.concepto?.esInscripcion);
+    const inscripcionPagada = deudaInscripcion?.pagada;
+  
     return (
-      <DashboardGrid>
-        <DashboardCard status={estadoPagos.alDia ? 'success' : 'danger'}>
-          <CardTitle>Estado de Cuenta</CardTitle>
-          <CardValue>
-            {estadoPagos.alDia ? 'Al día' : 'Con deudas'}
-          </CardValue>
-          {!estadoPagos.alDia && (
-            <CardSubValue>
-              {estadoPagos.mesesAdeudados.length} {estadoPagos.mesesAdeudados.length === 1 ? 'mes' : 'meses'} pendientes
-            </CardSubValue>
-          )}
-        </DashboardCard>
-
+      <>
+        {/* Inscripción Card primero */}
+        {estadisticas && estadoPagos && (
+          <>
+            {selectedAlumno?.deudas && (
+              <InscripcionCard status={
+                selectedAlumno.deudas.find(d => d.concepto?.esInscripcion)?.pagada 
+                  ? 'success' 
+                  : 'warning'
+              }>
+                <InscripcionInfo>
+                  <InscripcionEstado status={
+                    selectedAlumno.deudas.find(d => d.concepto?.esInscripcion)?.pagada 
+                      ? 'success' 
+                      : 'warning'
+                  }>
+                    Inscripción: {
+                      selectedAlumno.deudas.find(d => d.concepto?.esInscripcion)?.pagada 
+                        ? 'Pagada' 
+                        : 'Pendiente'
+                    }
+                  </InscripcionEstado>
+                  {selectedAlumno.deudas.find(d => d.concepto?.esInscripcion)?.pagada ? (
+                    <InscripcionFecha>
+                      Fecha de pago: {formatFecha(
+                        selectedAlumno.deudas.find(d => d.concepto?.esInscripcion)?.fechaPago || ''
+                      )}
+                    </InscripcionFecha>
+                  ) : (
+                    <InscripcionFecha>
+                      Vencimiento: {formatFecha(
+                        selectedAlumno.deudas.find(d => d.concepto?.esInscripcion)?.fechaVencimiento || ''
+                      )}
+                    </InscripcionFecha>
+                  )}
+                </InscripcionInfo>
+              </InscripcionCard>
+            )}
+    
+            {/* Luego el DashboardGrid con las otras cards */}
+            <DashboardGrid>
+              <DashboardCard status={estadoPagos.alDia ? 'success' : 'danger'}>
+                <CardTitle>Estado de Cuenta</CardTitle>
+                <CardValue>
+                  {estadoPagos.alDia ? 'Al día' : 'Con deudas'}
+                </CardValue>
+                {!estadoPagos.alDia && (
+                  <CardSubValue>
+                    {estadoPagos.mesesAdeudados.length} {estadoPagos.mesesAdeudados.length === 1 ? 'mes' : 'meses'} pendientes
+                  </CardSubValue>
+                )}
+              </DashboardCard>
         <DashboardCard>
           <CardTitle>Total Pagado</CardTitle>
           <CardValue>{formatCurrency(estadisticas.totalPagado)}</CardValue>
@@ -409,8 +487,12 @@ const CtaCte: React.FC = () => {
           )}
         </DashboardCard>
       </DashboardGrid>
+      </>
+        )}
+      </>
     );
-  };
+    }
+
 
   // Continúo con las funciones de renderizado y el JSX principal
 
