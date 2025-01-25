@@ -1,4 +1,3 @@
-// src/pages/registro.tsx
 import styled from 'styled-components';
 import Image from 'next/image';
 import { useState, useEffect } from 'react';
@@ -6,8 +5,84 @@ import { Estilo } from '@/types/alumnos-estilos';
 
 const PageWrapper = styled.div`
  min-height: 100vh;
- background: linear-gradient(to bottom right, #663399, #4B0082);
- padding: 20px;
+ position: relative;
+ &::before {
+   content: '';
+   position: absolute;
+   top: 0;
+   left: 0;
+   right: 0;
+   bottom: 0;
+   background: url('/fondo-mb.png') center/cover no-repeat;
+   filter: blur(8px) brightness(0.7);
+   z-index: -1;
+ }
+`;
+
+const GradientBorder = styled.div`
+ position: absolute;
+ top: 0;
+ left: 0;
+ right: 0;
+ bottom: 0;
+ background: linear-gradient(
+   45deg,
+   rgba(102, 51, 153, 0.3) 0%,
+   rgba(102, 51, 153, 0) 50%,
+   rgba(102, 51, 153, 0.3) 100%
+ );
+ pointer-events: none;
+ z-index: -1;
+`;
+
+const SuccessAlert = styled.div`
+ position: fixed;
+ top: 50%;
+ left: 50%;
+ transform: translate(-50%, -50%);
+ background: rgba(255, 255, 255, 0.95);
+ padding: 30px 50px;
+ border-radius: 15px;
+ box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+ text-align: center;
+ animation: fadeInScale 0.5s ease-out;
+ z-index: 1000;
+
+ @keyframes fadeInScale {
+   from {
+     opacity: 0;
+     transform: translate(-50%, -50%) scale(0.8);
+   }
+   to {
+     opacity: 1;
+     transform: translate(-50%, -50%) scale(1);
+   }
+ }
+`;
+
+const SuccessIcon = styled.div`
+ width: 60px;
+ height: 60px;
+ background: #4CAF50;
+ border-radius: 50%;
+ display: flex;
+ align-items: center;
+ justify-content: center;
+ margin: 0 auto 20px;
+ color: white;
+ font-size: 30px;
+`;
+
+const SuccessTitle = styled.h2`
+ color: #2E7D32;
+ margin-bottom: 10px;
+ font-size: 24px;
+`;
+
+const SuccessText = styled.p`
+ color: #555;
+ font-size: 16px;
+ margin-bottom: 20px;
 `;
 
 const LogoContainer = styled.div`
@@ -138,6 +213,7 @@ export default function RegistroAlumno() {
  const [estilos, setEstilos] = useState<Estilo[]>([]);
  const [loading, setLoading] = useState(false);
  const [message, setMessage] = useState<{text: string; isError: boolean} | null>(null);
+ const [showSuccess, setShowSuccess] = useState(false);
 
  useEffect(() => {
    fetchEstilos();
@@ -187,21 +263,25 @@ export default function RegistroAlumno() {
        throw new Error(error.error || 'Error al registrar alumno');
      }
 
-     setMessage({text: '¡Registro exitoso! Bienvenido/a a la academia', isError: false});
-     setFormData({
-       nombre: '',
-       apellido: '',
-       dni: '',
-       fechaNacimiento: '',
-       email: '',
-       telefono: '',
-       numeroEmergencia: '',
-       direccion: '',
-       obraSocial: '',
-       nombreTutor: '',
-       dniTutor: '',
-       estilosIds: []
-     });
+     setShowSuccess(true);
+     setTimeout(() => {
+       setShowSuccess(false);
+       setFormData({
+         nombre: '',
+         apellido: '',
+         dni: '',
+         fechaNacimiento: '',
+         email: '',
+         telefono: '',
+         numeroEmergencia: '',
+         direccion: '',
+         obraSocial: '',
+         nombreTutor: '',
+         dniTutor: '',
+         estilosIds: []
+       });
+     }, 3000);
+
    } catch (error) {
      console.error('Error:', error);
      setMessage({
@@ -214,163 +294,175 @@ export default function RegistroAlumno() {
  };
 
  return (
-   <PageWrapper>
-     <LogoContainer>
-       <Image 
-         src="/mb-logo.png"
-         alt="Logo Academia"
-         width={200} 
-         height={200}
-         priority
-       />
-     </LogoContainer>
-     
-     <FormContainer>
-       <Title>Registro de Nuevo Alumno</Title>
-       
-       <Form onSubmit={handleSubmit}>
-         {message && (
-           <Message isError={message.isError}>
-             {message.text}
-           </Message>
-         )}
-         
-         <InputGroup>
-           <Label>Nombre *</Label>
-           <Input
-             type="text"
-             name="nombre"
-             value={formData.nombre}
-             onChange={handleInputChange}
-             required
-           />
-         </InputGroup>
-
-         <InputGroup>
-           <Label>Apellido *</Label>
-           <Input
-             type="text"
-             name="apellido"
-             value={formData.apellido}
-             onChange={handleInputChange}
-             required
-           />
-         </InputGroup>
-
-         <InputGroup>
-           <Label>DNI *</Label>
-           <Input
-             type="text"
-             name="dni"
-             value={formData.dni}
-             onChange={handleInputChange}
-             required
-           />
-         </InputGroup>
-
-         <InputGroup>
-           <Label>Fecha de Nacimiento *</Label>
-           <Input
-             type="date"
-             name="fechaNacimiento"
-             value={formData.fechaNacimiento}
-             onChange={handleInputChange}
-             required
-           />
-         </InputGroup>
-
-         <InputGroup>
-           <Label>Email</Label>
-           <Input
-             type="email"
-             name="email"
-             value={formData.email}
-             onChange={handleInputChange}
-           />
-         </InputGroup>
-
-         <InputGroup>
-           <Label>Teléfono</Label>
-           <Input
-             type="tel"
-             name="telefono"
-             value={formData.telefono}
-             onChange={handleInputChange}
-           />
-         </InputGroup>
-
-         <InputGroup>
-           <Label>Teléfono de Emergencia</Label>
-           <Input
-             type="tel"
-             name="numeroEmergencia"
-             value={formData.numeroEmergencia}
-             onChange={handleInputChange}
-           />
-         </InputGroup>
-
-         <InputGroup>
-           <Label>Dirección</Label>
-           <Input
-             type="text"
-             name="direccion"
-             value={formData.direccion}
-             onChange={handleInputChange}
-           />
-         </InputGroup>
-
-         <InputGroup>
-           <Label>Obra Social</Label>
-           <Input
-             type="text"
-             name="obraSocial"
-             value={formData.obraSocial}
-             onChange={handleInputChange}
-           />
-         </InputGroup>
-
-         <InputGroup>
-           <Label>Nombre del Tutor</Label>
-           <Input
-             type="text"
-             name="nombreTutor"
-             value={formData.nombreTutor}
-             onChange={handleInputChange}
-           />
-         </InputGroup>
-
-         <InputGroup>
-           <Label>DNI del Tutor</Label>
-           <Input
-             type="text"
-             name="dniTutor"
-             value={formData.dniTutor}
-             onChange={handleInputChange}
-           />
-         </InputGroup>
-
-         <InputGroup>
-           <Label>Estilos de Danza *</Label>
-           <Select
-             name="estilosIds"
-             multiple
-             value={formData.estilosIds}
-             onChange={handleInputChange}
-             required
-           >
-             {estilos.map(estilo => (
-               <option key={estilo.id} value={estilo.id}>
-                 {estilo.nombre}
-               </option>
-             ))}
-           </Select>
-         </InputGroup>
-
-         <SubmitButton type="submit" disabled={loading}>
-           {loading ? 'Registrando...' : 'Completar Registro'}
-         </SubmitButton>
-       </Form>
-     </FormContainer>
-   </PageWrapper>
+  <PageWrapper>
+    <GradientBorder />
+    <LogoContainer>
+      <Image 
+        src="/mb-logo.png"
+        alt="Logo Academia"
+        width={200} 
+        height={200}
+        priority
+      />
+    </LogoContainer>
+    
+    <FormContainer>
+      <Title>Registro de Nuevo Alumno</Title>
+      
+      <Form onSubmit={handleSubmit}>
+        {message && (
+          <Message isError={message.isError}>
+            {message.text}
+          </Message>
+        )}
+        
+        <InputGroup>
+          <Label>Nombre *</Label>
+          <Input
+            type="text"
+            name="nombre"
+            value={formData.nombre}
+            onChange={handleInputChange}
+            required
+          />
+        </InputGroup>
+ 
+        <InputGroup>
+          <Label>Apellido *</Label>
+          <Input
+            type="text"
+            name="apellido"
+            value={formData.apellido}
+            onChange={handleInputChange}
+            required
+          />
+        </InputGroup>
+ 
+        <InputGroup>
+          <Label>DNI *</Label>
+          <Input
+            type="text"
+            name="dni"
+            value={formData.dni}
+            onChange={handleInputChange}
+            required
+          />
+        </InputGroup>
+ 
+        <InputGroup>
+          <Label>Fecha de Nacimiento *</Label>
+          <Input
+            type="date"
+            name="fechaNacimiento"
+            value={formData.fechaNacimiento}
+            onChange={handleInputChange}
+            required
+          />
+        </InputGroup>
+ 
+        <InputGroup>
+          <Label>Email</Label>
+          <Input
+            type="email"
+            name="email"
+            value={formData.email}
+            onChange={handleInputChange}
+          />
+        </InputGroup>
+ 
+        <InputGroup>
+          <Label>Teléfono</Label>
+          <Input
+            type="tel"
+            name="telefono"
+            value={formData.telefono}
+            onChange={handleInputChange}
+          />
+        </InputGroup>
+ 
+        <InputGroup>
+          <Label>Teléfono de Emergencia</Label>
+          <Input
+            type="tel"
+            name="numeroEmergencia"
+            value={formData.numeroEmergencia}
+            onChange={handleInputChange}
+          />
+        </InputGroup>
+ 
+        <InputGroup>
+          <Label>Dirección</Label>
+          <Input
+            type="text"
+            name="direccion"
+            value={formData.direccion}
+            onChange={handleInputChange}
+          />
+        </InputGroup>
+ 
+        <InputGroup>
+          <Label>Obra Social</Label>
+          <Input
+            type="text"
+            name="obraSocial"
+            value={formData.obraSocial}
+            onChange={handleInputChange}
+          />
+        </InputGroup>
+ 
+        <InputGroup>
+          <Label>Nombre del Tutor</Label>
+          <Input
+            type="text"
+            name="nombreTutor"
+            value={formData.nombreTutor}
+            onChange={handleInputChange}
+          />
+        </InputGroup>
+ 
+        <InputGroup>
+          <Label>DNI del Tutor</Label>
+          <Input
+            type="text"
+            name="dniTutor"
+            value={formData.dniTutor}
+            onChange={handleInputChange}
+          />
+        </InputGroup>
+ 
+        <InputGroup>
+          <Label>Estilos de Danza *</Label>
+          <Select
+            name="estilosIds"
+            multiple
+            value={formData.estilosIds}
+            onChange={handleInputChange}
+            required
+          >
+            {estilos.map(estilo => (
+              <option key={estilo.id} value={estilo.id}>
+                {estilo.nombre}
+              </option>
+            ))}
+          </Select>
+        </InputGroup>
+ 
+        <SubmitButton type="submit" disabled={loading}>
+          {loading ? 'Registrando...' : 'Completar Registro'}
+        </SubmitButton>
+      </Form>
+    </FormContainer>
+ 
+    {showSuccess && (
+      <SuccessAlert>
+        <SuccessIcon>✓</SuccessIcon>
+        <SuccessTitle>¡Registro Exitoso!</SuccessTitle>
+        <SuccessText>
+          ¡Bienvenida/o a nuestra Academia!💛✨<br/>
+          Tu registro ha sido completado con éxito.
+        </SuccessText>
+      </SuccessAlert>
+    )}
+  </PageWrapper>
  );
 }

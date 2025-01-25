@@ -1,5 +1,5 @@
 // components/CtaCte/index.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import styled from 'styled-components';
 
 // Interfaces
@@ -324,9 +324,31 @@ const CtaCte: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'recibos' | 'deudas'>('dashboard');
   const [loading, setLoading] = useState(false);
 
-  // Effects
-  // Funciones de fetch
-  const fetchAlumnos = async () => {
+  useEffect(() => {
+    let isSubscribed = true;
+  
+    // Add cleanup to the main data fetching
+    const fetchData = async () => {
+      if (isSubscribed && searchTerm.length > 2) {
+        await fetchAlumnos();
+      }
+    };
+  
+    fetchData();
+  
+    // Cleanup function
+    return () => {
+      isSubscribed = false;
+      setSearchTerm('');
+      setAlumnos([]);
+      setSelectedAlumno(null);
+      setRecibos([]);
+      setEstadisticas(null);
+      setEstadoPagos(null);
+    };
+  }, []); // Empty dependency array for component mount/unmount
+
+  const fetchAlumnos = useCallback(async () => {
     try {
       const res = await fetch(`/api/ctacte?query=${searchTerm}`);
       if (res.ok) {
@@ -339,21 +361,16 @@ const CtaCte: React.FC = () => {
     } catch (error) {
       console.error('Error fetching alumnos:', error);
     }
-  };
-
-  useEffect(() => {
-    const handleSearch = async () => {
-      if (searchTerm.length > 2) {
-        await fetchAlumnos();
-      } else {
-        setAlumnos([]);
-      }
-    };
-    
-    handleSearch();
-  }, [searchTerm, fetchAlumnos]); // incluimos fetchAlumnos como dependencia
+  }, [searchTerm]);
   
-
+  useEffect(() => {
+    if (searchTerm.length > 2) {
+      fetchAlumnos();
+    } else {
+      setAlumnos([]);
+    }
+  }, [searchTerm, fetchAlumnos]);
+  
   const fetchAlumnoInfo = async (alumnoId: number) => {
     setLoading(true);
     try {
@@ -400,7 +417,6 @@ const CtaCte: React.FC = () => {
     if (!estadisticas || !estadoPagos) return null;
 
     const deudaInscripcion = selectedAlumno?.deudas?.find(d => d.concepto?.esInscripcion);
-    const inscripcionPagada = deudaInscripcion?.pagada;
   
     return (
       <>
@@ -492,9 +508,6 @@ const CtaCte: React.FC = () => {
       </>
     );
     }
-
-
-  // Continúo con las funciones de renderizado y el JSX principal
 
  const renderRecibosTable = () => {
   return (

@@ -26,9 +26,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
   } else if (req.method === 'DELETE') {
     try {
-      await prisma.recibo.delete({
-        where: { id: parseInt(id) }
+      await prisma.$transaction(async (tx) => {
+        // Primero eliminar los pagos de deuda relacionados
+        await tx.pagoDeuda.deleteMany({
+          where: { reciboId: parseInt(id) }
+        });
+        
+        // Luego eliminar el recibo
+        await tx.recibo.delete({
+          where: { id: parseInt(id) }
+        });
       });
+      
       res.status(200).json({ message: 'Recibo eliminado exitosamente' });
     } catch (error) {
       console.error('Error eliminando recibo:', error);
