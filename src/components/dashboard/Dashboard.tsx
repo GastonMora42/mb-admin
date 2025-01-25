@@ -100,8 +100,6 @@ const variants = {
   }
 };
 
-// ... (resto de styled components se mantienen igual)
-
 const Dashboard: React.FC = () => {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);

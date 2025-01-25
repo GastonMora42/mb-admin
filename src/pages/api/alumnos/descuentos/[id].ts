@@ -1,3 +1,4 @@
+//src/pages/api/alumnos/descuentos/[id].ts
 import type { NextApiRequest, NextApiResponse } from 'next'
 import prisma from '@/lib/prisma'
 

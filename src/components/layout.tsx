@@ -144,17 +144,15 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const router = useRouter();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  const toggleSidebar = () => {
-    setIsSidebarOpen(!isSidebarOpen);
-  };
+  // If it's the registration page, return children without layout
+  if (router.pathname === '/registro') {
+    return <>{children}</>;
+  }
 
-  const closeSidebar = () => {
-    setIsSidebarOpen(false);
-  };
-
-  const isLinkActive = (path: string) => {
-    return router.pathname === path || router.pathname.startsWith(`${path}/`);
-  };
+  const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
+  const closeSidebar = () => setIsSidebarOpen(false);
+  const isLinkActive = (path: string) => 
+    router.pathname === path || router.pathname.startsWith(`${path}/`);
 
   return (
     <Container>
@@ -232,6 +230,17 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             <StyledLink isActive={isLinkActive('/alumnos-sueltos-asistencia')}>
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
               Info Clases
+            </StyledLink>
+          </Link>
+          <Link href="/registro" passHref>
+            <StyledLink isActive={isLinkActive('/registro')}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                <circle cx="8.5" cy="7" r="4"></circle>
+                <line x1="20" y1="8" x2="20" y2="14"></line>
+                <line x1="23" y1="11" x2="17" y2="11"></line>
+              </svg>
+              Registro de Alumnos
             </StyledLink>
           </Link>
           </Sidebar>
