@@ -1,3 +1,4 @@
+//src/amplify-cognito-config.ts
 import { Amplify, type ResourcesConfig } from "aws-amplify";
 import React from "react";
 import dotenv from 'dotenv';

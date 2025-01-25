@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import styled from 'styled-components';
@@ -143,11 +143,17 @@ const Overlay = styled.div<{ isOpen: boolean }>`
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const router = useRouter();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [key, setKey] = useState(0); // Add this
 
   // If it's the registration page, return children without layout
   if (router.pathname === '/registro') {
     return <>{children}</>;
   }
+
+  useEffect(() => {
+    setKey(prev => prev + 1);
+  }, [router.pathname]);
+
 
   const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
   const closeSidebar = () => setIsSidebarOpen(false);
@@ -244,7 +250,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             </StyledLink>
           </Link>
           </Sidebar>
-        <Main sidebarOpen={isSidebarOpen} onClick={() => isSidebarOpen && closeSidebar()}>
+          <Main key={key} sidebarOpen={isSidebarOpen} onClick={() => isSidebarOpen && closeSidebar()}>
           {children}
         </Main>
       </Content>

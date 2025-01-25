@@ -1,3 +1,4 @@
+//src/lib/cognito-actions.ts
 import { redirect } from "next/navigation";
 import { 
   signUp,
@@ -123,6 +124,17 @@ export async function handleSendEmailVerificationCode(email: string): Promise<Ve
   }
 }
 
+export async function setAuthCookie() {
+  try {
+    const session = await getCurrentUser();
+    const userAttributes = await fetchUserAttributes();
+    const token = JSON.stringify({ session, userAttributes });
+    document.cookie = `auth-token=${token}; path=/; max-age=3600; secure`;
+  } catch (error) {
+    console.error('Error setting auth cookie:', error);
+  }
+}
+
 // Confirmación de registro
 export async function handleConfirmSignUp(email: string, code: string): Promise<AuthResponse> {
   if (!email || !code) {
@@ -173,8 +185,8 @@ export async function handleSignIn(email: string, password: string): Promise<Aut
     });
 
     if (isSignedIn) {
+      await setAuthCookie();
       const userAttributes = await fetchUserAttributes();
-      
       return { 
         success: true, 
         redirectTo: "/dashboard",
