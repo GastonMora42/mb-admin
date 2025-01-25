@@ -515,6 +515,27 @@ const [filtros, setFiltros] = useState<Filtros>({
     }
   };
 
+  const handleEliminarRecibo = async (id: number) => {
+    if (!confirm('¿Está seguro que desea eliminar definitivamente este recibo?')) return;
+    
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/recibos/${id}`, {
+        method: 'DELETE'
+      });
+  
+      if (!res.ok) throw new Error('Error al eliminar el recibo');
+      
+      await fetchRecibos();
+      setMessage({ text: 'Recibo eliminado exitosamente', isError: false });
+    } catch (error) {
+      console.error('Error eliminando recibo:', error);
+      setMessage({ text: 'Error al eliminar el recibo', isError: true });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const agregarReciboPendiente = () => {
     setLoading(true); // Al inicio
     try {
@@ -1361,37 +1382,50 @@ return (
             </span>
           </Td>
           <Td style={{ display: 'flex', gap: '5px' }}>
-            {!recibo.anulado && (
-              <>
-                <Button 
-                  onClick={() => handleAnularRecibo(recibo.id)}
-                  disabled={loading}
-                  style={{
-                    backgroundColor: '#ff4444',
-                    color: 'white',
-                    padding: '5px 10px',
-                    fontSize: '0.9em'
-                  }}
-                >
-                  Anular
-                </Button>
-                {isPrinterAvailable && (
-                  <Button
-                    onClick={() => printReceipt(recibo)}
-                    disabled={loading}
-                    style={{
-                      backgroundColor: '#4CAF50',
-                      color: 'white',
-                      padding: '5px 10px',
-                      fontSize: '0.9em'
-                    }}
-                  >
-                    Reimprimir
-                  </Button>
-                )}
-              </>
-            )}
-          </Td>
+  {recibo.anulado ? (
+    <Button 
+      onClick={() => handleEliminarRecibo(recibo.id)}
+      disabled={loading}
+      style={{
+        backgroundColor: '#dc3545',
+        color: 'white',
+        padding: '5px 10px',
+        fontSize: '0.9em'
+      }}
+    >
+      Eliminar
+    </Button>
+  ) : (
+    <>
+      <Button 
+        onClick={() => handleAnularRecibo(recibo.id)}
+        disabled={loading}
+        style={{
+          backgroundColor: '#ff4444',
+          color: 'white',
+          padding: '5px 10px',
+          fontSize: '0.9em'
+        }}
+      >
+        Anular
+      </Button>
+      {isPrinterAvailable && (
+        <Button
+          onClick={() => printReceipt(recibo)}
+          disabled={loading}
+          style={{
+            backgroundColor: '#4CAF50',
+            color: 'white',
+            padding: '5px 10px',
+            fontSize: '0.9em'
+          }}
+        >
+          Reimprimir
+        </Button>
+      )}
+    </>
+  )}
+</Td>
         </Tr>
       ))}
     </tbody>
