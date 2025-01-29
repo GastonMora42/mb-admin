@@ -1,33 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import styled, { createGlobalStyle } from 'styled-components';
+import styled from 'styled-components';
 import { Alumno, Estilo } from '@/types/alumnos-estilos';
 import EstilosComponent from './EstilosXAlumnos';
 import EditAlumnoModal from '@/pages/api/alumnos/EditAlumnoModal';
-
-const GlobalStyle = createGlobalStyle`
-  * {
-    color: #000000;
-  }
-
-  [style*="background-color: #000000"],
-  [style*="background-color:#000000"],
-  .bg-black,
-  th {
-    color: #FFFFFF !important;
-  }
-
-  input,
-  textarea,
-  select {
-    color: #000000 !important;
-    -webkit-text-fill-color: #000000 !important;
-  }
-
-  ::placeholder {
-    color: #666666 !important;
-    -webkit-text-fill-color: #666666 !important;
-  }
-`;
 
 const PageContainer = styled.div`
   max-width: 1200px;
@@ -54,11 +29,24 @@ const Form = styled.form`
   margin-bottom: 30px;
 `;
 
-const Th = styled.th`
-  background-color: #000000;
-  color: #FFFFFF !important;
-  text-align: left;
-  padding: 12px;
+const Input = styled.input`
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+`;
+
+const TextArea = styled.textarea`
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  resize: vertical;
+  min-height: 100px;
+`;
+
+const Select = styled.select`
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
 `;
 
 const Button = styled.button`
@@ -81,6 +69,12 @@ const Table = styled.table`
   margin-top: 20px;
 `;
 
+const Th = styled.th`
+  background-color: #000000;
+  color: #FFFFFF;
+  text-align: left;
+  padding: 12px;
+`;
 
 const Td = styled.td`
   border-bottom: 1px solid #F9F8F8;
@@ -108,60 +102,6 @@ const ScrollableContainer = styled.div`
   border-radius: 4px;
   padding: 20px;
   margin-bottom: 20px;
-`;
-
-const Input = styled.input`
-  padding: 10px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  color: #333333; // Color gris oscuro para el texto
-  background-color: #ffffff; // Fondo blanco explícito
-  
-  &::placeholder {
-    color: #666666; // Color más claro para el placeholder
-  }
-
-  &:focus {
-    color: #000000; // Negro cuando está en foco
-    outline-color: #FFC001; // Mantiene el color de tu tema
-  }
-`;
-
-const TextArea = styled.textarea`
-  padding: 10px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  resize: vertical;
-  min-height: 100px;
-  color: #333333; // Color gris oscuro para el texto
-  background-color: #ffffff; // Fondo blanco explícito
-  
-  &::placeholder {
-    color: #666666; // Color más claro para el placeholder
-  }
-
-  &:focus {
-    color: #000000; // Negro cuando está en foco
-    outline-color: #FFC001; // Mantiene el color de tu tema
-  }
-`;
-
-const Select = styled.select`
-  padding: 10px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  color: #333333; // Color gris oscuro para el texto
-  background-color: #ffffff; // Fondo blanco explícito
-  
-  option {
-    color: #333333; // Color gris oscuro para las opciones
-    background-color: #ffffff; // Fondo blanco para las opciones
-  }
-
-  &:focus {
-    color: #000000;
-    outline-color: #FFC001;
-  }
 `;
 
 const HorizontalScrollContainer = styled.div`
@@ -439,7 +379,6 @@ const handleGuardarEdicion = async (alumnoData: any) => {
 };
 return (
   <PageContainer>
-    <GlobalStyle />
     <Container>
       <Title>Gestión de Alumnos</Title>
 

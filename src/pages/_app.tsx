@@ -6,6 +6,14 @@ import { useRouter } from 'next/router'
 import { useEffect, useState } from 'react'
 import { getCurrentUser } from 'aws-amplify/auth'
 import { Hub as AWSHub } from '@aws-amplify/core'
+import { createGlobalStyle } from 'styled-components'
+
+const GlobalStyle = createGlobalStyle`
+  body, input, textarea, select, label, span {
+    color: #000000 !important;
+    -webkit-text-fill-color: #000000 !important;
+  }
+`;
 
 const publicPaths = ['/', '/login', '/register', '/confirm-register']
 
@@ -66,9 +74,12 @@ function AppContent({ Component, pageProps }: AppProps) {
 
 export default function App(props: AppProps) {
  return (
-   <SafeHydrate>
-     <ConfigureAmplifyClientSide />
-     <AppContent {...props} />
-   </SafeHydrate>
+   <>
+     <GlobalStyle />
+     <SafeHydrate>
+       <ConfigureAmplifyClientSide />
+       <AppContent {...props} />
+     </SafeHydrate>
+   </>
  )
 }
