@@ -1,11 +1,36 @@
-* {
-  box-sizing: border-box;
-  padding: 0;
-  margin: 0;
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --foreground-rgb: 0, 0, 0;
+  --background-start-rgb: 214, 219, 220;
+  --background-end-rgb: 255, 255, 255;
+  --text-primary: #000000;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --foreground-rgb: 255, 255, 255;
+    --background-start-rgb: 0, 0, 0;
+    --background-end-rgb: 0, 0, 0;
+    --text-primary: #ffffff;
+  }
 }
 
 body {
-  color: #000000;
+  color: rgb(var(--foreground-rgb));
+  background: linear-gradient(
+      to bottom,
+      transparent,
+      rgb(var(--background-end-rgb))
+    )
+    rgb(var(--background-start-rgb));
+}
+
+/* Nuevas reglas para solucionar problemas de contraste */
+.light-mode {
+  color: var(--text-primary);
 }
 
 input, 
@@ -15,19 +40,54 @@ td,
 th, 
 label,
 option {
-  color: inherit;
+  color: var(--text-primary);
 }
 
-
+/* Asegurar contraste en inputs con autocompletado */
 input:-webkit-autofill,
 input:-webkit-autofill:hover,
 input:-webkit-autofill:focus,
 input:-webkit-autofill:active {
-  -webkit-text-fill-color: #000000 !important;
+  -webkit-text-fill-color: var(--text-primary) !important;
+  -webkit-box-shadow: 0 0 0 30px white inset !important;
 }
 
+/* Soporte para Firefox y otros navegadores */
 input,
 select,
 textarea {
   color-scheme: light;
+}
+
+/* Asegurar contraste en tablas */
+table {
+  color: var(--text-primary);
+}
+
+/* Asegurar contraste en elementos de formulario específicos */
+form {
+  color: var(--text-primary);
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+/* Estilos específicos para modo claro forzado */
+[data-theme="light"] {
+  --text-primary: #000000;
+  background-color: #ffffff;
+}
+
+/* Asegurar visibilidad en contenedores con fondo blanco */
+.white-bg {
+  background-color: #ffffff;
+  color: #000000;
+}
+
+/* Asegurar contraste en componentes styled-components */
+[class*="styled"] {
+  color: var(--text-primary);
 }
