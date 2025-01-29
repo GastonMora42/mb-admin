@@ -43,26 +43,6 @@ const Form = styled.form`
   margin-bottom: 30px;
 `;
 
-const Input = styled.input`
-  padding: 10px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-`;
-
-const TextArea = styled.textarea`
-  padding: 10px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  resize: vertical;
-  min-height: 100px;
-`;
-
-const Select = styled.select`
-  padding: 10px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-`;
-
 const Button = styled.button`
   background-color: #FFC001;
   color: #000000;
@@ -116,6 +96,60 @@ const ScrollableContainer = styled.div`
   border-radius: 4px;
   padding: 20px;
   margin-bottom: 20px;
+`;
+
+const Input = styled.input`
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  color: #333333; // Color gris oscuro para el texto
+  background-color: #ffffff; // Fondo blanco explícito
+  
+  &::placeholder {
+    color: #666666; // Color más claro para el placeholder
+  }
+
+  &:focus {
+    color: #000000; // Negro cuando está en foco
+    outline-color: #FFC001; // Mantiene el color de tu tema
+  }
+`;
+
+const TextArea = styled.textarea`
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  resize: vertical;
+  min-height: 100px;
+  color: #333333; // Color gris oscuro para el texto
+  background-color: #ffffff; // Fondo blanco explícito
+  
+  &::placeholder {
+    color: #666666; // Color más claro para el placeholder
+  }
+
+  &:focus {
+    color: #000000; // Negro cuando está en foco
+    outline-color: #FFC001; // Mantiene el color de tu tema
+  }
+`;
+
+const Select = styled.select`
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  color: #333333; // Color gris oscuro para el texto
+  background-color: #ffffff; // Fondo blanco explícito
+  
+  option {
+    color: #333333; // Color gris oscuro para las opciones
+    background-color: #ffffff; // Fondo blanco para las opciones
+  }
+
+  &:focus {
+    color: #000000;
+    outline-color: #FFC001;
+  }
 `;
 
 const HorizontalScrollContainer = styled.div`
