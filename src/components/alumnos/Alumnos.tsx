@@ -5,16 +5,10 @@ import EstilosComponent from './EstilosXAlumnos';
 import EditAlumnoModal from '@/pages/api/alumnos/EditAlumnoModal';
 
 const GlobalStyle = createGlobalStyle`
-  label {
-    color: #000000 !important;
-  }
-  
-  input, select, textarea {
-    color: #000000 !important;
-  }
-  
-  option {
-    color: #000000 !important;
+  input, textarea, select {
+    color: #333333 !important;
+    -webkit-text-fill-color: #333333 !important;
+    background-color: #ffffff !important;
   }
 `;
 
