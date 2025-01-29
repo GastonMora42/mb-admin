@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import styled from 'styled-components';
 import { format } from 'date-fns';
 import { 
@@ -184,6 +184,48 @@ const Th = styled.th`
   text-align: left;
   padding: 12px;
   white-space: nowrap;
+`;
+
+// Nuevos Styled Components para el autocompletado
+const AutocompleteContainer = styled.div`
+  position: relative;
+  width: 100%;
+`;
+
+const AutocompleteInput = styled(Input)`
+  width: 100%;
+`;
+
+const SuggestionsList = styled.ul`
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  max-height: 200px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid #ccc;
+  border-top: none;
+  border-radius: 0 0 4px 4px;
+  background-color: white;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  z-index: 1000;
+`;
+
+const SuggestionItem = styled.li`
+  padding: 8px 12px;
+  cursor: pointer;
+  border-bottom: 1px solid #eee;
+
+  &:last-child {
+    border-bottom: none;
+  }
+
+  &:hover {
+    background-color: #f5f5f5;
+  }
 `;
 
 const Td = styled.td`
@@ -405,6 +447,8 @@ const Recibos: React.FC = () => {
   const [estiloSeleccionado, setEstiloSeleccionado] = useState<string>('');
   const [recibosPendientes, setRecibosPendientes] = useState<ReciboPendiente[]>([]);
   const { isPrinterAvailable, printReceipt } = usePrinter();
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
   const [nuevoRecibo, setNuevoRecibo] = useState({
     monto: '',
@@ -635,6 +679,19 @@ const crearRecibosPendientes = async () => {
         }
       };
 
+      useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+          const target = event.target as HTMLElement;
+          if (!target.closest('.autocomplete-container')) {
+            setShowSuggestions(false);
+          }
+        };
+      
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+          document.removeEventListener('mousedown', handleClickOutside);
+        };
+      }, []);
 
   const fetchAlumnos = async () => {
     try {
@@ -705,6 +762,13 @@ const crearRecibosPendientes = async () => {
     }
   };
   
+  const filteredAlumnos = useMemo(() => {
+    if (!searchTerm) return [];
+    const searchTermLower = searchTerm.toLowerCase();
+    return alumnos.filter(alumno => 
+      `${alumno.apellido} ${alumno.nombre}`.toLowerCase().includes(searchTermLower)
+    );
+  }, [searchTerm, alumnos]);
 
   const calcularVistaPrevia = () => {
     const montoBase = parseFloat(nuevoRecibo.monto) || 0;
@@ -851,7 +915,7 @@ return (
               border: `1px solid ${isPrinterAvailable ? '#4caf50' : '#ffc107'}`
             }}
           >
-            Verificar
+            Verificar Impresora
           </Button>
         </div>
         {/* Formulario Principal */}
@@ -913,24 +977,24 @@ return (
               required
             />
           </InputGroup>
-  
-          <InputGroup>
-            <InputLabel>Fecha de Efecto</InputLabel>
-            <Input
-              type="date"
-              name="fechaEfecto"
-              value={nuevoRecibo.fechaEfecto}
-              onChange={handleInputChange}
-              required
-            />
-          </InputGroup>
-  
+
           <InputGroup>
             <InputLabel>Período Correspondiente</InputLabel>
             <Input
               type="month"
               name="periodoPago"
               value={nuevoRecibo.periodoPago}
+              onChange={handleInputChange}
+              required
+            />
+          </InputGroup>
+          
+          <InputGroup>
+            <InputLabel>Fecha de Efecto</InputLabel>
+            <Input
+              type="date"
+              name="fechaEfecto"
+              value={nuevoRecibo.fechaEfecto}
               onChange={handleInputChange}
               required
             />
@@ -1279,21 +1343,39 @@ return (
           </FilterSection>
 
           <FilterSection>
-            <InputLabel>Alumno</InputLabel>
-            <br />
-            <Select
-              name="alumnoId"
-              value={filtros.alumnoId}
-              onChange={(e) => setFiltros(prev => ({ ...prev, alumnoId: e.target.value }))}
-            >
-              <option value="">Todos los alumnos</option>
-              {alumnos.map(alumno => (
-                <option key={alumno.id} value={alumno.id}>
-                  {alumno.nombre} {alumno.apellido}
-                </option>
-              ))}
-            </Select>
-          </FilterSection>
+  <InputLabel>Alumno</InputLabel>
+  <AutocompleteContainer>
+    <AutocompleteInput
+      type="text"
+      value={searchTerm}
+      onChange={(e) => {
+        setSearchTerm(e.target.value);
+        setShowSuggestions(true);
+      }}
+      onFocus={() => setShowSuggestions(true)}
+      placeholder="Buscar por apellido..."
+    />
+    {showSuggestions && searchTerm && (
+      <SuggestionsList>
+        {filteredAlumnos.map(alumno => (
+          <SuggestionItem
+            key={alumno.id}
+            onClick={() => {
+              setFiltros(prev => ({ ...prev, alumnoId: alumno.id.toString() }));
+              setSearchTerm(`${alumno.apellido} ${alumno.nombre}`);
+              setShowSuggestions(false);
+            }}
+          >
+            {alumno.apellido} {alumno.nombre}
+          </SuggestionItem>
+        ))}
+        {filteredAlumnos.length === 0 && (
+          <SuggestionItem>No se encontraron alumnos</SuggestionItem>
+        )}
+      </SuggestionsList>
+    )}
+  </AutocompleteContainer>
+</FilterSection>
 
           <FilterSection>
             <InputLabel>Tipo de Pago</InputLabel>

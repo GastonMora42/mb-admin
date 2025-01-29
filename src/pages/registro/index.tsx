@@ -345,7 +345,6 @@ export default function RegistroAlumno() {
             name="dni"
             value={formData.dni}
             onChange={handleInputChange}
-            required
           />
         </InputGroup>
  
@@ -356,7 +355,6 @@ export default function RegistroAlumno() {
             name="fechaNacimiento"
             value={formData.fechaNacimiento}
             onChange={handleInputChange}
-            required
           />
         </InputGroup>
  
@@ -437,7 +435,6 @@ export default function RegistroAlumno() {
             multiple
             value={formData.estilosIds}
             onChange={handleInputChange}
-            required
           >
             {estilos.map(estilo => (
               <option key={estilo.id} value={estilo.id}>

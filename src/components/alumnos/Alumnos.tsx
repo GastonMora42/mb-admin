@@ -459,7 +459,6 @@ return (
         name="dni"
         value={nuevoAlumno.dni}
         onChange={handleInputChange}
-        required
       />
     </div>
 
@@ -499,7 +498,6 @@ return (
           name="fechaNacimiento"
           value={nuevoAlumno.fechaNacimiento}
           onChange={handleInputChange}
-          required
         />
       </div>
     )}
@@ -631,7 +629,6 @@ return (
             multiple
             value={nuevoAlumno.estilosIds}
             onChange={handleInputChange}
-            required
             style={{ height: '120px' }}
           >
             {estilos.map(estilo => (
