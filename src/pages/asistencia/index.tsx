@@ -5,7 +5,7 @@ import { RoleBasedAccess } from '@/components/RoleBasedAcces';
 export default function AsistenciaPage() {
   return (
     <Layout>
-      <RoleBasedAccess allowedRoles={['Dueño', 'Profesor']}>
+      <RoleBasedAccess allowedRoles={['Dueño', 'Profesor', 'Secretaria']}>
       <TomarAsistencia />
       </RoleBasedAccess>
     </Layout>
