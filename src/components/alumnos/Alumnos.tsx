@@ -1,8 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import styled from 'styled-components';
+import styled, { createGlobalStyle } from 'styled-components';
 import { Alumno, Estilo } from '@/types/alumnos-estilos';
 import EstilosComponent from './EstilosXAlumnos';
 import EditAlumnoModal from '@/pages/api/alumnos/EditAlumnoModal';
+
+const GlobalStyle = createGlobalStyle`
+  label {
+    color: #000000 !important;
+  }
+  
+  input, select, textarea {
+    color: #000000 !important;
+  }
+  
+  option {
+    color: #000000 !important;
+  }
+`;
 
 const PageContainer = styled.div`
   max-width: 1200px;
@@ -379,6 +393,7 @@ const handleGuardarEdicion = async (alumnoData: any) => {
 };
 return (
   <PageContainer>
+    <GlobalStyle />
     <Container>
       <Title>Gestión de Alumnos</Title>
 
