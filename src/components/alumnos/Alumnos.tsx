@@ -5,10 +5,27 @@ import EstilosComponent from './EstilosXAlumnos';
 import EditAlumnoModal from '@/pages/api/alumnos/EditAlumnoModal';
 
 const GlobalStyle = createGlobalStyle`
-  input, textarea, select {
-    color: #333333 !important;
-    -webkit-text-fill-color: #333333 !important;
-    background-color: #ffffff !important;
+  * {
+    color: #000000;
+  }
+
+  [style*="background-color: #000000"],
+  [style*="background-color:#000000"],
+  .bg-black,
+  th {
+    color: #FFFFFF !important;
+  }
+
+  input,
+  textarea,
+  select {
+    color: #000000 !important;
+    -webkit-text-fill-color: #000000 !important;
+  }
+
+  ::placeholder {
+    color: #666666 !important;
+    -webkit-text-fill-color: #666666 !important;
   }
 `;
 
@@ -37,6 +54,13 @@ const Form = styled.form`
   margin-bottom: 30px;
 `;
 
+const Th = styled.th`
+  background-color: #000000;
+  color: #FFFFFF !important;
+  text-align: left;
+  padding: 12px;
+`;
+
 const Button = styled.button`
   background-color: #FFC001;
   color: #000000;
@@ -57,12 +81,6 @@ const Table = styled.table`
   margin-top: 20px;
 `;
 
-const Th = styled.th`
-  background-color: #000000;
-  color: #FFFFFF;
-  text-align: left;
-  padding: 12px;
-`;
 
 const Td = styled.td`
   border-bottom: 1px solid #F9F8F8;
