@@ -9,7 +9,7 @@ import { Hub as AWSHub } from '@aws-amplify/core'
 import { createGlobalStyle } from 'styled-components'
 
 const GlobalStyle = createGlobalStyle`
-  input, textarea, select, label, option, td, p {
+  input, textarea, select, label, option, td, p, .highlight {
     color: #000000 !important;
     -webkit-text-fill-color: #000000 !important;
   }
@@ -42,6 +42,21 @@ const GlobalStyle = createGlobalStyle`
     color: #000000 !important;
     -webkit-text-fill-color: #000000 !important;
     background-color: white !important;
+  }
+
+    /* Para contenido HTML dinámico */
+  [dangerouslySetInnerHTML], 
+  [class*="Terms"], 
+  .TermsContent,
+  .TermsModal {
+    color: #000000 !important;
+    -webkit-text-fill-color: #000000 !important;
+  }
+
+  /* Para todos los elementos dentro de contenido dinámico */
+  [dangerouslySetInnerHTML] * {
+    color: #000000 !important;
+    -webkit-text-fill-color: #000000 !important;
   }
 `;
 
