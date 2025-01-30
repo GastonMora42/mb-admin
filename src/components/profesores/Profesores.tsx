@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { Profesor, Estilo } from '@/types';
+import EditProfesorModal from './EditProfesorModal';
 
 const PageContainer = styled.div`
   max-width: 1200px;
@@ -153,6 +154,14 @@ const DeleteButton = styled(Button)`
   }
 `;
 
+const ActionButtons = styled.div`
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 20px;
+`;
+
+
 const ToggleButton = styled(Button)`
   background-color: #4CAF50;
   color: white;
@@ -261,6 +270,7 @@ const Profesores = () => {
   const [profesores, setProfesores] = useState<Profesor[]>([]);
   const [estilos, setEstilos] = useState<Estilo[]>([]);
   const [mostrarListado, setMostrarListado] = useState(true);
+  const [editandoProfesor, setEditandoProfesor] = useState<Profesor | null>(null);
   const [nuevoProfesor, setNuevoProfesor] = useState<ProfesorForm>({
     nombre: '',
     apellido: '',
@@ -381,6 +391,37 @@ const Profesores = () => {
       console.error('Error:', error);
       setMessage({ 
         text: error instanceof Error ? error.message : 'Error al eliminar profesor', 
+        isError: true 
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGuardarEdicion = async (profesorData: any) => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/profesores', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(profesorData),
+      });
+  
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Error al actualizar profesor');
+      }
+  
+      const profesorActualizado = await res.json();
+      setProfesores(prev => 
+        prev.map(p => p.id === profesorActualizado.id ? profesorActualizado : p)
+      );
+      setEditandoProfesor(null);
+      setMessage({ text: 'Profesor actualizado exitosamente', isError: false });
+    } catch (error) {
+      console.error('Error:', error);
+      setMessage({ 
+        text: error instanceof Error ? error.message : 'Error al actualizar profesor', 
         isError: true 
       });
     } finally {
@@ -596,13 +637,19 @@ const Profesores = () => {
                     <Td>{profesor.porcentajePorDefecto}%</Td>
                     <Td>{profesor.porcentajeClasesSueltasPorDefecto}%</Td>
                     <Td>
-                      <DeleteButton 
-                        onClick={() => handleDelete(profesor.id)}
-                        disabled={loading}
-                      >
-                        Eliminar
-                      </DeleteButton>
-                    </Td>
+                    <ActionButtons>
+    <Button onClick={() => setEditandoProfesor(profesor)}>
+      Editar
+    </Button>
+    <DeleteButton 
+      onClick={() => handleDelete(profesor.id)}
+      disabled={loading}
+    >
+      Eliminar
+    </DeleteButton>
+    </ActionButtons>
+</Td>
+
                   </Tr>
                 ))}
               </tbody>
@@ -610,6 +657,14 @@ const Profesores = () => {
           </ScrollableContainer>
         )}
       </Container>
+      {editandoProfesor && (
+  <EditProfesorModal
+    profesor={editandoProfesor}
+    estilos={estilos}
+    onClose={() => setEditandoProfesor(null)}
+    onSave={handleGuardarEdicion}
+  />
+)}
     </PageContainer>
   );
 };

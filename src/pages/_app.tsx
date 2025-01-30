@@ -9,7 +9,7 @@ import { Hub as AWSHub } from '@aws-amplify/core'
 import { createGlobalStyle } from 'styled-components'
 
 const GlobalStyle = createGlobalStyle`
-  input, textarea, select, label, option, td, div, p {
+  input, textarea, select, label, option, td, p {
     color: #000000 !important;
     -webkit-text-fill-color: #000000 !important;
   }
