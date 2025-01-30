@@ -988,17 +988,6 @@ return (
               required
             />
           </InputGroup>
-          
-          <InputGroup>
-            <InputLabel>Fecha de Efecto</InputLabel>
-            <Input
-              type="date"
-              name="fechaEfecto"
-              value={nuevoRecibo.fechaEfecto}
-              onChange={handleInputChange}
-              required
-            />
-          </InputGroup>
   
           <InputGroup>
             <InputLabel>Concepto</InputLabel>
