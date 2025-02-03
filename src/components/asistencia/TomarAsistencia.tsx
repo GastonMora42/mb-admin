@@ -487,6 +487,7 @@ const TomarAsistencia: React.FC = () => {
                     value={nuevoAlumnoSuelto.telefono}
                     onChange={handleNuevoAlumnoSueltoChange}
                     placeholder="Teléfono"
+                    required
                   />
                 </InputGroup>
 

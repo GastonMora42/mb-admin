@@ -336,6 +336,25 @@ Me comprometo a cumplir con el siguiente contrato, y doy fe que mi hijo/a se enc
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Validación de campos requeridos y formato de fecha
+    if (!formData.nombre || !formData.apellido || !formData.dni || !formData.fechaNacimiento) {
+      setMessage({
+        text: 'Los campos marcados con * son obligatorios',
+        isError: true
+      });
+      return;
+    }
+  
+    // Validar formato de fecha
+    const fechaNacimiento = new Date(formData.fechaNacimiento);
+    if (isNaN(fechaNacimiento.getTime())) {
+      setMessage({
+        text: 'La fecha de nacimiento no es válida',
+        isError: true
+      });
+      return;
+    }
+  
     if (!acceptedTerms) {
       setMessage({
         text: 'Debes aceptar los términos y condiciones',
@@ -343,29 +362,41 @@ Me comprometo a cumplir con el siguiente contrato, y doy fe que mi hijo/a se enc
       });
       return;
     }
-    
+  
     setLoading(true);
     
     try {
+      // Preparar los datos eliminando strings vacíos
+      const alumnoData = {
+        ...formData,
+        email: formData.email || null,
+        telefono: formData.telefono || null,
+        numeroEmergencia: formData.numeroEmergencia || null,
+        direccion: formData.direccion || null,
+        obraSocial: formData.obraSocial || null,
+        nombreTutor: formData.nombreTutor || null,
+        dniTutor: formData.dniTutor || null,
+        tipoAlumno: 'regular',
+        estilosIds: formData.estilosIds.map(id => parseInt(id)),
+        activo: true,
+        fechaNacimiento: fechaNacimiento.toISOString() // Convertir a formato ISO
+      };
+  
       const res = await fetch('/api/alumnos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...formData,
-          tipoAlumno: 'regular',
-          estilosIds: formData.estilosIds.map(id => parseInt(id)),
-          activo: true
-        }),
+        body: JSON.stringify(alumnoData),
       });
-
+  
       if (!res.ok) {
         const error = await res.json();
         throw new Error(error.error || 'Error al registrar alumno');
       }
-
+  
       setShowSuccess(true);
       setTimeout(() => {
         setShowSuccess(false);
+        // Resetear el formulario
         setFormData({
           nombre: '',
           apellido: '',
@@ -392,6 +423,7 @@ Me comprometo a cumplir con el siguiente contrato, y doy fe que mi hijo/a se enc
       setLoading(false);
     }
   };
+  
 
   return (
     <PageWrapper>

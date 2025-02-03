@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 
+// Styled Components
 const Container = styled.div`
   background-color: #FFFFFF;
   padding: 30px;
@@ -24,12 +25,26 @@ const Input = styled.input`
   padding: 10px;
   border: 1px solid #ccc;
   border-radius: 4px;
+  font-size: 14px;
+
+  &:focus {
+    outline: none;
+    border-color: #FFC001;
+    box-shadow: 0 0 0 2px rgba(255, 192, 1, 0.2);
+  }
 `;
 
 const Select = styled.select`
   padding: 10px;
   border: 1px solid #ccc;
   border-radius: 4px;
+  font-size: 14px;
+  
+  &:focus {
+    outline: none;
+    border-color: #FFC001;
+    box-shadow: 0 0 0 2px rgba(255, 192, 1, 0.2);
+  }
 `;
 
 const Button = styled.button`
@@ -39,10 +54,41 @@ const Button = styled.button`
   padding: 10px 20px;
   border-radius: 4px;
   cursor: pointer;
-  transition: background-color 0.3s;
-
+  transition: all 0.3s ease;
+  font-weight: 500;
+  
   &:hover {
     background-color: #e6ac00;
+    transform: translateY(-1px);
+  }
+
+  &:disabled {
+    background-color: #cccccc;
+    cursor: not-allowed;
+    transform: none;
+  }
+`;
+
+const ActionButton = styled(Button)`
+  padding: 8px 16px;
+  font-size: 0.9em;
+  
+  &.edit {
+    background-color: #4CAF50;
+    color: white;
+    
+    &:hover {
+      background-color: #45a049;
+    }
+  }
+  
+  &.delete {
+    background-color: #f44336;
+    color: white;
+    
+    &:hover {
+      background-color: #da190b;
+    }
   }
 `;
 
@@ -57,6 +103,7 @@ const Th = styled.th`
   color: #FFFFFF;
   text-align: left;
   padding: 12px;
+  font-weight: 500;
 `;
 
 const Td = styled.td`
@@ -68,16 +115,61 @@ const Tr = styled.tr`
   &:nth-child(even) {
     background-color: #F9F8F8;
   }
+
+  &:hover {
+    background-color: #f5f5f5;
+  }
 `;
 
 const Message = styled.div<{ isError?: boolean }>`
   margin-top: 20px;
   padding: 10px;
   border-radius: 4px;
-  background-color: ${props => props.isError ? '#ffcccc' : '#ccffcc'};
-  color: ${props => props.isError ? '#cc0000' : '#006600'};
+  background-color: ${props => props.isError ? '#ffebee' : '#e8f5e9'};
+  color: ${props => props.isError ? '#c62828' : '#2e7d32'};
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  &::before {
+    content: "${props => props.isError ? '❌' : '✅'}";
+  }
 `;
 
+const Modal = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+`;
+
+const ModalContent = styled.div`
+  background-color: white;
+  padding: 20px;
+  border-radius: 8px;
+  width: 90%;
+  max-width: 500px;
+`;
+
+const ModalTitle = styled.h3`
+  margin-bottom: 20px;
+  color: #000000;
+`;
+
+const ButtonGroup = styled.div`
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 20px;
+`;
+
+// Interfaces
 interface Estilo {
   id: number;
   nombre: string;
@@ -96,7 +188,15 @@ interface Profesor {
   apellido: string;
 }
 
-const Estilos = () => {
+interface EstiloEdicion {
+  id: number;
+  nombre: string;
+  descripcion: string;
+  importe: number;
+  profesorId?: number;
+}
+
+const Estilos: React.FC = () => {
   const [estilos, setEstilos] = useState<Estilo[]>([]);
   const [profesores, setProfesores] = useState<Profesor[]>([]);
   const [nuevoEstilo, setNuevoEstilo] = useState({
@@ -105,6 +205,7 @@ const Estilos = () => {
     profesorId: '',
     importe: ''
   });
+  const [estiloEnEdicion, setEstiloEnEdicion] = useState<EstiloEdicion | null>(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ text: string; isError: boolean } | null>(null);
 
@@ -117,14 +218,12 @@ const Estilos = () => {
     setLoading(true);
     try {
       const res = await fetch('/api/estilos');
-      if (!res.ok) {
-        throw new Error('Error al obtener estilos');
-      }
+      if (!res.ok) throw new Error('Error al obtener estilos');
       const data = await res.json();
       setEstilos(data);
     } catch (error) {
       console.error('Error fetching estilos:', error);
-      setMessage({ text: 'Error al cargar estilos. Por favor, intente nuevamente.', isError: true });
+      setMessage({ text: 'Error al cargar estilos', isError: true });
     } finally {
       setLoading(false);
     }
@@ -133,13 +232,12 @@ const Estilos = () => {
   const fetchProfesores = async () => {
     try {
       const res = await fetch('/api/profesores');
-      if (!res.ok) {
-        throw new Error('Error al obtener profesores');
-      }
+      if (!res.ok) throw new Error('Error al obtener profesores');
       const data = await res.json();
       setProfesores(data);
     } catch (error) {
       console.error('Error fetching profesores:', error);
+      setMessage({ text: 'Error al cargar profesores', isError: true });
     }
   };
 
@@ -147,6 +245,15 @@ const Estilos = () => {
     const { name, value } = e.target;
     setNuevoEstilo(prev => ({
       ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleEdicionChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    if (!estiloEnEdicion) return;
+    const { name, value } = e.target;
+    setEstiloEnEdicion(prev => ({
+      ...prev!,
       [name]: value
     }));
   };
@@ -160,16 +267,72 @@ const Estilos = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(nuevoEstilo),
       });
-      if (!res.ok) {
-        throw new Error('Error al crear estilo');
-      }
-      const estiloCreado = await res.json();
-      setEstilos(prev => [...prev, estiloCreado]);
+      if (!res.ok) throw new Error('Error al crear estilo');
+      
+      await fetchEstilos();
       setNuevoEstilo({ nombre: '', descripcion: '', profesorId: '', importe: '' });
-      setMessage({ text: `Estilo ${estiloCreado.nombre} creado con éxito.`, isError: false });
+      setMessage({ text: 'Estilo creado exitosamente', isError: false });
     } catch (error) {
-      console.error('Error creating estilo:', error);
-      setMessage({ text: 'Error al crear estilo. Por favor, intente nuevamente.', isError: true });
+      console.error('Error:', error);
+      setMessage({ text: 'Error al crear estilo', isError: true });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEditar = (estilo: Estilo) => {
+    setEstiloEnEdicion({
+      id: estilo.id,
+      nombre: estilo.nombre,
+      descripcion: estilo.descripcion || '',
+      importe: estilo.importe,
+      profesorId: estilo.profesor?.id
+    });
+  };
+
+  const handleGuardarEdicion = async () => {
+    if (!estiloEnEdicion) return;
+    
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/estilos/${estiloEnEdicion.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(estiloEnEdicion),
+      });
+
+      if (!res.ok) throw new Error('Error al actualizar estilo');
+
+      await fetchEstilos();
+      setEstiloEnEdicion(null);
+      setMessage({ text: 'Estilo actualizado exitosamente', isError: false });
+    } catch (error) {
+      console.error('Error:', error);
+      setMessage({ text: 'Error al actualizar estilo', isError: true });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEliminar = async (id: number) => {
+    if (!confirm('¿Está seguro que desea eliminar este estilo?')) return;
+    
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/estilos/${id}`, {
+        method: 'DELETE',
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Error al eliminar estilo');
+      }
+
+      await fetchEstilos();
+      setMessage({ text: 'Estilo eliminado exitosamente', isError: false });
+    } catch (error: any) {
+      console.error('Error:', error);
+      setMessage({ text: error.message || 'Error al eliminar estilo', isError: true });
     } finally {
       setLoading(false);
     }
@@ -178,6 +341,7 @@ const Estilos = () => {
   return (
     <Container>
       <Title>Estilos</Title>
+
       <Form onSubmit={handleSubmit}>
         <Input
           type="text"
@@ -194,18 +358,6 @@ const Estilos = () => {
           onChange={handleInputChange}
           placeholder="Descripción"
         />
-        <Select
-          name="profesorId"
-          value={nuevoEstilo.profesorId}
-          onChange={handleInputChange}
-        >
-          <option value="">Seleccione un profesor (opcional)</option>
-          {profesores.map((profesor) => (
-            <option key={profesor.id} value={profesor.id}>
-              {profesor.nombre} {profesor.apellido}
-            </option>
-          ))}
-        </Select>
         <Input
           type="number"
           name="importe"
@@ -213,35 +365,121 @@ const Estilos = () => {
           onChange={handleInputChange}
           placeholder="Importe"
           required
-          step="0.01"
         />
         <Button type="submit" disabled={loading}>
           {loading ? 'Agregando...' : 'Agregar Estilo'}
         </Button>
       </Form>
+
       {message && (
-        <Message isError={message.isError}>{message.text}</Message>
+        <Message isError={message.isError}>
+          {message.text}
+        </Message>
       )}
+
       <Table>
         <thead>
-        <Tr>
+          <Tr>
             <Th>Nombre</Th>
             <Th>Descripción</Th>
             <Th>Importe</Th>
             <Th>Profesor Encargado</Th>
+            <Th>Acciones</Th>
           </Tr>
         </thead>
         <tbody>
           {estilos.map((estilo) => (
             <Tr key={estilo.id}>
-            <Td>{estilo.nombre}</Td>
-            <Td>{estilo.descripcion}</Td>
-            <Td>${estilo.importe.toFixed(2)}</Td>
-            <Td>{estilo.profesor ? `${estilo.profesor.nombre} ${estilo.profesor.apellido}` : 'No asignado'}</Td>
-          </Tr>
+              <Td>{estilo.nombre}</Td>
+              <Td>{estilo.descripcion}</Td>
+              <Td>${estilo.importe.toFixed(0)}</Td>
+              <Td>
+                {estilo.profesor 
+                  ? `${estilo.profesor.nombre} ${estilo.profesor.apellido}` 
+                  : 'No asignado'}
+              </Td>
+              <Td>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <ActionButton
+                    type="button"
+                    className="edit"
+                    onClick={() => handleEditar(estilo)}
+                  >
+                    Editar
+                  </ActionButton>
+                  <ActionButton
+                    type="button"
+                    className="delete"
+                    onClick={() => handleEliminar(estilo.id)}
+                  >
+                    Eliminar
+                  </ActionButton>
+                </div>
+              </Td>
+            </Tr>
           ))}
         </tbody>
       </Table>
+
+      {estiloEnEdicion && (
+        <Modal>
+          <ModalContent>
+            <ModalTitle>Editar Estilo</ModalTitle>
+            <Form onSubmit={(e) => {
+              e.preventDefault();
+              handleGuardarEdicion();
+            }}>
+              <Input
+                type="text"
+                name="nombre"
+                value={estiloEnEdicion.nombre}
+                onChange={handleEdicionChange}
+                placeholder="Nombre"
+                required
+              />
+              <Input
+                type="text"
+                name="descripcion"
+                value={estiloEnEdicion.descripcion}
+                onChange={handleEdicionChange}
+                placeholder="Descripción"
+              />
+              <Select
+                name="profesorId"
+                value={estiloEnEdicion.profesorId || ''}
+                onChange={handleEdicionChange}
+              >
+                <option value="">Seleccione un profesor (opcional)</option>
+                {profesores.map((profesor) => (
+                  <option key={profesor.id} value={profesor.id}>
+                    {profesor.nombre} {profesor.apellido}
+                  </option>
+                ))}
+              </Select>
+              <Input
+                type="number"
+                name="importe"
+                value={estiloEnEdicion.importe}
+                onChange={handleEdicionChange}
+                placeholder="Importe"
+                required
+              />
+              <ButtonGroup>
+                <Button
+                  type="button"
+                  onClick={() => setEstiloEnEdicion(null)}
+                  style={{ backgroundColor: '#cccccc' }}
+                >
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={loading}>
+                  {loading ? 'Guardando...' : 'Guardar Cambios'}
+                </Button>
+              </ButtonGroup>
+            </Form>
+          </ModalContent>
+        </Modal>
+      )}
     </Container>
   );
 };

@@ -336,6 +336,40 @@ const CloseFiltersButton = styled.button`
   }
 `;
 
+const ActionButton = styled(Button)`
+  width: auto;
+  min-width: 160px;
+  padding: 12px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+  margin: 20px 0;
+  
+  @media (max-width: 768px) {
+    width: 100%;
+    padding: 14px 20px;
+    font-size: 0.95em;
+  }
+
+  &:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+  }
+
+  &:not(:disabled):hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  }
+
+  &:not(:disabled):active {
+    transform: translateY(0);
+  }
+`;
+
 const PreviewSection = styled.div`
   background-color: #f9f9f9;
   padding: 20px;
@@ -449,6 +483,9 @@ const Recibos: React.FC = () => {
   const { isPrinterAvailable, printReceipt } = usePrinter();
   const [searchTerm, setSearchTerm] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [searchAlumno, setSearchAlumno] = useState('');
+  const [showAlumnoSuggestions, setShowAlumnoSuggestions] = useState(false);
+ 
 
   const [nuevoRecibo, setNuevoRecibo] = useState({
     monto: '',
@@ -795,6 +832,30 @@ const crearRecibosPendientes = async () => {
     });
   };
 
+  const filteredAlumnosForm = useMemo(() => {
+    if (!searchAlumno) return [];
+    const searchTermLower = searchAlumno.toLowerCase();
+    return (nuevoRecibo.esClaseSuelta ? alumnosSueltos : alumnos)
+      .filter(alumno => 
+        `${alumno.apellido} ${alumno.nombre}`.toLowerCase().includes(searchTermLower)
+      );
+  }, [searchAlumno, alumnos, alumnosSueltos, nuevoRecibo.esClaseSuelta]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('.autocomplete-container')) {
+        setShowAlumnoSuggestions(false);
+      }
+    };
+  
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
     const checked = type === 'checkbox' ? (e.target as HTMLInputElement).checked : undefined;
@@ -884,6 +945,7 @@ const crearRecibosPendientes = async () => {
       descuentoManual: 0,
     });
     setDeudasSeleccionadas({});
+    setSearchAlumno(''); // Agregar esta línea
 };
 
 
@@ -934,38 +996,92 @@ return (
           </InputGroup>
   
           {!nuevoRecibo.esClaseSuelta ? (
-            <InputGroup>
-              <InputLabel>Alumno Regular</InputLabel>
-              <Select
-                name="alumnoId"
-                value={nuevoRecibo.alumnoId}
-                onChange={handleInputChange}
+  <InputGroup>
+    <InputLabel>Alumno Regular</InputLabel>
+    <AutocompleteContainer className="autocomplete-container">
+      <AutocompleteInput
+        type="text"
+        value={searchAlumno}
+        onChange={(e) => {
+          setSearchAlumno(e.target.value);
+          setShowAlumnoSuggestions(true);
+          if (nuevoRecibo.alumnoId) {
+            setNuevoRecibo(prev => ({ ...prev, alumnoId: '' }));
+            setDeudasSeleccionadas({});
+          }
+        }}
+        onFocus={() => setShowAlumnoSuggestions(true)}
+        placeholder="Buscar alumno por apellido..."
+      />
+      {showAlumnoSuggestions && searchAlumno && (
+        <SuggestionsList>
+          {filteredAlumnosForm.length > 0 ? (
+            filteredAlumnosForm.map(alumno => (
+              <SuggestionItem
+                key={alumno.id}
+                onClick={() => {
+                  setNuevoRecibo(prev => ({ 
+                    ...prev, 
+                    alumnoId: alumno.id.toString() 
+                  }));
+                  setSearchAlumno(`${alumno.apellido} ${alumno.nombre}`);
+                  setShowAlumnoSuggestions(false);
+                  fetchDeudasAlumno(alumno.id.toString());
+                }}
               >
-                <option value="">Seleccione un alumno regular</option>
-                {alumnos.map(alumno => (
-                  <option key={alumno.id} value={alumno.id}>
-                    {alumno.nombre} {alumno.apellido}
-                  </option>
-                ))}
-              </Select>
-            </InputGroup>
+                {alumno.apellido} {alumno.nombre}
+              </SuggestionItem>
+            ))
           ) : (
-            <InputGroup>
-              <InputLabel>Alumno Suelto</InputLabel>
-              <Select
-                name="alumnoSueltoId"
-                value={nuevoRecibo.alumnoSueltoId}
-                onChange={handleInputChange}
-              >
-                <option value="">Seleccione un alumno suelto</option>
-                {alumnosSueltos.map(alumno => (
-                  <option key={alumno.id} value={alumno.id}>
-                    {alumno.nombre} {alumno.apellido}
-                  </option>
-                ))}
-              </Select>
-            </InputGroup>
+            <SuggestionItem>No se encontraron alumnos</SuggestionItem>
           )}
+        </SuggestionsList>
+      )}
+    </AutocompleteContainer>
+  </InputGroup>
+) : (
+  <InputGroup>
+    <InputLabel>Alumno Suelto</InputLabel>
+    <AutocompleteContainer className="autocomplete-container">
+      <AutocompleteInput
+        type="text"
+        value={searchAlumno}
+        onChange={(e) => {
+          setSearchAlumno(e.target.value);
+          setShowAlumnoSuggestions(true);
+          if (nuevoRecibo.alumnoSueltoId) {
+            setNuevoRecibo(prev => ({ ...prev, alumnoSueltoId: '' }));
+          }
+        }}
+        onFocus={() => setShowAlumnoSuggestions(true)}
+        placeholder="Buscar alumno suelto por apellido..."
+      />
+      {showAlumnoSuggestions && searchAlumno && (
+        <SuggestionsList>
+          {filteredAlumnosForm.length > 0 ? (
+            filteredAlumnosForm.map(alumno => (
+              <SuggestionItem
+                key={alumno.id}
+                onClick={() => {
+                  setNuevoRecibo(prev => ({ 
+                    ...prev, 
+                    alumnoSueltoId: alumno.id.toString() 
+                  }));
+                  setSearchAlumno(`${alumno.apellido} ${alumno.nombre}`);
+                  setShowAlumnoSuggestions(false);
+                }}
+              >
+                {alumno.apellido} {alumno.nombre}
+              </SuggestionItem>
+            ))
+          ) : (
+            <SuggestionItem>No se encontraron alumnos sueltos</SuggestionItem>
+          )}
+        </SuggestionsList>
+      )}
+    </AutocompleteContainer>
+  </InputGroup>
+)}
   
           <InputGroup>
             <InputLabel>Fecha de Creación</InputLabel>
@@ -1164,10 +1280,45 @@ return (
     )}
   </DeudaSection>
 )}
-
-        <Button type="submit" disabled={loading}>
-          {loading ? 'Agregando...' : 'Agregar a Vista Previa'}
-        </Button>
+<ActionButton 
+  type="submit" 
+  disabled={loading}
+  style={{
+    backgroundColor: loading ? '#cccccc' : '#FFC001',
+    color: loading ? '#666666' : '#000000',
+  }}
+>
+  {loading ? (
+    <>
+      <span className="spinner" style={{
+        display: 'inline-block',
+        width: '16px',
+        height: '16px',
+        border: '2px solid #666666',
+        borderTop: '2px solid transparent',
+        borderRadius: '50%',
+        animation: 'spin 1s linear infinite',
+      }}></span>
+      Agregando...
+    </>
+  ) : (
+    <>
+      <svg 
+        width="20" 
+        height="20" 
+        viewBox="0 0 24 24" 
+        fill="none" 
+        stroke="currentColor" 
+        strokeWidth="2"
+        strokeLinecap="round" 
+        strokeLinejoin="round"
+      >
+        <path d="M12 5v14M5 12h14"/>
+      </svg>
+      Agregar a Vista Previa
+    </>
+  )}
+</ActionButton>
       </Form>
 
 {/* Vista previa de recibos pendientes con mejoras visuales */}
@@ -1200,19 +1351,19 @@ return (
           alignItems: 'flex-end',
           minWidth: '200px'
         }}>
-          <div>Monto Original: ${recibo.monto.toFixed(2)}</div>
+          <div>Monto Original: ${recibo.monto.toFixed(0)}</div>
           {recibo.descuento && (
             <div style={{ color: '#4caf50' }}>
               Descuento: {recibo.descuento}%
             </div>
           )}
-          <div style={{ 
-            fontWeight: 'bold', 
-            fontSize: '1.1em', 
-            marginTop: '5px' 
-          }}>
-            Monto Final: ${(recibo.monto * (1 - (recibo.descuento || 0) / 100)).toFixed(2)}
-          </div>
+<div style={{ 
+  fontWeight: 'bold', 
+  fontSize: '1.1em', 
+  marginTop: '5px' 
+}}>
+  Monto Final: ${(recibo.monto * (1 - (recibo.descuento || 0) / 100)).toFixed(0)}
+</div>
           {isPrinterAvailable && (
             <div style={{ 
               color: '#666', 
@@ -1248,11 +1399,11 @@ return (
         </div>
       </div>
       <div style={{ textAlign: 'right' }}>
-        <span style={{ fontSize: '1.2em', fontWeight: 'bold' }}>
-          ${recibosPendientes.reduce((sum, r) => 
-            sum + (r.monto * (1 - (r.descuento || 0) / 100)), 0
-          ).toFixed(2)}
-        </span>
+      <span style={{ fontSize: '1.2em', fontWeight: 'bold' }}>
+  ${recibosPendientes.reduce((sum, r) => 
+    sum + (r.monto * (1 - (r.descuento || 0) / 100)), 0
+  ).toFixed(0)}
+</span>
       </div>
     </PreviewTotal>
 
@@ -1437,9 +1588,9 @@ return (
               : `${recibo.alumnoSuelto?.nombre} ${recibo.alumnoSuelto?.apellido} (Suelto)`}
           </Td>
           <Td>{recibo.concepto.nombre}</Td>
-          <Td>${recibo.montoOriginal.toFixed(2)}</Td>
+          <Td>${recibo.montoOriginal.toFixed(0)}</Td>
           <Td>{recibo.descuento ? `${(recibo.descuento * 100).toFixed(0)}%` : '-'}</Td>
-          <Td>${recibo.monto.toFixed(2)}</Td>
+          <Td>${recibo.monto.toFixed(0)}</Td>
           <Td>{recibo.tipoPago}</Td>
           <Td>
             <span style={{
