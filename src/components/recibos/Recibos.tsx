@@ -14,6 +14,7 @@ import { usePrinter } from '@/hooks/usePrinter';
 import PrinterIcon from '@heroicons/react/24/outline/PrinterIcon';
 import { PrinterService } from '@/lib/printer/printer.service';
 import { PrinterStatus } from '../PrinterStatus';
+import { useUserRole } from '@/hooks/useUserRole';
 
 // Styled Components
 const Container = styled.div`
@@ -469,6 +470,7 @@ const initialVistaPrevia: VistaPrevia = {
 };
 
 const Recibos: React.FC = () => {
+  const userRole = useUserRole();
   const [recibos, setRecibos] = useState<Recibo[]>([]);
   const [alumnos, setAlumnos] = useState<Alumno[]>([]);
   const [alumnosSueltos, setAlumnosSueltos] = useState<AlumnoSuelto[]>([]);
@@ -1627,50 +1629,52 @@ return (
             </span>
           </Td>
           <Td style={{ display: 'flex', gap: '5px' }}>
-  {recibo.anulado ? (
-    <Button 
-      onClick={() => handleEliminarRecibo(recibo.id)}
-      disabled={loading}
-      style={{
-        backgroundColor: '#dc3545',
-        color: 'white',
-        padding: '5px 10px',
-        fontSize: '0.9em'
-      }}
-    >
-      Eliminar
-    </Button>
-  ) : (
-    <>
-      <Button 
-        onClick={() => handleAnularRecibo(recibo.id)}
-        disabled={loading}
-        style={{
-          backgroundColor: '#ff4444',
-          color: 'white',
-          padding: '5px 10px',
-          fontSize: '0.9em'
-        }}
-      >
-        Anular
-      </Button>
-      {isPrinterAvailable && (
-        <Button
-          onClick={() => printReceipt(recibo)}
+    {recibo.anulado ? (
+      userRole === 'Dueño' && (
+        <Button 
+          onClick={() => handleEliminarRecibo(recibo.id)}
           disabled={loading}
           style={{
-            backgroundColor: '#4CAF50',
+            backgroundColor: '#dc3545',
             color: 'white',
             padding: '5px 10px',
             fontSize: '0.9em'
           }}
         >
-          Reimprimir
+          Eliminar
         </Button>
-      )}
-    </>
-  )}
-</Td>
+      )
+    ) : (
+      <>
+        <Button 
+          onClick={() => handleAnularRecibo(recibo.id)}
+          disabled={loading}
+          style={{
+            backgroundColor: '#ff4444',
+            color: 'white',
+            padding: '5px 10px',
+            fontSize: '0.9em'
+          }}
+        >
+          Anular
+        </Button>
+        {isPrinterAvailable && (
+          <Button
+            onClick={() => printReceipt(recibo)}
+            disabled={loading}
+            style={{
+              backgroundColor: '#4CAF50',
+              color: 'white',
+              padding: '5px 10px',
+              fontSize: '0.9em'
+            }}
+          >
+            Reimprimir
+          </Button>
+        )}
+      </>
+    )}
+  </Td>
         </Tr>
       ))}
     </tbody>
