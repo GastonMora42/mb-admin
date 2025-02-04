@@ -120,6 +120,7 @@ const GlobalStyle = createGlobalStyle`
     background-color: #000000;
     border: 1px solid rgba(0,0,0,0.2);
   }
+    
 
   /* Elementos de lista y menús desplegables */
   .dropdown-item,
