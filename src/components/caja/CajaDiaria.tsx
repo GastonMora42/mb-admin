@@ -215,16 +215,10 @@ const CajaDiaria = () => {
  const [searchConcepto, setSearchConcepto] = useState('');
  const [alumnosFiltrados, setAlumnosFiltrados] = useState<any[]>([]);
  const [conceptosFiltrados, setConceptosFiltrados] = useState<any[]>([]);
- 
- const userRole = useUserRole();
+ const [autoUpdateInterval, setAutoUpdateInterval] = useState<NodeJS.Timeout | null>(null);
 
- useEffect(() => {
-   if (userRole === 'Dueño' || userRole === 'Secretaria') {
-     fetchCajaDiaria();
-     fetchAlumnos();
-     fetchConceptos();
-   }
- }, [userRole]);
+
+ const userRole = useUserRole();
 
  useEffect(() => {
    const handleClickOutside = (event: MouseEvent) => {
@@ -240,6 +234,27 @@ const CajaDiaria = () => {
      document.removeEventListener('mousedown', handleClickOutside);
    };
  }, []);
+
+ useEffect(() => {
+  if (userRole === 'Dueño' || userRole === 'Secretaria') {
+    // Actualización inicial
+    fetchCajaDiaria();
+    
+    // Configurar actualización automática cada 30 segundos
+    const interval = setInterval(() => {
+      fetchCajaDiaria();
+    }, 30000);
+    
+    setAutoUpdateInterval(interval);
+    
+    // Limpiar el intervalo cuando el componente se desmonte
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
+  }
+}, [userRole]); // Solo depende del userRole
 
  const filteredAlumnos = useMemo(() => {
    if (!searchAlumno) return [];
@@ -287,27 +302,33 @@ const CajaDiaria = () => {
   setLoading(true);
   try {
     const today = new Date().toISOString().split('T')[0];
-    const queryParams = new URLSearchParams({
-      // Si es Dueño, usa las fechas seleccionadas, si no, usa la fecha actual
-      ...(userRole === 'Dueño' 
-        ? {
-            fechaInicio: fechaInicio || today,
-            fechaFin: fechaFin || today,
-          }
-        : {
-            fechaInicio: today,
-            fechaFin: today,
-          }
-      ),
-      ...Object.fromEntries(Object.entries(filtros).filter(([_, v]) => v !== ''))
-    });
+    let queryParams = new URLSearchParams();
+
+    // Si es Dueño y ha seleccionado fechas, usa esas fechas
+    if (userRole === 'Dueño' && (fechaInicio || fechaFin)) {
+      queryParams.append('fechaInicio', fechaInicio || today);
+      queryParams.append('fechaFin', fechaFin || today);
+    } else {
+      // Para Secretaria o cuando el Dueño no ha seleccionado fechas
+      queryParams.append('fechaInicio', today);
+      queryParams.append('fechaFin', today);
+    }
+
+    // Agregar otros filtros solo si es Dueño
+    if (userRole === 'Dueño') {
+      Object.entries(filtros).forEach(([key, value]) => {
+        if (value) queryParams.append(key, value);
+      });
+    }
 
     const res = await fetch(`/api/cajadiaria?${queryParams}`);
     if (!res.ok) throw new Error('Error al obtener recibos');
+    
     const data = await res.json();
     setCajaData(data);
+    
     setMessage({ 
-      text: userRole === 'Dueño' ? 
+      text: userRole === 'Dueño' && (fechaInicio || fechaFin) ? 
         "Este es el historial de caja en las fechas seleccionadas" : 
         "Esta es la caja del día corriente", 
       isError: false 
