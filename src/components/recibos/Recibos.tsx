@@ -618,50 +618,55 @@ const [filtros, setFiltros] = useState<Filtros>({
   };
 
   const agregarReciboPendiente = () => {
-    setLoading(true); // Al inicio
+    setLoading(true);
     try {
       const descuento = nuevoRecibo.descuentoManual ? 
-        parseFloat(nuevoRecibo.descuentoManual.toString()) / 100 : 
+        nuevoRecibo.descuentoManual : // Ya no dividimos entre 100 aquí
         undefined;
-    
-    const reciboTemp: ReciboPendiente = {
-      id: crypto.randomUUID(),
-      alumno: alumnos.find(a => a.id === parseInt(nuevoRecibo.alumnoId)),
-      alumnoSuelto: alumnosSueltos.find(a => a.id === parseInt(nuevoRecibo.alumnoSueltoId)),
-      monto: parseFloat(nuevoRecibo.monto),
-      fecha: nuevoRecibo.fecha,
-      fechaEfecto: nuevoRecibo.fechaEfecto,
-      periodoPago: nuevoRecibo.periodoPago,
-      concepto: conceptos.find(c => c.id === parseInt(nuevoRecibo.conceptoId))!,
-      tipoPago: nuevoRecibo.tipoPago,
-      descuento, // Ahora será undefined si no hay descuento
-      deudasSeleccionadas: {...deudasSeleccionadas}
-    };
-    
-    setRecibosPendientes(prev => [...prev, reciboTemp]);
-    resetForm();
-    setLoading(false); // Importante: setear loading a false al terminar
-  } catch (error) {
-    console.error('Error:', error);
-    setLoading(false); // También en caso de error
-  }
-};
+      
+      const reciboTemp: ReciboPendiente = {
+        id: crypto.randomUUID(),
+        alumno: alumnos.find(a => a.id === parseInt(nuevoRecibo.alumnoId)),
+        alumnoSuelto: alumnosSueltos.find(a => a.id === parseInt(nuevoRecibo.alumnoSueltoId)),
+        monto: parseFloat(nuevoRecibo.monto),
+        fecha: nuevoRecibo.fecha,
+        fechaEfecto: nuevoRecibo.fechaEfecto,
+        periodoPago: nuevoRecibo.periodoPago,
+        concepto: conceptos.find(c => c.id === parseInt(nuevoRecibo.conceptoId))!,
+        tipoPago: nuevoRecibo.tipoPago,
+        descuento,
+        deudasSeleccionadas: {...deudasSeleccionadas}
+      };
+      
+      setRecibosPendientes(prev => [...prev, reciboTemp]);
+      resetForm();
+    } catch (error) {
+      console.error('Error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
 // Función para crear todos los recibos pendientes
 const crearRecibosPendientes = async () => {
   setLoading(true);
   try {
     for (const recibo of recibosPendientes) {
+      // Calculamos el monto final con el descuento aplicado
+      const descuentoDecimal = recibo.descuento ? (recibo.descuento / 100) : 0;
+      const montoFinal = recibo.monto * (1 - descuentoDecimal);
+
       const reciboData = {
-        monto: recibo.monto,
-        montoOriginal: recibo.monto,
-        descuento: recibo.descuento,
+        monto: montoFinal, // Monto con descuento aplicado
+        montoOriginal: recibo.monto, // Monto original sin descuento
+        descuento: descuentoDecimal, // Descuento en decimal (ej: 0.1 para 10%)
         periodoPago: recibo.periodoPago,
         tipoPago: recibo.tipoPago,
+        fecha: recibo.fecha,
         fechaEfecto: recibo.fechaEfecto,
         fueraDeTermino: false,
         esClaseSuelta: false,
-        esMesCompleto: true, // Importante: esto debe ser true
+        esMesCompleto: true,
         alumnoId: recibo.alumno?.id,
         alumnoSueltoId: recibo.alumnoSuelto?.id,
         conceptoId: recibo.concepto.id,
@@ -672,18 +677,18 @@ const crearRecibosPendientes = async () => {
           periodo: deuda.periodo
         }))
       };
-      
-            const res = await fetch('/api/recibos', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(reciboData),
-            });
-      
-            if (!res.ok) {
-              throw new Error('Error al crear el recibo');
-            }
-      
-            const reciboCreado = await res.json();
+
+      const res = await fetch('/api/recibos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(reciboData),
+      });
+
+      if (!res.ok) {
+        throw new Error('Error al crear el recibo');
+      }
+
+      const reciboCreado = await res.json();
       
             // Intentar imprimir si la impresora está disponible
             if (isPrinterAvailable) {
@@ -815,7 +820,7 @@ const crearRecibosPendientes = async () => {
     );
     
     const subtotal = montoBase + deudasTotal;
-    const descuentoTotal = subtotal * (nuevoRecibo.descuentoManual / 100);
+    const descuentoTotal = subtotal * (parseFloat(nuevoRecibo.descuentoManual.toString()) / 100);
     const total = subtotal - descuentoTotal;
 
     const deudasAPagar = Object.entries(deudasSeleccionadas).map(([id, deuda]) => ({
@@ -930,23 +935,28 @@ const crearRecibosPendientes = async () => {
   };
 
   const resetForm = () => {
-    setNuevoRecibo({
+    setNuevoRecibo(prev => ({
       monto: '',
       periodoPago: format(new Date(), 'yyyy-MM'),
-      tipoPago: TipoPago.EFECTIVO, // Aquí también
-      alumnoId: '',
-      alumnoSueltoId: '',
+      tipoPago: TipoPago.EFECTIVO,
+      // Mantenemos los datos del alumno
+      alumnoId: prev.alumnoId,
+      alumnoSueltoId: prev.alumnoSueltoId,
+      esClaseSuelta: prev.esClaseSuelta,
+      // Reseteamos el resto de campos
       conceptoId: '',
       fueraDeTermino: false,
-      esClaseSuelta: false,
       esMesCompleto: false,
       fecha: format(new Date(), 'yyyy-MM-dd'),
       fechaEfecto: format(new Date(), 'yyyy-MM-dd'),
       descuentoManual: 0,
-    });
-    setDeudasSeleccionadas({});
-    setSearchAlumno(''); // Agregar esta línea
-};
+    }));
+    
+    // No reseteamos las deudas seleccionadas si hay un alumno
+    if (!nuevoRecibo.alumnoId && !nuevoRecibo.alumnoSueltoId) {
+      setDeudasSeleccionadas({});
+    }
+  };
 
 
 return (
@@ -1151,17 +1161,20 @@ return (
           </InputGroup>
   
           <InputGroup>
-            <InputLabel>Puedes aplicar un descuento Manual (%)</InputLabel>
-            <Input
-              type="number"
-              name="descuentoManual"
-              value={nuevoRecibo.descuentoManual}
-              onChange={handleInputChange}
-              min="0"
-              max="100"
-              step="1"
-            />
-          </InputGroup>
+  <InputLabel>Puedes aplicar un descuento Manual (%)</InputLabel>
+  <Input
+    type="number"
+    name="descuentoManual"
+    value={nuevoRecibo.descuentoManual}
+    onChange={(e) => {
+      const value = Math.min(Math.max(0, parseInt(e.target.value) || 0), 100);
+      setNuevoRecibo(prev => ({ ...prev, descuentoManual: value }));
+    }}
+    min="0"
+    max="100"
+    step="1"
+  />
+</InputGroup>
   
           <InputGroup>
             <InputLabel>Opciones Adicionales</InputLabel>
@@ -1579,19 +1592,29 @@ return (
     <tbody>
       {recibos.map(recibo => (
         <Tr key={recibo.id}>
-          <Td>{recibo.numeroRecibo}</Td>
-          <Td>{new Date(recibo.fecha).toLocaleDateString()}</Td>
-          <Td>{new Date(recibo.fechaEfecto).toLocaleDateString()}</Td>
-          <Td>
-            {recibo.alumno 
-              ? `${recibo.alumno.nombre} ${recibo.alumno.apellido}`
-              : `${recibo.alumnoSuelto?.nombre} ${recibo.alumnoSuelto?.apellido} (Suelto)`}
-          </Td>
-          <Td>{recibo.concepto.nombre}</Td>
-          <Td>${recibo.montoOriginal.toFixed(0)}</Td>
-          <Td>{recibo.descuento ? `${(recibo.descuento * 100).toFixed(0)}%` : '-'}</Td>
-          <Td>${recibo.monto.toFixed(0)}</Td>
-          <Td>{recibo.tipoPago}</Td>
+  <Td>{recibo.numeroRecibo}</Td>
+  <Td>{new Date(recibo.fecha).toLocaleDateString()}</Td>
+  <Td>{new Date(recibo.fechaEfecto).toLocaleDateString()}</Td>
+  <Td>
+    {recibo.alumno 
+      ? `${recibo.alumno.nombre} ${recibo.alumno.apellido}`
+      : `${recibo.alumnoSuelto?.nombre} ${recibo.alumnoSuelto?.apellido} (Suelto)`}
+  </Td>
+  <Td>{recibo.concepto.nombre}</Td>
+  <Td>
+    ${recibo.montoOriginal ? recibo.montoOriginal.toFixed(0) : 
+      (recibo.monto / (1 - (recibo.descuento || 0))).toFixed(0)}
+  </Td>
+  <Td style={{ 
+    color: recibo.descuento ? '#2e7d32' : 'inherit',
+    fontWeight: recibo.descuento ? 'bold' : 'normal'
+  }}>
+    {recibo.descuento ? `${(recibo.descuento * 100).toFixed(0)}%` : '-'}
+  </Td>
+  <Td style={{ fontWeight: 'bold' }}>
+    ${recibo.monto.toFixed(0)}
+  </Td>
+  <Td>{recibo.tipoPago}</Td>
           <Td>
             <span style={{
               padding: '4px 8px',

@@ -152,7 +152,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   else if (req.method === 'POST') {
     try {
       const { 
-        monto, 
+        monto,
+        montoOriginal, // Agregamos este campo
+        descuento,     // Agregamos este campo
         fechaEfecto,
         periodoPago, 
         tipoPago, 
@@ -162,7 +164,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         esClaseSuelta,
         claseId,
         esMesCompleto,
-        deudasAPagar // array de deudas a pagar
+        deudasAPagar
       } = req.body;
   
       const result = await prisma.$transaction(async (tx) => {
@@ -170,7 +172,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const recibo = await tx.recibo.create({
           data: {
             monto: parseFloat(monto),
-            montoOriginal: parseFloat(monto),
+            montoOriginal: parseFloat(montoOriginal || monto), // Usamos el montoOriginal si existe
+            descuento: descuento ? parseFloat(descuento) : null, // Guardamos el descuento
             fechaEfecto: new Date(fechaEfecto),
             periodoPago,
             tipoPago,
