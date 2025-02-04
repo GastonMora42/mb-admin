@@ -26,6 +26,7 @@ const GlobalStyle = createGlobalStyle`
       color: #666666 !important;
       -webkit-text-fill-color: #666666 !important;
     }
+      
     &:-ms-input-placeholder {
       color: #666666 !important;
     }
