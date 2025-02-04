@@ -9,133 +9,54 @@ import { Hub as AWSHub } from '@aws-amplify/core'
 import { createGlobalStyle } from 'styled-components'
 
 const GlobalStyle = createGlobalStyle`
-  /* Estilos base para elementos de formulario */
-  input, textarea, select, label, option, td, p, .highlight {
-    color: #000000;
+  input, textarea, select, label, option, td, p, .highlight, div, text {
+    color: #000000 !important;
+    -webkit-text-fill-color: #000000 !important;
   }
 
-  /* Inputs y campos de texto */
+  /* Específico para inputs y sus valores */
   input, textarea, select {
-    color: #000000;
-    background-color: #ffffff;
-    border: 1px solid #cccccc;
-
+    color: #000000 !important;
+    -webkit-text-fill-color: #000000 !important;
     &::placeholder {
-      color: #666666;
+      color: #666666 !important;
+      -webkit-text-fill-color: #666666 !important;
     }
-
+    &::-webkit-input-placeholder {
+      color: #666666 !important;
+      -webkit-text-fill-color: #666666 !important;
+    }
+    &:-ms-input-placeholder {
+      color: #666666 !important;
+    }
     &:-webkit-autofill,
     &:-webkit-autofill:hover,
     &:-webkit-autofill:focus {
-      -webkit-text-fill-color: #000000;
-      -webkit-box-shadow: 0 0 0px 1000px white inset;
-      transition: background-color 5000s ease-in-out 0s;
+      -webkit-text-fill-color: #000000 !important;
+      -webkit-box-shadow: 0 0 0px 1000px white inset !important;
     }
   }
 
-  /* Select y sus opciones */
-  select {
-    option {
-      color: #000000;
-      background-color: #ffffff;
-    }
+  /* Para las opciones de select y texto dinámico */
+  option, .highlight {
+    color: #000000 !important;
+    -webkit-text-fill-color: #000000 !important;
+    background-color: white !important;
   }
 
-  /* Listas desplegables y autocompletado */
-  .autocomplete-dropdown,
-  .suggestions-list,
-  .dropdown-content {
-    background-color: #ffffff;
-    border: 1px solid #cccccc;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-
-    > * {
-      color: #000000;
-      background-color: #ffffff;
-
-      &:hover {
-        background-color: #f5f5f5;
-      }
-    }
-  }
-
-  /* Mensajes de alerta y notificaciones */
-  .alert,
-  .notification,
-  .message {
-    &.success {
-      color: #155724;
-      background-color: #d4edda;
-      border-color: #c3e6cb;
-    }
-
-    &.error {
-      color: #721c24;
-      background-color: #f8d7da;
-      border-color: #f5c6cb;
-    }
-
-    &.warning {
-      color: #856404;
-      background-color: #fff3cd;
-      border-color: #ffeeba;
-    }
-
-    &.info {
-      color: #0c5460;
-      background-color: #d1ecf1;
-      border-color: #bee5eb;
-    }
-  }
-
-  /* Modales y overlays */
-  .modal,
-  .overlay,
-  .popup {
-    background-color: #ffffff;
-    color: #000000;
-
-    h1, h2, h3, h4, h5, h6, p, span {
-      color: #000000;
-    }
-  }
-
-  /* Contenido dinámico */
+    /* Para contenido HTML dinámico */
   [dangerouslySetInnerHTML], 
   [class*="Terms"], 
   .TermsContent,
   .TermsModal {
-    color: #000000;
-    background-color: #ffffff;
-
-    * {
-      color: inherit;
-    }
+    color: #000000 !important;
+    -webkit-text-fill-color: #000000 !important;
   }
 
-  /* Tooltips y popovers */
-  .tooltip,
-  .popover {
-    color: #ffffff;
-    background-color: #000000;
-    border: 1px solid rgba(0,0,0,0.2);
-  }
-    
-
-  /* Elementos de lista y menús desplegables */
-  .dropdown-item,
-  .list-item {
-    color: #000000;
-    background-color: #ffffff;
-
-    &:hover {
-      background-color: #f8f9fa;
-    }
-
-    &.active {
-      color: #ffffff;
-      background-color: #007bff;
-    }
+  /* Para todos los elementos dentro de contenido dinámico */
+  [dangerouslySetInnerHTML] * {
+    color: #000000 !important;
+    -webkit-text-fill-color: #000000 !important;
   }
 `;
 

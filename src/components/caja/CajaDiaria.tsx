@@ -282,34 +282,43 @@ const CajaDiaria = () => {
  };
 
  const fetchCajaDiaria = async () => {
-   if (userRole !== 'Dueño' && userRole !== 'Secretaria') return;
-   
-   setLoading(true);
-   try {
-     const today = new Date().toISOString().split('T')[0];
-     const queryParams = new URLSearchParams({
-       ...(userRole === 'Dueño' && fechaInicio && { fechaInicio }),
-       ...(userRole === 'Dueño' && fechaFin && { fechaFin }),
-       ...(userRole === 'Secretaria' && { fechaInicio: today, fechaFin: today }),
-       ...Object.fromEntries(Object.entries(filtros).filter(([_, v]) => v !== ''))
-     });
-     const res = await fetch(`/api/cajadiaria?${queryParams}`);
-     if (!res.ok) throw new Error('Error al obtener recibos');
-     const data = await res.json();
-     setCajaData(data);
-     setMessage({ 
-       text: userRole === 'Dueño' && (fechaInicio || fechaFin) ? 
-         "Este es el historial de caja en las fechas seleccionadas" : 
-         "Esta es la caja del día corriente", 
-       isError: false 
-     });
-   } catch (error) {
-     console.error('Error fetching recibos:', error);
-     setMessage({ text: 'Error al cargar recibos. Por favor, intente nuevamente.', isError: true });
-   } finally {
-     setLoading(false);
-   }
- };
+  if (userRole !== 'Dueño' && userRole !== 'Secretaria') return;
+  
+  setLoading(true);
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const queryParams = new URLSearchParams({
+      // Si es Dueño, usa las fechas seleccionadas, si no, usa la fecha actual
+      ...(userRole === 'Dueño' 
+        ? {
+            fechaInicio: fechaInicio || today,
+            fechaFin: fechaFin || today,
+          }
+        : {
+            fechaInicio: today,
+            fechaFin: today,
+          }
+      ),
+      ...Object.fromEntries(Object.entries(filtros).filter(([_, v]) => v !== ''))
+    });
+
+    const res = await fetch(`/api/cajadiaria?${queryParams}`);
+    if (!res.ok) throw new Error('Error al obtener recibos');
+    const data = await res.json();
+    setCajaData(data);
+    setMessage({ 
+      text: userRole === 'Dueño' ? 
+        "Este es el historial de caja en las fechas seleccionadas" : 
+        "Esta es la caja del día corriente", 
+      isError: false 
+    });
+  } catch (error) {
+    console.error('Error fetching recibos:', error);
+    setMessage({ text: 'Error al cargar recibos', isError: true });
+  } finally {
+    setLoading(false);
+  }
+};
 
  const renderAlumnoNombre = (recibo: Recibo) => {
    if (recibo.alumno) {
@@ -332,6 +341,14 @@ const CajaDiaria = () => {
      fetchCajaDiaria();
    }
  };
+
+ useEffect(() => {
+  if (userRole === 'Dueño' || userRole === 'Secretaria') {
+    fetchCajaDiaria();
+    fetchAlumnos();
+    fetchConceptos();
+  }
+}, [userRole]);
 
  useEffect(() => {
   if (searchAlumno) {
