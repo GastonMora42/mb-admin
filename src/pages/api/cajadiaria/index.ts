@@ -75,6 +75,8 @@ export default async function handler(
       };
     }
 
+
+    
     if (numeroRecibo) {
       whereClause.numeroRecibo = parseInt(String(numeroRecibo), 10);
     }

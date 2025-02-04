@@ -153,8 +153,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     try {
       const { 
         monto,
-        montoOriginal, // Agregamos este campo
-        descuento,     // Agregamos este campo
+        montoOriginal,
+        descuento,
         fechaEfecto,
         periodoPago, 
         tipoPago, 
@@ -167,14 +167,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         deudasAPagar
       } = req.body;
   
+      // Ajustamos la fecha a la zona horaria de Argentina
+      const fechaEfectoArgentina = new Date(fechaEfecto);
+      fechaEfectoArgentina.setUTCHours(fechaEfectoArgentina.getUTCHours() - 3); // UTC-3 para Argentina
+  
       const result = await prisma.$transaction(async (tx) => {
         // 1. Crear el recibo
         const recibo = await tx.recibo.create({
           data: {
             monto: parseFloat(monto),
-            montoOriginal: parseFloat(montoOriginal || monto), // Usamos el montoOriginal si existe
-            descuento: descuento ? parseFloat(descuento) : null, // Guardamos el descuento
-            fechaEfecto: new Date(fechaEfecto),
+            montoOriginal: parseFloat(montoOriginal || monto),
+            descuento: descuento ? parseFloat(descuento) : null,
+            fechaEfecto: fechaEfectoArgentina, // Usamos la fecha ajustada
             periodoPago,
             tipoPago,
             esClaseSuelta,
@@ -226,10 +230,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 deudaId: deuda.deudaId,
                 reciboId: recibo.id,
                 monto: deuda.monto,
-                fecha: new Date()
+                fecha: fechaEfectoArgentina // Usamos la misma fecha ajustada
               }
             });
-  
+            
             // Actualizar la deuda
             await tx.deuda.update({
               where: { id: deuda.deudaId },
