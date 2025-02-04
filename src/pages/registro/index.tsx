@@ -19,22 +19,6 @@ const PageWrapper = styled.div`
   }
 `;
 
-const GradientBorder = styled.div`
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(
-    45deg,
-    rgba(102, 51, 153, 0.3) 0%,
-    rgba(102, 51, 153, 0) 50%,
-    rgba(102, 51, 153, 0.3) 100%
-  );
-  pointer-events: none;
-  z-index: -1;
-`;
-
 const TermsModal = styled.div`
   position: fixed;
   top: 50%;
@@ -49,17 +33,48 @@ const TermsModal = styled.div`
   box-shadow: 0 5px 30px rgba(0, 0, 0, 0.3);
   z-index: 1000;
   overflow-y: auto;
+
+  &.white-bg * {
+    color: #000000 !important;
+  }
+
+  /* Excepción para el título que queremos mantener en color original */
+  h1 {
+    color: #FFC001 !important;
+  }
 `;
 
 const TermsContent = styled.div`
   font-size: 16px;
   line-height: 1.6;
   margin-bottom: 20px;
+  color: #000000;
   
   .highlight {
-    color: #663399;
+    color: #663399 !important;
     font-weight: bold;
   }
+
+  /* Asegurarnos que todo el texto sea negro por defecto */
+  * {
+    color: #000000;
+  }
+`;
+
+const GradientBorder = styled.div`
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    45deg,
+    rgba(102, 51, 153, 0.3) 0%,
+    rgba(102, 51, 153, 0) 50%,
+    rgba(102, 51, 153, 0.3) 100%
+  );
+  pointer-events: none;
+  z-index: -1;
 `;
 
 const CheckboxContainer = styled.div`
@@ -490,6 +505,7 @@ Me comprometo a cumplir con el siguiente contrato, y doy fe que mi hijo/a se enc
             />
           </InputGroup>
 
+
           <InputGroup>
             <Label>Email</Label>
             <Input
@@ -594,29 +610,29 @@ Me comprometo a cumplir con el siguiente contrato, y doy fe que mi hijo/a se enc
       </FormContainer>
 
       {showTerms && (
-        <TermsModal>
-          <Title>Términos y Condiciones</Title>
-          <TermsContent dangerouslySetInnerHTML={{ __html: getTermsText() }} />
-          
-          <CheckboxContainer>
-            <input
-              type="checkbox"
-              id="acceptTerms"
-              checked={acceptedTerms}
-              onChange={(e) => setAcceptedTerms(e.target.checked)}
-            />
-            <label htmlFor="acceptTerms">
-              He leído y acepto los términos y condiciones
-            </label>
-          </CheckboxContainer>
-          
-          <TermsButton 
-            onClick={() => setShowTerms(false)}
-          >
-            Cerrar
-          </TermsButton>
-        </TermsModal>
-      )}
+  <TermsModal className="white-bg">
+    <Title>Términos y Condiciones</Title>
+    <TermsContent dangerouslySetInnerHTML={{ __html: getTermsText() }} />
+    
+    <CheckboxContainer>
+      <input
+        type="checkbox"
+        id="acceptTerms"
+        checked={acceptedTerms}
+        onChange={(e) => setAcceptedTerms(e.target.checked)}
+      />
+      <label htmlFor="acceptTerms">
+        He leído y acepto los términos y condiciones
+      </label>
+    </CheckboxContainer>
+    
+    <TermsButton 
+      onClick={() => setShowTerms(false)}
+    >
+      Cerrar
+    </TermsButton>
+  </TermsModal>
+)}
 
       {showSuccess && (
         <SuccessAlert>

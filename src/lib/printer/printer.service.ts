@@ -1,3 +1,4 @@
+// src/lib/printer/printer.service.ts
 import { ThermalPrinter, PrinterTypes, CharacterSet } from 'node-thermal-printer';
 import type { Prisma } from '@prisma/client';
 
@@ -30,6 +31,7 @@ interface PrinterConfig {
 }
 
 export class PrinterService {
+  private bridgeUrl = 'http://localhost:3001';
   private printer: ThermalPrinter | null = null;
   private isConnected: boolean = false;
   private config: PrinterConfig = {
@@ -63,6 +65,17 @@ export class PrinterService {
   }
 
   async detectPrinter(): Promise<boolean> {
+    try {
+      // Primero intentamos detectar a través del bridge
+      const response = await fetch(`${this.bridgeUrl}/status`);
+      if (response.ok) {
+        return true;
+      }
+    } catch (error) {
+      console.warn('Bridge no disponible, intentando detección directa...');
+    }
+
+    // Si el bridge no está disponible, intentamos detección directa
     if (typeof window === 'undefined' || !navigator.usb) {
       console.warn('USB API no disponible');
       return false;
@@ -111,6 +124,18 @@ export class PrinterService {
   }
 
   async init(): Promise<boolean> {
+    // Primero intentamos inicializar a través del bridge
+    try {
+      const status = await this.checkStatus();
+      if (status.connected) {
+        this.isConnected = true;
+        return true;
+      }
+    } catch (error) {
+      console.warn('No se pudo inicializar a través del bridge');
+    }
+
+    // Si el bridge no está disponible, intentamos inicialización directa
     if (!await this.ensurePrinterAvailable()) return false;
 
     try {
@@ -131,6 +156,24 @@ export class PrinterService {
   }
 
   async printTest(): Promise<boolean> {
+    // Primero intentamos a través del bridge
+    try {
+      const response = await fetch(`${this.bridgeUrl}/print`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          test: true,
+          message: "=== TEST DE IMPRESIÓN ==="
+        })
+      });
+      if (response.ok) return true;
+    } catch (error) {
+      console.warn('No se pudo imprimir a través del bridge, intentando impresión directa...');
+    }
+
+    // Si el bridge no está disponible, intentamos impresión directa
     if (!this.isConnected || !await this.ensurePrinterAvailable()) return false;
 
     try {
@@ -149,6 +192,25 @@ export class PrinterService {
   }
 
   async printReceipt(recibo: ReciboWithRelations): Promise<{ success: boolean; message?: string }> {
+    // Primero intentamos imprimir a través del bridge
+    try {
+      const response = await fetch(`${this.bridgeUrl}/print`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(recibo)
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        return result;
+      }
+    } catch (error) {
+      console.warn('No se pudo imprimir a través del bridge, intentando impresión directa...');
+    }
+
+    // Si el bridge no está disponible, intentamos impresión directa
     if (!this.isConnected || !await this.ensurePrinterAvailable()) {
       return { success: false, message: 'Impresora no disponible' };
     }
@@ -222,6 +284,19 @@ export class PrinterService {
       return { 
         success: false, 
         message: error instanceof Error ? error.message : 'Error al imprimir'
+      };
+    }
+  }
+
+  async checkStatus(): Promise<{ connected: boolean; error?: string }> {
+    try {
+      const response = await fetch(`${this.bridgeUrl}/status`);
+      const data = await response.json();
+      return { connected: data.status === 'running' };
+    } catch (error) {
+      return {
+        connected: false,
+        error: 'No se puede conectar con el servidor de impresión'
       };
     }
   }
