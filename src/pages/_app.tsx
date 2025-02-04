@@ -9,6 +9,7 @@ import { Hub as AWSHub } from '@aws-amplify/core'
 import { createGlobalStyle } from 'styled-components'
 
 const GlobalStyle = createGlobalStyle`
+  /* Estilos base para textos y elementos de formulario */
   input, textarea, select, label, option, td, p, .highlight, text {
     color: #000000 !important;
     -webkit-text-fill-color: #000000 !important;
@@ -26,7 +27,6 @@ const GlobalStyle = createGlobalStyle`
       color: #666666 !important;
       -webkit-text-fill-color: #666666 !important;
     }
-
     &:-ms-input-placeholder {
       color: #666666 !important;
     }
@@ -45,7 +45,7 @@ const GlobalStyle = createGlobalStyle`
     background-color: white !important;
   }
 
-    /* Para contenido HTML dinámico */
+  /* Para contenido HTML dinámico */
   [dangerouslySetInnerHTML], 
   [class*="Terms"], 
   .TermsContent,
@@ -56,6 +56,27 @@ const GlobalStyle = createGlobalStyle`
 
   /* Para todos los elementos dentro de contenido dinámico */
   [dangerouslySetInnerHTML] * {
+    color: #000000 !important;
+    -webkit-text-fill-color: #000000 !important;
+  }
+
+  /* Nuevo: Para divs con fondo blanco */
+  div[style*="background-color: white"],
+  div[style*="background-color: #FFFFFF"],
+  div[style*="background-color: #fff"],
+  div[style*="background: white"],
+  div[style*="background: #FFFFFF"],
+  div[style*="background: #fff"] {
+    color: #000000 !important;
+  }
+
+  /* Nuevo: Para mantener contraste en divs con otros fondos */
+  div:not([style*="background-color: white"]):not([style*="background-color: #FFFFFF"]):not([style*="background-color: #fff"]):not([style*="background: white"]):not([style*="background: #FFFFFF"]):not([style*="background: #fff"]) {
+    color: inherit;
+  }
+
+  /* Nuevo: Clase de utilidad para forzar texto negro en fondo blanco */
+  .white-bg {
     color: #000000 !important;
     -webkit-text-fill-color: #000000 !important;
   }

@@ -25,6 +25,17 @@ const Container = styled.div`
   position: relative;
 `;
 
+const Form = styled.form`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+  margin-bottom: 30px;
+  &.white-bg * {
+    color: #000000 !important;
+  }
+`;
+
+
 const DeudaItem = styled.div`
   padding: 10px;
   border: 1px solid #eee;
@@ -108,17 +119,6 @@ const PreviewRecibos = styled.div`
   border: 1px solid #eee;
 `;
 
-const PreviewReciboItem = styled.div`
-  display: flex;
-  justify-content: space-between;
-  padding: 10px;
-  border-bottom: 1px solid #eee;
-  
-  &:last-child {
-    border-bottom: none;
-  }
-`;
-
 const TableContainer = styled.div`
   width: 100%;
   overflow-x: auto;
@@ -128,13 +128,6 @@ const TableContainer = styled.div`
 const Title = styled.h2`
   color: #000000;
   margin-bottom: 20px;
-`;
-
-const Form = styled.form`
-  display: flex;
-  flex-wrap: wrap;
-  gap: 15px;
-  margin-bottom: 30px;
 `;
 
 const Input = styled.input`
@@ -241,14 +234,6 @@ const Tr = styled.tr`
   }
 `;
 
-const DeudaSection = styled.div`
-  margin: 15px 0;
-  padding: 15px;
-  background-color: #f9f9f9;
-  border-radius: 4px;
-  position: relative;
-  z-index: 1;
-`;
 
 const Message = styled.div<{ isError?: boolean }>`
   margin-top: 20px;
@@ -371,12 +356,45 @@ const ActionButton = styled(Button)`
   }
 `;
 
+// Para la sección de deudas
+const DeudaSection = styled.div`
+  margin: 15px 0;
+  padding: 15px;
+  background-color: #f9f9f9;
+  border-radius: 4px;
+  position: relative;
+  z-index: 1;
+  &.white-bg * {
+    color: #000000 !important;
+  }
+`;
+
+// Para la vista previa
 const PreviewSection = styled.div`
   background-color: #f9f9f9;
   padding: 20px;
   border-radius: 4px;
   margin-bottom: 20px;
+  &.white-bg * {
+    color: #000000 !important;
+  }
 `;
+
+// Para los items de recibos pendientes
+const PreviewReciboItem = styled.div`
+  display: flex;
+  justify-content: space-between;
+  padding: 10px;
+  border-bottom: 1px solid #eee;
+  &.white-bg * {
+    color: #000000 !important;
+  }
+  
+  &:last-child {
+    border-bottom: none;
+  }
+`;
+
 
 const PreviewTitle = styled.h3`
   color: #000000;
@@ -993,7 +1011,7 @@ return (
           </Button>
         </div>
         {/* Formulario Principal */}
-        <Form onSubmit={(e) => { e.preventDefault(); agregarReciboPendiente(); }}>
+        <Form className="white-bg" onSubmit={(e) => { e.preventDefault(); agregarReciboPendiente(); }}>
           <InputGroup>
             <InputLabel>Tipo de Alumno</InputLabel>
             <CheckboxLabel>
@@ -1212,7 +1230,7 @@ return (
           </InputGroup>
 {/* Sección de Deudas */}
 {nuevoRecibo.alumnoId && !nuevoRecibo.esClaseSuelta && (
-  <DeudaSection>
+  <DeudaSection className="white-bg">
     <InputLabel>Deudas Pendientes</InputLabel>
     <CheckboxLabel style={{ marginBottom: '10px' }}>
       <input
@@ -1338,7 +1356,7 @@ return (
 
 {/* Vista previa de recibos pendientes con mejoras visuales */}
 {recibosPendientes.length > 0 && (
-  <PreviewSection>
+  <PreviewSection className="white-bg">
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
       <PreviewTitle>Recibos Pendientes de Crear</PreviewTitle>
       <span style={{ color: '#666' }}>
@@ -1347,7 +1365,7 @@ return (
     </div>
 
     {recibosPendientes.map(recibo => (
-      <PreviewReciboItem key={recibo.id}>
+      <PreviewReciboItem className="white-bg" key={recibo.id}>
         <div style={{ flex: 1 }}>
           <strong style={{ fontSize: '1.1em' }}>
             {recibo.alumno 
@@ -1629,52 +1647,50 @@ return (
             </span>
           </Td>
           <Td style={{ display: 'flex', gap: '5px' }}>
-    {recibo.anulado ? (
-      userRole === 'Dueño' && (
-        <Button 
-          onClick={() => handleEliminarRecibo(recibo.id)}
+  {recibo.anulado ? (
+    <Button 
+      onClick={() => handleEliminarRecibo(recibo.id)}
+      disabled={loading}
+      style={{
+        backgroundColor: '#dc3545',
+        color: 'white',
+        padding: '5px 10px',
+        fontSize: '0.9em'
+      }}
+    >
+      Eliminar
+    </Button>
+  ) : (
+    <>
+      <Button 
+        onClick={() => handleAnularRecibo(recibo.id)}
+        disabled={loading}
+        style={{
+          backgroundColor: '#ff4444',
+          color: 'white',
+          padding: '5px 10px',
+          fontSize: '0.9em'
+        }}
+      >
+        Anular
+      </Button>
+      {isPrinterAvailable && (
+        <Button
+          onClick={() => printReceipt(recibo)}
           disabled={loading}
           style={{
-            backgroundColor: '#dc3545',
+            backgroundColor: '#4CAF50',
             color: 'white',
             padding: '5px 10px',
             fontSize: '0.9em'
           }}
         >
-          Eliminar
+          Reimprimir
         </Button>
-      )
-    ) : (
-      <>
-        <Button 
-          onClick={() => handleAnularRecibo(recibo.id)}
-          disabled={loading}
-          style={{
-            backgroundColor: '#ff4444',
-            color: 'white',
-            padding: '5px 10px',
-            fontSize: '0.9em'
-          }}
-        >
-          Anular
-        </Button>
-        {isPrinterAvailable && (
-          <Button
-            onClick={() => printReceipt(recibo)}
-            disabled={loading}
-            style={{
-              backgroundColor: '#4CAF50',
-              color: 'white',
-              padding: '5px 10px',
-              fontSize: '0.9em'
-            }}
-          >
-            Reimprimir
-          </Button>
-        )}
-      </>
-    )}
-  </Td>
+      )}
+    </>
+  )}
+</Td>
         </Tr>
       ))}
     </tbody>
