@@ -302,7 +302,7 @@ const CajaDiaria = () => {
   setLoading(true);
   try {
     const today = new Date().toISOString().split('T')[0];
-    let queryParams = new URLSearchParams();
+    const queryParams = new URLSearchParams();
 
     // Si es Dueño y ha seleccionado fechas, usa esas fechas
     if (userRole === 'Dueño' && (fechaInicio || fechaFin)) {
