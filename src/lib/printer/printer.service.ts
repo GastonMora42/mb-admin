@@ -1,24 +1,19 @@
+import { ReciboWithRelations } from '@/types/recibos';
 import type { Prisma } from '@prisma/client';
-
-type ReciboWithRelations = Prisma.ReciboGetPayload<{
-  include: {
-    alumno: true;
-    alumnoSuelto: true;
-    concepto: true;
-    pagosDeuda: {
-      include: {
-        deuda: {
-          include: {
-            estilo: true;
-          }
-        }
-      }
-    }
-  }
-}>;
 
 export class PrinterService {
   private bridgeUrl = 'http://localhost:3001';
+
+  async init(): Promise<boolean> {
+    try {
+      const response = await fetch(`${this.bridgeUrl}/getprinters`);
+      const impresoras = await response.json();
+      return impresoras.length > 0;
+    } catch (error) {
+      console.warn('Error inicializando impresora:', error);
+      return false;
+    }
+  }
 
   async detectPrinter(): Promise<boolean> {
     try {
