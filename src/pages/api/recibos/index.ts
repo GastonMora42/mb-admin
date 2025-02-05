@@ -1,6 +1,6 @@
-//src/pages/api/recibos/index.ts
 import type { NextApiRequest, NextApiResponse } from 'next'
 import prisma from '@/lib/prisma'
+import { PrinterService } from '@/lib/printer/printer.service'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'GET') {
@@ -176,6 +176,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         timeZone: 'America/Argentina/Buenos_Aires'
       }));
 
+      const printerService = new PrinterService();
+
       const result = await prisma.$transaction(async (tx) => {
         // 1. Crear el recibo
         const recibo = await tx.recibo.create({
@@ -183,8 +185,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             monto: parseFloat(monto),
             montoOriginal: parseFloat(montoOriginal || monto),
             descuento: descuento ? parseFloat(descuento) : null,
-    fecha: fechaArgentina,
-    fechaEfecto: fechaArgentina,
+            fecha: fechaArgentina,
+            fechaEfecto: fechaArgentina,
             periodoPago,
             tipoPago,
             esClaseSuelta,
@@ -213,6 +215,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               include: {
                 profesor: true,
                 estilo: true
+              }
+            },
+            pagosDeuda: {
+              include: {
+                deuda: {
+                  include: {
+                    estilo: true
+                  }
+                }
               }
             }
           }
@@ -251,6 +262,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           }
         }
   
+        // Imprimir recibo
+        try {
+          const printResult = await printerService.printReceipt(recibo);
+          
+          if (!printResult.success) {
+            console.warn('No se pudo imprimir el recibo:', printResult.message);
+          }
+        } catch (printError) {
+          console.error('Error al intentar imprimir:', printError);
+        }
+
         // Retornar el recibo creado con toda la información actualizada
         return await tx.recibo.findUnique({
           where: { id: recibo.id },
