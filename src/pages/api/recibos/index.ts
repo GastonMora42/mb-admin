@@ -327,6 +327,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           });
         }));
 
+        
         // Marcar el recibo como anulado
         await prisma.recibo.update({
           where: { id: reciboId },
