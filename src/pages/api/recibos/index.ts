@@ -1,3 +1,4 @@
+//src/pages/api/recibos/index.ts
 import type { NextApiRequest, NextApiResponse } from 'next'
 import prisma from '@/lib/prisma'
 
@@ -171,6 +172,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const fechaEfectoArgentina = new Date(fechaEfecto);
       fechaEfectoArgentina.setUTCHours(fechaEfectoArgentina.getUTCHours() - 3); // UTC-3 para Argentina
   
+      const fechaArgentina = new Date(new Date().toLocaleString('en-US', {
+        timeZone: 'America/Argentina/Buenos_Aires'
+      }));
+
       const result = await prisma.$transaction(async (tx) => {
         // 1. Crear el recibo
         const recibo = await tx.recibo.create({
@@ -178,7 +183,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             monto: parseFloat(monto),
             montoOriginal: parseFloat(montoOriginal || monto),
             descuento: descuento ? parseFloat(descuento) : null,
-            fechaEfecto: fechaEfectoArgentina, // Usamos la fecha ajustada
+    fecha: fechaArgentina,
+    fechaEfecto: fechaArgentina,
             periodoPago,
             tipoPago,
             esClaseSuelta,

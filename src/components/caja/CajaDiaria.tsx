@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import styled from 'styled-components';
 import { useUserRole } from '@/hooks/useUserRole';
 
@@ -216,9 +216,31 @@ const CajaDiaria = () => {
  const [alumnosFiltrados, setAlumnosFiltrados] = useState<any[]>([]);
  const [conceptosFiltrados, setConceptosFiltrados] = useState<any[]>([]);
  const [autoUpdateInterval, setAutoUpdateInterval] = useState<NodeJS.Timeout | null>(null);
-
+ const lastUpdate = useRef(new Date());
 
  const userRole = useUserRole();
+
+ useEffect(() => {
+  // Actualización inicial
+  fetchCajaDiaria();
+  lastUpdate.current = new Date();
+  
+  // Actualizar cada minuto
+  const interval = setInterval(() => {
+    const now = new Date();
+    const argentinaDate = new Date(now.toLocaleString('en-US', {
+      timeZone: 'America/Argentina/Buenos_Aires'
+    }));
+    
+    // Si cambió el día, actualizar
+    if (argentinaDate.getDate() !== lastUpdate.current.getDate()) {
+      fetchCajaDiaria();
+      lastUpdate.current = argentinaDate;
+    }
+  }, 60000);
+
+  return () => clearInterval(interval);
+}, []);
 
  useEffect(() => {
    const handleClickOutside = (event: MouseEvent) => {

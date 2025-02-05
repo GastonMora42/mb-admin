@@ -1,3 +1,4 @@
+//src/api/cajadiaria/index.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 import { Prisma } from '@prisma/client';
@@ -61,20 +62,29 @@ export default async function handler(
 
     const whereClause: WhereClauseType = {};
 
-    if (fechaInicio && fechaFin) {
-      whereClause.fecha = {
-        gte: new Date(String(fechaInicio)),
-        lte: new Date(String(fechaFin) + 'T23:59:59.999Z'),
-      };
-    } else {
-      const hoy = new Date();
-      hoy.setHours(0, 0, 0, 0);
-      whereClause.fecha = {
-        gte: hoy,
-        lte: new Date(hoy.getTime() + 24 * 60 * 60 * 1000),
-      };
-    }
+// Función auxiliar para obtener fecha en Argentina
+const getArgentinaDate = (date?: Date) => {
+  const d = date || new Date();
+  return new Date(d.toLocaleString('en-US', { timeZone: 'America/Argentina/Buenos_Aires' }));
+};
 
+// En el handler, modificar el manejo de fechas
+if (fechaInicio && fechaFin) {
+  whereClause.fecha = {
+    gte: getArgentinaDate(new Date(String(fechaInicio))),
+    lte: new Date(new Date(String(fechaFin) + 'T23:59:59.999-03:00')),
+  };
+} else {
+  const hoyArgentina = getArgentinaDate();
+  hoyArgentina.setHours(0, 0, 0, 0);
+  const mañanaArgentina = new Date(hoyArgentina);
+  mañanaArgentina.setDate(mañanaArgentina.getDate() + 1);
+  
+  whereClause.fecha = {
+    gte: hoyArgentina,
+    lte: mañanaArgentina,
+  };
+}
 
     
     if (numeroRecibo) {

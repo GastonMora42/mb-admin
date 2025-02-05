@@ -1,3 +1,4 @@
+//src/comopnents/recibos/recibos.tsx
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import styled from 'styled-components';
 import { format } from 'date-fns';
@@ -505,7 +506,13 @@ const Recibos: React.FC = () => {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [searchAlumno, setSearchAlumno] = useState('');
   const [showAlumnoSuggestions, setShowAlumnoSuggestions] = useState(false);
- 
+
+
+  const getFechaArgentina = () => {
+    return new Date().toLocaleString('en-US', {
+      timeZone: 'America/Argentina/Buenos_Aires'
+    }).split(',')[0];
+  };
 
   const [nuevoRecibo, setNuevoRecibo] = useState({
     monto: '',
@@ -517,8 +524,8 @@ const Recibos: React.FC = () => {
     fueraDeTermino: false,
     esClaseSuelta: false,
     esMesCompleto: false,
-    fecha: format(new Date(), 'yyyy-MM-dd'),
-    fechaEfecto: format(new Date(), 'yyyy-MM-dd'),
+    fecha: getFechaArgentina(),
+    fechaEfecto: getFechaArgentina(),
     descuentoManual: 0,
 });
 
@@ -564,7 +571,6 @@ const [filtros, setFiltros] = useState<Filtros>({
       setConceptosFiltrados([]);
     }
   }, [estiloSeleccionado, nuevoRecibo.esClaseSuelta, conceptos]);
-
 
   const fetchRecibos = useCallback(async () => {
     setLoading(true);
