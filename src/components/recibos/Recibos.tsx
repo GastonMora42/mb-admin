@@ -514,19 +514,19 @@ const Recibos: React.FC = () => {
     }).split(',')[0];
   };
 
-  const [nuevoRecibo, setNuevoRecibo] = useState({
-    monto: '',
-    periodoPago: format(new Date(), 'yyyy-MM'),
-    tipoPago: TipoPago.EFECTIVO, // Cambiado de 'EFECTIVO' a TipoPago.EFECTIVO
-    alumnoId: '',
-    alumnoSueltoId: '',
-    conceptoId: '',
-    fueraDeTermino: false,
-    esClaseSuelta: false,
-    esMesCompleto: false,
-    fecha: getFechaArgentina(),
-    fechaEfecto: getFechaArgentina(),
-    descuentoManual: 0,
+const [nuevoRecibo, setNuevoRecibo] = useState({
+  monto: '',
+  periodoPago: format(new Date(), 'yyyy-MM'),
+  tipoPago: TipoPago.EFECTIVO,
+  alumnoId: '',
+  alumnoSueltoId: '',
+  conceptoId: '',
+  fueraDeTermino: false,
+  esClaseSuelta: false,
+  esMesCompleto: false,
+  fecha: format(new Date(), 'yyyy-MM-dd'),
+  fechaEfecto: format(new Date(), 'yyyy-MM-dd'), // Inicialmente igual a la fecha
+  descuentoManual: 0,
 });
 
 const [filtros, setFiltros] = useState<Filtros>({
@@ -646,10 +646,6 @@ const [filtros, setFiltros] = useState<Filtros>({
   const agregarReciboPendiente = () => {
     setLoading(true);
     try {
-      const descuento = nuevoRecibo.descuentoManual ? 
-        nuevoRecibo.descuentoManual : // Ya no dividimos entre 100 aquí
-        undefined;
-      
       const reciboTemp: ReciboPendiente = {
         id: crypto.randomUUID(),
         alumno: alumnos.find(a => a.id === parseInt(nuevoRecibo.alumnoId)),
@@ -660,7 +656,7 @@ const [filtros, setFiltros] = useState<Filtros>({
         periodoPago: nuevoRecibo.periodoPago,
         concepto: conceptos.find(c => c.id === parseInt(nuevoRecibo.conceptoId))!,
         tipoPago: nuevoRecibo.tipoPago,
-        descuento,
+        descuento: nuevoRecibo.descuentoManual ? nuevoRecibo.descuentoManual : undefined,
         deudasSeleccionadas: {...deudasSeleccionadas}
       };
       
@@ -961,24 +957,20 @@ const crearRecibosPendientes = async () => {
   };
 
   const resetForm = () => {
+    const currentDate = format(new Date(), 'yyyy-MM-dd');
     setNuevoRecibo(prev => ({
+      ...prev,
       monto: '',
       periodoPago: format(new Date(), 'yyyy-MM'),
       tipoPago: TipoPago.EFECTIVO,
-      // Mantenemos los datos del alumno
-      alumnoId: prev.alumnoId,
-      alumnoSueltoId: prev.alumnoSueltoId,
-      esClaseSuelta: prev.esClaseSuelta,
-      // Reseteamos el resto de campos
       conceptoId: '',
       fueraDeTermino: false,
       esMesCompleto: false,
-      fecha: format(new Date(), 'yyyy-MM-dd'),
-      fechaEfecto: format(new Date(), 'yyyy-MM-dd'),
+      fecha: currentDate,
+      fechaEfecto: currentDate, // Reset ambas fechas al mismo valor
       descuentoManual: 0,
     }));
     
-    // No reseteamos las deudas seleccionadas si hay un alumno
     if (!nuevoRecibo.alumnoId && !nuevoRecibo.alumnoSueltoId) {
       setDeudasSeleccionadas({});
     }
@@ -1119,17 +1111,39 @@ return (
   </InputGroup>
 )}
   
-          <InputGroup>
-            <InputLabel>Fecha de Creación</InputLabel>
-            <Input
-              type="date"
-              name="fecha"
-              value={nuevoRecibo.fecha}
-              onChange={handleInputChange}
-              required
-            />
-          </InputGroup>
+  <InputGroup>
+  <InputLabel>Fecha de Creación</InputLabel>
+  <Input
+    type="date"
+    name="fecha"
+    value={nuevoRecibo.fecha}
+    onChange={(e) => {
+      const newDate = e.target.value;
+      setNuevoRecibo(prev => ({
+        ...prev,
+        fecha: newDate,
+        fechaEfecto: newDate // Actualizar automáticamente la fecha de efecto
+      }));
+    }}
+    required
+  />
+</InputGroup>
 
+<InputGroup>
+  <InputLabel>Fecha de Efecto</InputLabel>
+  <Input
+    type="date"
+    name="fechaEfecto"
+    value={nuevoRecibo.fechaEfecto}
+    onChange={(e) => {
+      setNuevoRecibo(prev => ({
+        ...prev,
+        fechaEfecto: e.target.value
+      }));
+    }}
+    required
+  />
+</InputGroup>
           <InputGroup>
             <InputLabel>Período Correspondiente</InputLabel>
             <Input

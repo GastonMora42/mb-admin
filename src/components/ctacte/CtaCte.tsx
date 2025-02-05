@@ -34,12 +34,12 @@ interface Deuda {
   anio: number;
   pagada: boolean;
   fechaPago: string | null;
-  fechaVencimiento: string; // Agregamos este campo
+  fechaVencimiento: string;
   estilo: {
     id: number;
     nombre: string;
   };
-  concepto?: {  // Agregamos el concepto también
+  concepto?: {
     id: number;
     nombre: string;
     esInscripcion: boolean;
@@ -108,6 +108,9 @@ const Container = styled.div`
   padding: 30px;
   border-radius: 8px;
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  &.white-bg * {
+    color: #000000 !important;
+  }
 `;
 
 const Title = styled.h2`
@@ -125,7 +128,6 @@ const SearchInput = styled.input`
   border-radius: 6px;
   font-size: 14px;
   transition: all 0.3s ease;
-
   &:focus {
     border-color: #FFC001;
     outline: none;
@@ -141,6 +143,9 @@ const AlumnoList = styled.ul`
   border-radius: 6px;
   max-height: 300px;
   overflow-y: auto;
+  &.white-bg * {
+    color: #000000 !important;
+  }
 `;
 
 const AlumnoItem = styled.li`
@@ -148,13 +153,14 @@ const AlumnoItem = styled.li`
   border-bottom: 1px solid #eee;
   cursor: pointer;
   transition: all 0.2s ease;
-
   &:last-child {
     border-bottom: none;
   }
-
   &:hover {
     background-color: #f5f5f5;
+  }
+  &.white-bg * {
+    color: #000000 !important;
   }
 `;
 
@@ -178,6 +184,9 @@ const DashboardCard = styled.div<{ status?: 'success' | 'warning' | 'danger' }>`
       default: return '#FFC001';
     }
   }};
+  &.white-bg * {
+    color: #000000 !important;
+  }
 `;
 
 const CardTitle = styled.h4`
@@ -211,7 +220,6 @@ const TabButton = styled.button<{ active: boolean }>`
   margin-right: 10px;
   border-radius: 6px;
   transition: all 0.3s ease;
-
   &:hover {
     background: ${props => props.active ? '#e6ac00' : '#eee'};
   }
@@ -224,6 +232,9 @@ const Table = styled.table`
   background-color: white;
   border-radius: 8px;
   overflow: hidden;
+  &.white-bg * {
+    color: #000000 !important;
+  }
 `;
 
 const Th = styled.th`
@@ -243,9 +254,11 @@ const Tr = styled.tr`
   &:nth-child(even) {
     background-color: #f9f9f9;
   }
-
   &:hover {
     background-color: #f5f5f5;
+  }
+  &.white-bg * {
+    color: #000000 !important;
   }
 `;
 
@@ -259,6 +272,9 @@ const TotalContainer = styled.div`
   font-weight: bold;
   display: flex;
   justify-content: space-between;
+  &.white-bg * {
+    color: #000000 !important;
+  }
 `;
 
 interface StatusProps {
@@ -272,6 +288,9 @@ const InscripcionCard = styled(DashboardCard)<StatusProps>`
   align-items: center;
   margin-bottom: 20px;
   background: ${props => props.status === 'success' ? '#e8f5e9' : '#fff3cd'};
+  &.white-bg * {
+    color: #000000 !important;
+  }
 `;
 
 const InscripcionInfo = styled.div`
@@ -313,6 +332,7 @@ const StatusBadge = styled.span<{ status: 'success' | 'warning' | 'danger' }>`
     }
   }};
 `;
+
 const CtaCte: React.FC = () => {
   // Estados
   const [searchTerm, setSearchTerm] = useState('');
@@ -325,28 +345,12 @@ const CtaCte: React.FC = () => {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    let isSubscribed = true;
-  
-    // Add cleanup to the main data fetching
-    const fetchData = async () => {
-      if (isSubscribed && searchTerm.length > 2) {
-        await fetchAlumnos();
-      }
-    };
-  
-    fetchData();
-  
-    // Cleanup function
-    return () => {
-      isSubscribed = false;
-      setSearchTerm('');
+    if (searchTerm.length > 2) {
+      fetchAlumnos();
+    } else {
       setAlumnos([]);
-      setSelectedAlumno(null);
-      setRecibos([]);
-      setEstadisticas(null);
-      setEstadoPagos(null);
-    };
-  }, []); // Empty dependency array for component mount/unmount
+    }
+  }, [searchTerm]);
 
   const fetchAlumnos = useCallback(async () => {
     try {
@@ -362,22 +366,13 @@ const CtaCte: React.FC = () => {
       console.error('Error fetching alumnos:', error);
     }
   }, [searchTerm]);
-  
-  useEffect(() => {
-    if (searchTerm.length > 2) {
-      fetchAlumnos();
-    } else {
-      setAlumnos([]);
-    }
-  }, [searchTerm, fetchAlumnos]);
-  
+
   const fetchAlumnoInfo = async (alumnoId: number) => {
     setLoading(true);
     try {
       const res = await fetch(`/api/ctacte?alumnoId=${alumnoId}`);
       if (res.ok) {
         const data = await res.json();
-        console.log('Data recibida:', data); // Para debug
         setSelectedAlumno(data.alumnoInfo);
         setRecibos(data.recibos);
         setEstadisticas(data.estadisticas);
@@ -396,7 +391,6 @@ const CtaCte: React.FC = () => {
     setAlumnos([]);
   };
 
-  // Funciones de utilidad
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('es-AR', {
       style: 'currency',
@@ -412,326 +406,304 @@ const CtaCte: React.FC = () => {
     });
   };
 
-  // Renderizado del dashboard
   const renderDashboard = () => {
     if (!estadisticas || !estadoPagos) return null;
-
-    const deudaInscripcion = selectedAlumno?.deudas?.find(d => d.concepto?.esInscripcion);
-  
     return (
       <>
-        {/* Inscripción Card primero */}
-        {estadisticas && estadoPagos && (
-          <>
-            {selectedAlumno?.deudas && (
-              <InscripcionCard status={
-                selectedAlumno.deudas.find(d => d.concepto?.esInscripcion)?.pagada 
-                  ? 'success' 
-                  : 'warning'
+        {selectedAlumno?.deudas && (
+          <InscripcionCard 
+            className="white-bg"
+            status={selectedAlumno.deudas.find(d => d.concepto?.esInscripcion)?.pagada ? 'success' : 'warning'}
+          >
+            <InscripcionInfo>
+              <InscripcionEstado status={
+                selectedAlumno.deudas.find(d => d.concepto?.esInscripcion)?.pagada ? 'success' : 'warning'
               }>
-                <InscripcionInfo>
-                  <InscripcionEstado status={
-                    selectedAlumno.deudas.find(d => d.concepto?.esInscripcion)?.pagada 
-                      ? 'success' 
-                      : 'warning'
-                  }>
-                    Inscripción: {
-                      selectedAlumno.deudas.find(d => d.concepto?.esInscripcion)?.pagada 
-                        ? 'Pagada' 
-                        : 'Pendiente'
-                    }
-                  </InscripcionEstado>
-                  {selectedAlumno.deudas.find(d => d.concepto?.esInscripcion)?.pagada ? (
-                    <InscripcionFecha>
-                      Fecha de pago: {formatFecha(
-                        selectedAlumno.deudas.find(d => d.concepto?.esInscripcion)?.fechaPago || ''
-                      )}
-                    </InscripcionFecha>
-                  ) : (
-                    <InscripcionFecha>
-                      Vencimiento: {formatFecha(
-                        selectedAlumno.deudas.find(d => d.concepto?.esInscripcion)?.fechaVencimiento || ''
-                      )}
-                    </InscripcionFecha>
+                Inscripción: {selectedAlumno.deudas.find(d => d.concepto?.esInscripcion)?.pagada ? 'Pagada' : 'Pendiente'}
+              </InscripcionEstado>
+              {selectedAlumno.deudas.find(d => d.concepto?.esInscripcion)?.pagada ? (
+                <InscripcionFecha>
+                  Fecha de pago: {formatFecha(
+                    selectedAlumno.deudas.find(d => d.concepto?.esInscripcion)?.fechaPago || ''
                   )}
-                </InscripcionInfo>
-              </InscripcionCard>
+                </InscripcionFecha>
+              ) : (
+                <InscripcionFecha>
+                  Vencimiento: {formatFecha(
+                    selectedAlumno.deudas.find(d => d.concepto?.esInscripcion)?.fechaVencimiento || ''
+                  )}
+                </InscripcionFecha>
+              )}
+            </InscripcionInfo>
+          </InscripcionCard>
+        )}
+        <DashboardGrid>
+          <DashboardCard className="white-bg" status={estadoPagos.alDia ? 'success' : 'danger'}>
+            <CardTitle>Estado de Cuenta</CardTitle>
+            <CardValue>
+              {estadoPagos.alDia ? 'Al día' : 'Con deudas'}
+            </CardValue>
+            {!estadoPagos.alDia && (
+              <CardSubValue>
+                {estadoPagos.mesesAdeudados.length} {estadoPagos.mesesAdeudados.length === 1 ? 'mes' : 'meses'} pendientes
+              </CardSubValue>
             )}
-    
-            {/* Luego el DashboardGrid con las otras cards */}
-            <DashboardGrid>
-              <DashboardCard status={estadoPagos.alDia ? 'success' : 'danger'}>
-                <CardTitle>Estado de Cuenta</CardTitle>
-                <CardValue>
-                  {estadoPagos.alDia ? 'Al día' : 'Con deudas'}
-                </CardValue>
-                {!estadoPagos.alDia && (
-                  <CardSubValue>
-                    {estadoPagos.mesesAdeudados.length} {estadoPagos.mesesAdeudados.length === 1 ? 'mes' : 'meses'} pendientes
-                  </CardSubValue>
-                )}
-              </DashboardCard>
-        <DashboardCard>
-          <CardTitle>Total Pagado</CardTitle>
-          <CardValue>{formatCurrency(estadisticas.totalPagado)}</CardValue>
-          {estadisticas.ultimoPago && (
-            <CardSubValue>
-              Último pago: {formatFecha(estadisticas.ultimoPago)}
-            </CardSubValue>
-          )}
-        </DashboardCard>
+          </DashboardCard>
 
-        <DashboardCard status={estadisticas.deudaTotal > 0 ? 'warning' : 'success'}>
-          <CardTitle>Deuda Total</CardTitle>
-          <CardValue>{formatCurrency(estadisticas.deudaTotal)}</CardValue>
-          <CardSubValue>
-            {estadisticas.cantidadDeudas} cuota{estadisticas.cantidadDeudas !== 1 ? 's' : ''} pendiente{estadisticas.cantidadDeudas !== 1 ? 's' : ''}
-          </CardSubValue>
-        </DashboardCard>
+          <DashboardCard className="white-bg">
+            <CardTitle>Total Pagado</CardTitle>
+            <CardValue>{formatCurrency(estadisticas.totalPagado)}</CardValue>
+            {estadisticas.ultimoPago && (
+              <CardSubValue>
+                Último pago: {formatFecha(estadisticas.ultimoPago)}
+              </CardSubValue>
+            )}
+          </DashboardCard>
 
-        <DashboardCard>
-          <CardTitle>Estilos Activos</CardTitle>
-          <CardValue>{estadisticas.estilosActivos}</CardValue>
-          {estadisticas.descuentosActivos.length > 0 && (
+          <DashboardCard className="white-bg" status={estadisticas.deudaTotal > 0 ? 'warning' : 'success'}>
+            <CardTitle>Deuda Total</CardTitle>
+            <CardValue>{formatCurrency(estadisticas.deudaTotal)}</CardValue>
             <CardSubValue>
-              {estadisticas.descuentosActivos.map((desc, i) => (
-                <div key={i}>
-                  {desc.tipo}: {desc.porcentaje}% descuento
-                </div>
-              ))}
+              {estadisticas.cantidadDeudas} cuota{estadisticas.cantidadDeudas !== 1 ? 's' : ''} pendiente{estadisticas.cantidadDeudas !== 1 ? 's' : ''}
             </CardSubValue>
-          )}
-        </DashboardCard>
-      </DashboardGrid>
+          </DashboardCard>
+
+          <DashboardCard className="white-bg">
+            <CardTitle>Estilos Activos</CardTitle>
+            <CardValue>{estadisticas.estilosActivos}</CardValue>
+            {estadisticas.descuentosActivos.length > 0 && (
+              <CardSubValue>
+                {estadisticas.descuentosActivos.map((desc, i) => (
+                  <div key={i}>
+                    {desc.tipo}: {desc.porcentaje}% descuento
+                  </div>
+                ))}
+              </CardSubValue>
+            )}
+          </DashboardCard>
+        </DashboardGrid>
       </>
+    );
+  };
+
+  const renderRecibosTable = () => {
+    return (
+      <>
+        <Table className="white-bg">
+          <thead>
+            <Tr>
+              <Th>N° Recibo</Th>
+              <Th>Fecha</Th>
+              <Th>Periodo</Th>
+              <Th>Concepto</Th>
+              <Th>Deudas Pagadas</Th>
+              <Th>Monto Original</Th>
+              <Th>Descuento</Th>
+              <Th>Monto Final</Th>
+              <Th>Forma de Pago</Th>
+            </Tr>
+          </thead>
+          <tbody>
+            {recibos.map((recibo) => (
+              <Tr key={recibo.id} className="white-bg">
+                <Td>{recibo.numeroRecibo}</Td>
+                <Td>{formatFecha(recibo.fecha)}</Td>
+                <Td>{recibo.periodoPago}</Td>
+                <Td>{recibo.concepto.nombre}</Td>
+                <Td>
+                  {recibo.pagosDeuda?.map((pago, index) => (
+                    <div key={index}>
+                      {pago.deuda.estilo.nombre}: {formatCurrency(pago.monto)}
+                    </div>
+                  ))}
+                </Td>
+                <Td>{formatCurrency(recibo.montoOriginal)}</Td>
+                <Td>
+                  {recibo.descuento 
+                    ? `${(recibo.descuento * 100).toFixed(0)}%` 
+                    : '-'}
+                </Td>
+                <Td>{formatCurrency(recibo.monto)}</Td>
+                <Td>{recibo.tipoPago}</Td>
+              </Tr>
+            ))}
+          </tbody>
+        </Table>
+        <TotalContainer className="white-bg">
+          <span>Total Pagado:</span>
+          <span>{formatCurrency(estadisticas?.totalPagado || 0)}</span>
+        </TotalContainer>
+      </>
+    );
+  };
+
+  const renderDeudasTable = () => {
+    if (!selectedAlumno?.deudas) return null;
+
+    const ordenarDeudas = (deudas: Deuda[]) => {
+      return deudas.sort((a, b) => {
+        if (a.anio !== b.anio) return a.anio - b.anio;
+        return parseInt(a.mes) - parseInt(b.mes);
+      });
+    };
+
+    const deudasPendientes = ordenarDeudas(selectedAlumno.deudas.filter(d => !d.pagada));
+    const deudasPagadas = ordenarDeudas(selectedAlumno.deudas.filter(d => d.pagada));
+
+    return (
+      <>
+        <h3>Deudas Pendientes ({deudasPendientes.length})</h3>
+        <Table className="white-bg">
+          <thead>
+            <Tr>
+              <Th>Estilo</Th>
+              <Th>Período</Th>
+              <Th>Monto</Th>
+              <Th>Estado</Th>
+            </Tr>
+          </thead>
+          <tbody>
+            {deudasPendientes.map((deuda) => (
+              <Tr key={deuda.id} className="white-bg">
+                <Td>{deuda.estilo.nombre}</Td>
+                <Td>{`${deuda.mes}/${deuda.anio}`}</Td>
+                <Td>{formatCurrency(deuda.monto)}</Td>
+                <Td>
+                  <StatusBadge status="danger">
+                    Pendiente
+                  </StatusBadge>
+                </Td>
+              </Tr>
+            ))}
+          </tbody>
+        </Table>
+        <h3 style={{ marginTop: '30px' }}>Deudas Pagadas ({deudasPagadas.length})</h3>
+        <Table className="white-bg">
+          <thead>
+            <Tr>
+              <Th>Estilo</Th>
+              <Th>Período</Th>
+              <Th>Monto Original</Th>
+              <Th>Pagos</Th>
+              <Th>Fecha Pago</Th>
+              <Th>Estado</Th>
+            </Tr>
+          </thead>
+          <tbody>
+            {deudasPagadas.map((deuda) => (
+              <Tr key={deuda.id} className="white-bg">
+                <Td>{deuda.estilo.nombre}</Td>
+                <Td>{`${deuda.mes}/${deuda.anio}`}</Td>
+                <Td>{formatCurrency(deuda.montoOriginal)}</Td>
+                <Td>
+                  {deuda.pagos.map((pago, index) => (
+                    <div key={index}>
+                      <div>Recibo #{pago.recibo.numeroRecibo}</div>
+                      <div>{formatCurrency(pago.monto)}</div>
+                      <small>{formatFecha(pago.recibo.fecha)}</small>
+                    </div>
+                  ))}
+                </Td>
+                <Td>{deuda.fechaPago ? formatFecha(deuda.fechaPago) : '-'}</Td>
+                <Td>
+                  <StatusBadge status="success">
+                    Pagada
+                  </StatusBadge>
+                </Td>
+              </Tr>
+            ))}
+          </tbody>
+        </Table>
+        {deudasPagadas.length === 0 && (
+          <div style={{ textAlign: 'center', padding: '20px', color: '#666' }}>
+            No hay deudas pagadas
+          </div>
         )}
       </>
     );
-    }
-
- const renderRecibosTable = () => {
-  return (
-    <>
-      <Table>
-        <thead>
-          <Tr>
-            <Th>N° Recibo</Th>
-            <Th>Fecha</Th>
-            <Th>Periodo</Th>
-            <Th>Concepto</Th>
-            <Th>Deudas Pagadas</Th>
-            <Th>Monto Original</Th>
-            <Th>Descuento</Th>
-            <Th>Monto Final</Th>
-            <Th>Forma de Pago</Th>
-          </Tr>
-        </thead>
-        <tbody>
-          {recibos.map((recibo) => (
-            <Tr key={recibo.id}>
-              <Td>{recibo.numeroRecibo}</Td>
-              <Td>{formatFecha(recibo.fecha)}</Td>
-              <Td>{recibo.periodoPago}</Td>
-              <Td>{recibo.concepto.nombre}</Td>
-              <Td>
-                {recibo.pagosDeuda?.map((pago, index) => (
-                  <div key={index}>
-                    {pago.deuda.estilo.nombre}: {formatCurrency(pago.monto)}
-                  </div>
-                ))}
-              </Td>
-              <Td>{formatCurrency(recibo.montoOriginal)}</Td>
-              <Td>
-                {recibo.descuento 
-                  ? `${(recibo.descuento * 100).toFixed(0)}%` 
-                  : '-'}
-              </Td>
-              <Td>{formatCurrency(recibo.monto)}</Td>
-              <Td>{recibo.tipoPago}</Td>
-            </Tr>
-          ))}
-        </tbody>
-      </Table>
-      <TotalContainer>
-        <span>Total Pagado:</span>
-        <span>{formatCurrency(estadisticas?.totalPagado || 0)}</span>
-      </TotalContainer>
-    </>
-  );
-};
-
-const renderDeudasTable = () => {
-  if (!selectedAlumno?.deudas) return null;
-
-  // Ordenar deudas por fecha
-  const ordenarDeudas = (deudas: Deuda[]) => {
-    return deudas.sort((a, b) => {
-      if (a.anio !== b.anio) return a.anio - b.anio;
-      return parseInt(a.mes) - parseInt(b.mes);
-    });
   };
 
-  const deudasPendientes = ordenarDeudas(selectedAlumno.deudas.filter(d => !d.pagada));
-  const deudasPagadas = ordenarDeudas(selectedAlumno.deudas.filter(d => d.pagada));
-
-  console.log('Deudas pagadas:', deudasPagadas); // Para debug
-
   return (
-    <>
-      <h3>Deudas Pendientes ({deudasPendientes.length})</h3>
-      <Table>
-        <thead>
-          <Tr>
-            <Th>Estilo</Th>
-            <Th>Período</Th>
-            <Th>Monto</Th>
-            <Th>Estado</Th>
-          </Tr>
-        </thead>
-        <tbody>
-          {deudasPendientes.map((deuda) => (
-            <Tr key={deuda.id}>
-              <Td>{deuda.estilo.nombre}</Td>
-              <Td>{`${deuda.mes}/${deuda.anio}`}</Td>
-              <Td>{formatCurrency(deuda.monto)}</Td>
-              <Td>
-                <StatusBadge status="danger">
-                  Pendiente
-                </StatusBadge>
-              </Td>
-            </Tr>
-          ))}
-        </tbody>
-      </Table>
+    <PageContainer>
+      <Container className="white-bg">
+        <Title>Cuenta Corriente</Title>
+        
+        <SearchInput
+          type="text"
+          placeholder="Buscar alumno por nombre o apellido..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
 
-      <h3 style={{ marginTop: '30px' }}>Deudas Pagadas ({deudasPagadas.length})</h3>
-      <Table>
-        <thead>
-          <Tr>
-            <Th>Estilo</Th>
-            <Th>Período</Th>
-            <Th>Monto Original</Th>
-            <Th>Pagos</Th>
-            <Th>Fecha Pago</Th>
-            <Th>Estado</Th>
-          </Tr>
-        </thead>
-        <tbody>
-          {deudasPagadas.map((deuda) => (
-            <Tr key={deuda.id}>
-              <Td>{deuda.estilo.nombre}</Td>
-              <Td>{`${deuda.mes}/${deuda.anio}`}</Td>
-              <Td>{formatCurrency(deuda.montoOriginal)}</Td>
-              <Td>
-                {deuda.pagos.map((pago, index) => (
-                  <div key={index}>
-                    <div>Recibo #{pago.recibo.numeroRecibo}</div>
-                    <div>{formatCurrency(pago.monto)}</div>
-                    <small>{formatFecha(pago.recibo.fecha)}</small>
-                  </div>
-                ))}
-              </Td>
-              <Td>{deuda.fechaPago ? formatFecha(deuda.fechaPago) : '-'}</Td>
-              <Td>
-                <StatusBadge status="success">
-                  Pagada
-                </StatusBadge>
-              </Td>
-            </Tr>
-          ))}
-        </tbody>
-      </Table>
-
-      {deudasPagadas.length === 0 && (
-        <div style={{ textAlign: 'center', padding: '20px', color: '#666' }}>
-          No hay deudas pagadas
-        </div>
-      )}
-    </>
-  );
-};
-
-// JSX Principal
-return (
-  <PageContainer>
-    <Container>
-      <Title>Cuenta Corriente</Title>
-      
-      <SearchInput
-        type="text"
-        placeholder="Buscar alumno por nombre o apellido..."
-        value={searchTerm}
-        onChange={(e) => setSearchTerm(e.target.value)}
-      />
-
-      {alumnos.length > 0 && (
-        <AlumnoList>
-          {alumnos.map((alumno) => (
-            <AlumnoItem 
-              key={alumno.id} 
-              onClick={() => handleAlumnoSelect(alumno)}
-            >
-              {alumno.nombre} {alumno.apellido}
-              {alumno.esAlumnoSuelto && 
-                <StatusBadge status="warning" style={{ marginLeft: '10px' }}>
-                  Suelto
-                </StatusBadge>
-              }
-            </AlumnoItem>
-          ))}
-        </AlumnoList>
-      )}
-
-      {selectedAlumno && !loading && (
-        <>
-          <div style={{ marginBottom: '30px' }}>
-            <h2 style={{ marginBottom: '10px' }}>
-              {selectedAlumno.nombre} {selectedAlumno.apellido}
-            </h2>
-            {estadoPagos && (
-              <StatusBadge 
-                status={estadoPagos.alDia ? 'success' : 'danger'}
+        {alumnos.length > 0 && (
+          <AlumnoList className="white-bg">
+            {alumnos.map((alumno) => (
+              <AlumnoItem 
+                key={alumno.id} 
+                onClick={() => handleAlumnoSelect(alumno)}
+                className="white-bg"
               >
-                {estadoPagos.alDia ? 'Al día' : 'Con deudas pendientes'}
-              </StatusBadge>
-            )}
+                {alumno.nombre} {alumno.apellido}
+                {alumno.esAlumnoSuelto && 
+                  <StatusBadge status="warning" style={{ marginLeft: '10px' }}>
+                    Suelto
+                  </StatusBadge>
+                }
+              </AlumnoItem>
+            ))}
+          </AlumnoList>
+        )}
+
+        {selectedAlumno && !loading && (
+          <>
+            <div style={{ marginBottom: '30px' }} className="white-bg">
+              <h2 style={{ marginBottom: '10px' }}>
+                {selectedAlumno.nombre} {selectedAlumno.apellido}
+              </h2>
+              {estadoPagos && (
+                <StatusBadge 
+                  status={estadoPagos.alDia ? 'success' : 'danger'}
+                >
+                  {estadoPagos.alDia ? 'Al día' : 'Con deudas pendientes'}
+                </StatusBadge>
+              )}
+            </div>
+
+            <TabsContainer>
+              <TabButton 
+                active={activeTab === 'dashboard'}
+                onClick={() => setActiveTab('dashboard')}
+              >
+                Dashboard
+              </TabButton>
+              <TabButton 
+                active={activeTab === 'recibos'}
+                onClick={() => setActiveTab('recibos')}
+              >
+                Recibos
+              </TabButton>
+              <TabButton 
+                active={activeTab === 'deudas'}
+                onClick={() => setActiveTab('deudas')}
+              >
+                Deudas
+              </TabButton>
+            </TabsContainer>
+
+            {activeTab === 'dashboard' && renderDashboard()}
+            {activeTab === 'recibos' && renderRecibosTable()}
+            {activeTab === 'deudas' && renderDeudasTable()}
+          </>
+        )}
+
+        {loading && (
+          <div style={{ textAlign: 'center', padding: '20px' }}>
+            Cargando información...
           </div>
-
-          <TabsContainer>
-            <TabButton 
-              active={activeTab === 'dashboard'}
-              onClick={() => setActiveTab('dashboard')}
-            >
-              Dashboard
-            </TabButton>
-            <TabButton 
-              active={activeTab === 'recibos'}
-              onClick={() => setActiveTab('recibos')}
-            >
-              Recibos
-            </TabButton>
-            <TabButton 
-              active={activeTab === 'deudas'}
-              onClick={() => setActiveTab('deudas')}
-            >
-              Deudas
-            </TabButton>
-          </TabsContainer>
-
-          {activeTab === 'dashboard' && renderDashboard()}
-          {activeTab === 'recibos' && renderRecibosTable()}
-          {activeTab === 'deudas' && renderDeudasTable()}
-        </>
-      )}
-
-      {loading && (
-        <div style={{ textAlign: 'center', padding: '20px' }}>
-          Cargando información...
-        </div>
-      )}
-    </Container>
-  </PageContainer>
-);
+        )}
+      </Container>
+    </PageContainer>
+  );
 };
 
 export default CtaCte;
