@@ -24,6 +24,7 @@ export class PrinterService {
       throw error;
     }
   }
+  
 
   async init(): Promise<boolean> {
     try {
