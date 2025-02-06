@@ -1,0 +1,10 @@
+{
+    "build": {
+      "env": {
+        "TZ": "America/Argentina/Buenos_Aires"
+      }
+    },
+    "env": {
+      "TZ": "America/Argentina/Buenos_Aires"
+    }
+  }
