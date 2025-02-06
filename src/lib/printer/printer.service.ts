@@ -80,48 +80,49 @@ export class PrinterService {
    }
  }
 
+ private readonly LOGO_PATH = './public/mb-logo.png';
+
  async printReceipt(recibo: ReciboWithRelations): Promise<{ success: boolean; message?: string }> {
   try {
     const operaciones = [
-      // Logo al inicio
       { 
         accion: 'image', 
-        datos: 'mb-logo.png'  // Necesitarás proporcionar la ruta correcta al logo
+        datos: this.LOGO_PATH
       },
-      { accion: 'text', datos: '\n\n\n' }, // Espacio después del logo
-      { accion: 'text', datos: '\n         ESTUDIO DE DANZAS\n' },
-      { accion: 'text', datos: '         DE MICAELA MEINDL\n' },
-      { accion: 'text', datos: '\n\n' }, // Más espacio
-      { accion: 'text', datos: `Recibo #: ${recibo.numeroRecibo || 'N/A'}\n` },
-      { accion: 'text', datos: `Fecha: ${new Date(recibo.fecha).toLocaleDateString()}\n` },
-      { accion: 'text', datos: `Hora: ${new Date(recibo.fecha).toLocaleTimeString()}\n` },
-      { accion: 'text', datos: '\n' },
+      { accion: 'text', datos: '\n\n\n\n' },
+      { accion: 'text', datos: '\n\n         ESTUDIO DE DANZAS\n\n' },
+      { accion: 'text', datos: '         DE MICAELA MEINDL\n\n' },
+      { accion: 'text', datos: '\n\n\n' },
+      { accion: 'text', datos: `Recibo #: ${recibo.numeroRecibo || 'N/A'}\n\n` },
+      { accion: 'text', datos: `Fecha: ${new Date(recibo.fecha).toLocaleDateString()}\n\n` },
+      { accion: 'text', datos: `Hora: ${new Date(recibo.fecha).toLocaleTimeString()}\n\n` },
+      { accion: 'text', datos: '\n\n' },
       { 
         accion: 'text', 
         datos: recibo.alumno 
-          ? `Alumno: ${recibo.alumno.nombre} ${recibo.alumno.apellido}\n`
-          : `Alumno Suelto: ${recibo.alumnoSuelto?.nombre} ${recibo.alumnoSuelto?.apellido}\n`
+          ? `Alumno: ${recibo.alumno.nombre} ${recibo.alumno.apellido}\n\n`
+          : `Alumno Suelto: ${recibo.alumnoSuelto?.nombre} ${recibo.alumnoSuelto?.apellido}\n\n`
       },
-      { accion: 'text', datos: `Concepto: ${recibo.concepto.nombre}\n` },
-      { accion: 'text', datos: '\n\n' }, // Doble espacio antes del monto
-      { accion: 'text', datos: `Monto Original: $${recibo.montoOriginal.toFixed(2)}\n` },
+      { accion: 'text', datos: `Concepto: ${recibo.concepto.nombre}\n\n` },
+      { accion: 'text', datos: '\n\n\n' },
+      { accion: 'text', datos: `Monto Original: $${recibo.montoOriginal.toFixed(2)}\n\n` },
       ...(recibo.descuento ? [
-        { accion: 'text', datos: `Descuento: ${(recibo.descuento * 100).toFixed(0)}%\n` },
-        { accion: 'text', datos: `Monto Descuento: -$${(recibo.montoOriginal * recibo.descuento).toFixed(2)}\n` }
+        { accion: 'text', datos: `Descuento: ${(recibo.descuento * 100).toFixed(0)}%\n\n` },
+        { accion: 'text', datos: `Monto Descuento: -$${(recibo.montoOriginal * recibo.descuento).toFixed(2)}\n\n` }
       ] : []),
       ...(recibo.pagosDeuda?.length ? [
-        { accion: 'text', datos: '\nDeudas Canceladas:\n' },
+        { accion: 'text', datos: '\n\nDeudas Canceladas:\n\n' },
         ...recibo.pagosDeuda.map(pago => ({
           accion: 'text', 
-          datos: `- ${pago.deuda.estilo.nombre}: $${pago.monto.toFixed(2)}\n`
+          datos: `- ${pago.deuda.estilo.nombre}: $${pago.monto.toFixed(2)}\n\n`
         }))
       ] : []),
-      { accion: 'text', datos: '\n\n' }, // Doble espacio antes del total
-      { accion: 'text', datos: `TOTAL: $${recibo.monto.toFixed(2)}\n` },
-      { accion: 'text', datos: `Forma de pago: ${recibo.tipoPago}\n` },
-      { accion: 'text', datos: '\n\n' },
-      { accion: 'text', datos: '           ¡Gracias por su pago!\n' },
-      { accion: 'text', datos: '\n\n\n\n' } // Más espacio al final para cortar el ticket
+      { accion: 'text', datos: '\n\n\n' },
+      { accion: 'text', datos: `TOTAL: $${recibo.monto.toFixed(2)}\n\n` },
+      { accion: 'text', datos: `Forma de pago: ${recibo.tipoPago}\n\n` },
+      { accion: 'text', datos: '\n\n\n' },
+      { accion: 'text', datos: '           ¡Gracias por su pago!\n\n' },
+      { accion: 'text', datos: '\n\n\n\n\n' }
     ];
 
     const response = await this.retryFetch(`${this.bridgeUrl}/imprimir`, {

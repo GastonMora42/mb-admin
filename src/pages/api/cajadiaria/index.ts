@@ -63,14 +63,18 @@ export default async function handler(
     const whereClause: WhereClauseType = {};
 
     if (fechaInicio && fechaFin) {
-      const startDate = getArgentinaDateTime(String(fechaInicio));
-      const endDate = getArgentinaDateTime(String(fechaFin));
-      endDate.setHours(23, 59, 59, 999);
+      const { start } = getArgentinaDayRange(fechaInicio as string);
+      const { end } = getArgentinaDayRange(fechaFin as string);
     
       whereClause.fecha = {
-        gte: startDate,
-        lte: endDate
+        gte: start,
+        lte: end
       };
+
+      // Debug logs
+      console.log('Fechas de búsqueda (UTC):');
+      console.log('Start:', start.toISOString());
+      console.log('End:', end.toISOString());
     } else {
       const { start, end } = getArgentinaDayRange();
       whereClause.fecha = {
