@@ -1,3 +1,4 @@
+//src/pages/api/recibos/index.ts
 import type { NextApiRequest, NextApiResponse } from 'next'
 import prisma from '@/lib/prisma'
 import { PrinterService } from '@/lib/printer/printer.service'
@@ -163,22 +164,33 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   } 
   
   else if (req.method === 'POST') {
-    try {
-      const { 
-        monto,
-        montoOriginal,
-        descuento,
-        fechaEfecto,
-        periodoPago, 
-        tipoPago, 
-        alumnoId, 
-        alumnoSueltoId, 
-        conceptoId, 
-        esClaseSuelta,
-        claseId,
-        esMesCompleto,
-        deudasAPagar
-      } = req.body;
+      try {
+        console.log('Body recibido:', req.body);
+        const { 
+          monto,
+          montoOriginal,
+          descuento,
+          fechaEfecto,
+          periodoPago, 
+          tipoPago, 
+          alumnoId, 
+          alumnoSueltoId, 
+          conceptoId, 
+          esClaseSuelta,
+          claseId,
+          esMesCompleto,
+          deudasAPagar
+        } = req.body;
+    
+        console.log('Datos parseados:', {
+          monto,
+          montoOriginal,
+          tipoPago,
+          alumnoId,
+          conceptoId,
+          deudasAPagar
+        });
+    
   
       // Ajustamos la fecha a la zona horaria de Argentina
       const fechaArgentina = getArgentinaDateTime();
@@ -340,9 +352,11 @@ if (alumnoId && deudasAPagar?.length > 0) {
       return res.status(201).json(result);
   
     } catch (error) {
-      console.error('Error al crear recibo:', error);
+      console.error('Error completo:', error);
+      console.error('Stack trace:', error instanceof Error ? error.stack : '');
       res.status(400).json({ 
-        error: error instanceof Error ? error.message : 'Error al crear recibo' 
+        error: error instanceof Error ? error.message : 'Error al crear recibo',
+        details: error instanceof Error ? error.stack : undefined
       });
     }
   }

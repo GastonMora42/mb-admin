@@ -85,28 +85,28 @@ export class PrinterService {
      const operaciones = [
        { accion: 'text', datos: '\n\nESTUDIO DE DANZAS' },
        { accion: 'text', datos: 'DE MICAELA MEINDL' },
-       { accion: 'text', datos: `\nRecibo #: ${recibo.numeroRecibo || 'N/A'}` },
-       { accion: 'text', datos: `Fecha: ${new Date(recibo.fecha).toLocaleDateString()}` },
-       { accion: 'text', datos: `Hora: ${new Date(recibo.fecha).toLocaleTimeString()}` },
+       { accion: 'text', datos: `\nRecibo #: \n\n\n${recibo.numeroRecibo || 'N/A'}` },
+       { accion: 'text', datos: `Fecha: \n\n\n${new Date(recibo.fecha).toLocaleDateString()}` },
+       { accion: 'text', datos: `Hora: \n\n\n${new Date(recibo.fecha).toLocaleTimeString()}` },
        { accion: 'text', datos: recibo.alumno 
-           ? `Alumno: ${recibo.alumno.nombre} ${recibo.alumno.apellido}`
-           : `Alumno Suelto: ${recibo.alumnoSuelto?.nombre} ${recibo.alumnoSuelto?.apellido}`
+           ? `Alumno: \n\n\n${recibo.alumno.nombre} ${recibo.alumno.apellido}`
+           : `Alumno Suelto: \n\n\n ${recibo.alumnoSuelto?.nombre} ${recibo.alumnoSuelto?.apellido}`
        },
-       { accion: 'text', datos: `\nConcepto: ${recibo.concepto.nombre}` },
-       { accion: 'text', datos: `Monto Original: $${recibo.montoOriginal.toFixed(2)}` },
+       { accion: 'text', datos: `\nConcepto:\n\n\n ${recibo.concepto.nombre}` },
+       { accion: 'text', datos: `Monto Original:\n\n\n $${recibo.montoOriginal.toFixed(2)}` },
        ...(recibo.descuento ? [
          { accion: 'text', datos: `Descuento: ${(recibo.descuento * 100).toFixed(0)}%` },
-         { accion: 'text', datos: `Monto Descuento: -$${(recibo.montoOriginal * recibo.descuento).toFixed(2)}` }
+         { accion: 'text', datos: `Monto Descuento: -$\n\n\n${(recibo.montoOriginal * recibo.descuento).toFixed(2)}` }
        ] : []),
        ...(recibo.pagosDeuda?.length ? [
-         { accion: 'text', datos: '\nDeudas Canceladas:' },
+         { accion: 'text', datos: '\nDeudas Canceladas: \n\n\n' },
          ...recibo.pagosDeuda.map(pago => ({
            accion: 'text', 
            datos: `- ${pago.deuda.estilo.nombre}: $${pago.monto.toFixed(2)}`
          }))
        ] : []),
-       { accion: 'text', datos: `\nTOTAL: $${recibo.monto.toFixed(2)}` },
-       { accion: 'text', datos: `Forma de pago: ${recibo.tipoPago}` },
+       { accion: 'text', datos: `\nTOTAL:\n\n\n $${recibo.monto.toFixed(2)}` },
+       { accion: 'text', datos: `Forma de pago: \n\n\n${recibo.tipoPago}` },
        { accion: 'text', datos: '\n¡Gracias por su pago!\n\n\n' }
      ];
 
