@@ -23,18 +23,19 @@ export function usePrinter() {
   const [printerService] = useState(() => new PrinterService());
   const [isPrinterAvailable, setIsPrinterAvailable] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
+  const [printError, setPrintError] = useState<string | null>(null);
 
   const checkPrinterAvailability = useCallback(async () => {
     setIsInitializing(true);
+    setPrintError(null);
     try {
       const isAvailable = await printerService.init();
       setIsPrinterAvailable(isAvailable);
-      
-      // Añadir log adicional
       console.log('Estado de impresora:', isAvailable ? 'Disponible' : 'No disponible');
     } catch (error) {
       console.error('Error verificando impresora:', error);
       setIsPrinterAvailable(false);
+      setPrintError(error instanceof Error ? error.message : 'Error desconocido');
     } finally {
       setIsInitializing(false);
     }
@@ -42,54 +43,49 @@ export function usePrinter() {
 
   useEffect(() => {
     checkPrinterAvailability();
+    const intervalId = setInterval(checkPrinterAvailability, 60000); // Verificar cada minuto
+    return () => clearInterval(intervalId);
   }, [checkPrinterAvailability]);
 
   const printReceipt = useCallback(async (recibo: any) => {
+    setPrintError(null);
     try {
-      // Validación adicional
       if (!recibo || !recibo.id) {
         throw new Error('Recibo inválido');
       }
-  
-      // Log antes del fetch
-      console.log('Intentando obtener recibo:', recibo.id);
-  
-      // Fetch del recibo completo
+
       const response = await fetch(`/api/recibos/${recibo.id}`);
       
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(`Error al obtener recibo: ${response.status} - ${errorText}`);
       }
-  
+
       const reciboCompleto = await response.json();
       
-      // Log de depuración
-      console.log('Recibo completo obtenido:', reciboCompleto);
-  
-      // Imprimir
       const printResult = await printerService.printReceipt(reciboCompleto);
       
-      // Log del resultado de impresión
-      console.log('Resultado de impresión:', printResult);
-  
+      if (!printResult.success) {
+        setPrintError(printResult.message || 'Error de impresión');
+      }
+
       return printResult;
     } catch (error) {
       console.error('Error en impresión de recibo:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Error desconocido al imprimir';
+      setPrintError(errorMessage);
       return { 
         success: false, 
-        message: error instanceof Error ? error.message : 'Error desconocido al imprimir' 
+        message: errorMessage
       };
     }
   }, [printerService]);
-
-  // Método para forzar verificación
-  const refreshPrinterStatus = checkPrinterAvailability;
 
   return {
     isPrinterAvailable,
     isInitializing,
     printReceipt,
-    refreshPrinterStatus  // Añadido para poder forzar refresco manual
+    printError,
+    refreshPrinterStatus: checkPrinterAvailability
   };
 }
