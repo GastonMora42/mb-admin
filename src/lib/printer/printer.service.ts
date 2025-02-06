@@ -58,7 +58,7 @@ export class PrinterService {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          nombre_impresora: 'NEXUSPOSNX-58', // Nombre de tu impresora
+          nombre_impresora: 'POS-58', // Nombre de tu impresora
           operaciones: [
             { accion: 'text', datos: '=== TEST DE IMPRESIÓN ===' },
             { accion: 'text', datos: new Date().toLocaleString() }
