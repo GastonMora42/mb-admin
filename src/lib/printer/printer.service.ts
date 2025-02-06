@@ -40,7 +40,7 @@ export class PrinterService {
     try {
       const response = await this.retryFetch(`${this.bridgeUrl}/status`);
       const status = await response.json();
-      return status.status === 'running';
+      return status.running === true;
     } catch (error) {
       console.warn('Error verificando driver:', error);
       return false;
@@ -94,49 +94,47 @@ export class PrinterService {
   }
 
   async printReceipt(recibo: ReciboWithRelations): Promise<{ success: boolean; message?: string }> {
-    try {
-      const operaciones = this.prepareReceiptOperations(recibo);
-
-      console.log('Operaciones de impresión:', operaciones);
-
-      const response = await this.retryFetch(`${this.bridgeUrl}/imprimir`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          nombre_impresora: 'POS-58',
-          operaciones: operaciones
-        })
-      });
-
-      if (!response.ok) {
-        // Intentar método alternativo de impresión
-        await this.fallbackPrint(recibo);
-      }
-
-      const result = await response.json();
-      
-      if (!result.success) {
-        throw new Error(result.message || 'Error de impresión');
-      }
-
-      return { success: true };
-    } catch (error) {
-      console.error('Error al imprimir:', error);
-      
-      try {
-        // Último intento de impresión
-        await this.fallbackPrint(recibo);
-        return { success: true };
-      } catch (fallbackError) {
-        console.error('Método alternativo de impresión falló:', fallbackError);
-        return { 
+    return new Promise(async (resolve, reject) => {
+      // Timeout de 10 segundos
+      const timeoutId = setTimeout(() => {
+        console.warn('Timeout en impresión de recibo');
+        reject({ 
           success: false, 
-          message: error instanceof Error ? error.message : 'Error desconocido al imprimir'
-        };
+          message: 'Timeout en impresión' 
+        });
+      }, 10000);
+  
+      try {
+        const response = await fetch(`${this.bridgeUrl}/imprimir`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            nombre_impresora: 'POS-58',
+            operaciones: [
+              // Tus operaciones de impresión
+            ]
+          })
+        });
+  
+        clearTimeout(timeoutId);
+  
+        if (!response.ok) {
+          throw new Error('Error en respuesta de impresión');
+        }
+  
+        const result = await response.json();
+        resolve(result);
+      } catch (error) {
+        clearTimeout(timeoutId);
+        console.error('Error al imprimir:', error);
+        reject({ 
+          success: false, 
+          message: error instanceof Error ? error.message : 'Error desconocido' 
+        });
       }
-    }
+    });
   }
 
   private prepareReceiptOperations(recibo: ReciboWithRelations): Array<{accion: string, datos: string}> {
@@ -179,6 +177,8 @@ export class PrinterService {
       { accion: 'text', datos: `Forma de pago: ${recibo.tipoPago}` },
       { accion: 'text', datos: '¡Gracias por su pago!' }
     ];
+
+    
   }
 
   private async fallbackPrint(recibo: ReciboWithRelations): Promise<void> {
