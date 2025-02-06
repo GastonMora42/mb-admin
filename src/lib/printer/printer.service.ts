@@ -15,6 +15,18 @@ export class PrinterService {
     }
   }
 
+  async checkDriver(): Promise<boolean> {
+    try {
+      // Verificar si el bridge responde
+      const response = await fetch(`${this.bridgeUrl}/status`);
+      const status = await response.json();
+      return status.running === true;
+    } catch (error) {
+      console.warn('Error verificando driver:', error);
+      return false;
+    }
+  }
+
   async detectPrinter(): Promise<boolean> {
     try {
       const response = await fetch(`${this.bridgeUrl}/getprinters`);
@@ -22,6 +34,18 @@ export class PrinterService {
       return impresoras.length > 0;
     } catch (error) {
       console.warn('Error detectando impresoras:', error);
+      return false;
+    }
+  }
+
+  async checkPermissions(): Promise<boolean> {
+    try {
+      // Verificar si puede listar impresoras
+      const response = await fetch(`${this.bridgeUrl}/getprinters`);
+      const impresoras = await response.json();
+      return impresoras.length > 0;
+    } catch (error) {
+      console.warn('Error verificando permisos:', error);
       return false;
     }
   }
@@ -49,6 +73,7 @@ export class PrinterService {
       return false;
     }
   }
+
 
   async printReceipt(recibo: ReciboWithRelations): Promise<{ success: boolean; message?: string }> {
     try {
