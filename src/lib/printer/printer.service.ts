@@ -83,12 +83,19 @@ export class PrinterService {
  async printReceipt(recibo: ReciboWithRelations): Promise<{ success: boolean; message?: string }> {
   try {
     const operaciones = [
-      { accion: 'text', datos: '\n\n       ESTUDIO DE DANZAS\n' },
-      { accion: 'text', datos: '       DE MICAELA MEINDL\n' },
-      { accion: 'text', datos: '\n----------------------------------------\n' },
+      // Logo al inicio
+      { 
+        accion: 'image', 
+        datos: 'mb-logo.png'  // Necesitarás proporcionar la ruta correcta al logo
+      },
+      { accion: 'text', datos: '\n\n\n' }, // Espacio después del logo
+      { accion: 'text', datos: '\n         ESTUDIO DE DANZAS\n' },
+      { accion: 'text', datos: '         DE MICAELA MEINDL\n' },
+      { accion: 'text', datos: '\n\n' }, // Más espacio
       { accion: 'text', datos: `Recibo #: ${recibo.numeroRecibo || 'N/A'}\n` },
       { accion: 'text', datos: `Fecha: ${new Date(recibo.fecha).toLocaleDateString()}\n` },
       { accion: 'text', datos: `Hora: ${new Date(recibo.fecha).toLocaleTimeString()}\n` },
+      { accion: 'text', datos: '\n' },
       { 
         accion: 'text', 
         datos: recibo.alumno 
@@ -96,7 +103,7 @@ export class PrinterService {
           : `Alumno Suelto: ${recibo.alumnoSuelto?.nombre} ${recibo.alumnoSuelto?.apellido}\n`
       },
       { accion: 'text', datos: `Concepto: ${recibo.concepto.nombre}\n` },
-      { accion: 'text', datos: '\n----------------------------------------\n' },
+      { accion: 'text', datos: '\n\n' }, // Doble espacio antes del monto
       { accion: 'text', datos: `Monto Original: $${recibo.montoOriginal.toFixed(2)}\n` },
       ...(recibo.descuento ? [
         { accion: 'text', datos: `Descuento: ${(recibo.descuento * 100).toFixed(0)}%\n` },
@@ -109,13 +116,14 @@ export class PrinterService {
           datos: `- ${pago.deuda.estilo.nombre}: $${pago.monto.toFixed(2)}\n`
         }))
       ] : []),
-      { accion: 'text', datos: '\n----------------------------------------\n' },
+      { accion: 'text', datos: '\n\n' }, // Doble espacio antes del total
       { accion: 'text', datos: `TOTAL: $${recibo.monto.toFixed(2)}\n` },
       { accion: 'text', datos: `Forma de pago: ${recibo.tipoPago}\n` },
-      { accion: 'text', datos: '\n----------------------------------------\n' },
-      { accion: 'text', datos: '         ¡Gracias por su pago!\n\n\n' }
+      { accion: 'text', datos: '\n\n' },
+      { accion: 'text', datos: '           ¡Gracias por su pago!\n' },
+      { accion: 'text', datos: '\n\n\n\n' } // Más espacio al final para cortar el ticket
     ];
- 
+
     const response = await this.retryFetch(`${this.bridgeUrl}/imprimir`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -124,7 +132,7 @@ export class PrinterService {
         operaciones
       })
     });
-    
+
      const result = await response.json();
      if (!result.success) {
        return await this.fallbackPrint(recibo);
@@ -166,9 +174,10 @@ export class PrinterService {
  }
 
  private prepareReceiptOperations(recibo: ReciboWithRelations): Array<{accion: string, datos: string}> {
-   return [
-     { accion: 'text', datos: 'ESTUDIO DE DANZAS' },
-     { accion: 'text', datos: 'DE MICAELA MEINDL' },
+  return [
+    { accion: 'image', datos: 'mb-logo.png' },
+    { accion: 'text', datos: '\n\n         ESTUDIO DE DANZAS' },
+    { accion: 'text', datos: '         DE MICAELA MEINDL\n\n' },
      { accion: 'text', datos: `Recibo #: ${recibo.numeroRecibo || 'N/A'}` },
      { accion: 'text', datos: `Fecha: ${new Date(recibo.fecha).toLocaleDateString()}` },
      { accion: 'text', datos: `Hora: ${new Date(recibo.fecha).toLocaleTimeString()}` },
