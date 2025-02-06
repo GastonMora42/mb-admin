@@ -108,7 +108,19 @@ export default async function handler(
         fecha: 'desc'
       } as Prisma.ReciboOrderByWithRelationInput,
     });
+    
+    const { start, end } = getArgentinaDayRange();
+    
+    console.log('Recibos encontrados:', recibos.length);
+    if (recibos.length > 0) {
+      console.log('Primera fecha:', recibos[0].fecha);
+      console.log('Última fecha:', recibos[recibos.length - 1].fecha);
+    }
 
+    console.log('Rango de fechas para búsqueda:');
+    console.log('Start:', start.toISOString());
+    console.log('End:', end.toISOString());
+    
     const totalMonto = recibos.reduce((sum, recibo) => sum + recibo.monto, 0);
 
     const totalPorTipoPago = recibos.reduce<Record<string, number>>((acc, recibo) => {
