@@ -2,7 +2,18 @@ import type { NextApiRequest, NextApiResponse } from 'next'
 import prisma from '@/lib/prisma'
 import { PrinterService } from '@/lib/printer/printer.service'
 
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: '10mb', // Aumentar límite de tamaño
+    },
+    responseLimit: '10mb', // Aumentar límite de respuesta
+    externalResolver: true, // Permitir resolución externa
+  },
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  res.setTimeout(30000); // 30 segundos
   if (req.method === 'GET') {
     const { 
       numero, 

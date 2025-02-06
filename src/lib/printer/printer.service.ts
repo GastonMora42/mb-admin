@@ -94,42 +94,47 @@ export class PrinterService {
   }
 
   async printReceipt(recibo: ReciboWithRelations): Promise<{ success: boolean; message?: string }> {
-    try {
-      const operaciones = this.prepareReceiptOperations(recibo);
-      
-      const response = await this.retryFetch(`${this.bridgeUrl}/imprimir`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          nombre_impresora: 'POS-58',
-          operaciones: operaciones
-        })
-      });
-      
-      const result = await response.json();
-      
-      if (!result.success) {
-        throw new Error(result.message || 'Error de impresión desconocido');
-      }
-      
-      return { success: true };
-    } catch (error) {
-      console.error('Error CRÍTICO al imprimir:', error);
-      
-      // Intentar un último método de impresión
-      try {
-        await this.fallbackPrint(recibo);
-        return { success: true, message: 'Impresión mediante método alternativo' };
-      } catch (fallbackError) {
-        console.error('Método alternativo también falló:', fallbackError);
-        return { 
+    return new Promise(async (resolve, reject) => {
+      // Timeout de 10 segundos
+      const timeoutId = setTimeout(() => {
+        console.warn('Timeout en impresión de recibo');
+        reject({ 
           success: false, 
-          message: error instanceof Error ? error.message : 'Error crítico de impresión' 
-        };
+          message: 'Timeout en impresión' 
+        });
+      }, 10000);
+  
+      try {
+        const response = await fetch(`${this.bridgeUrl}/imprimir`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            nombre_impresora: 'POS-58',
+            operaciones: [
+              // Tus operaciones de impresión
+            ]
+          })
+        });
+  
+        clearTimeout(timeoutId);
+  
+        if (!response.ok) {
+          throw new Error('Error en respuesta de impresión');
+        }
+  
+        const result = await response.json();
+        resolve(result);
+      } catch (error) {
+        clearTimeout(timeoutId);
+        console.error('Error al imprimir:', error);
+        reject({ 
+          success: false, 
+          message: error instanceof Error ? error.message : 'Error desconocido' 
+        });
       }
-    }
+    });
   }
 
   private prepareReceiptOperations(recibo: ReciboWithRelations): Array<{accion: string, datos: string}> {
