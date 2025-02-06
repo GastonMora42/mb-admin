@@ -2,7 +2,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import prisma from '@/lib/prisma'
 import { PrinterService } from '@/lib/printer/printer.service'
-import { getArgentinaDateTime } from '@/utils/dateUtils';
+import { getArgentinaDateTime, getArgentinaDayRange } from '@/utils/dateUtils';
 
 export const config = {
   api: {
@@ -179,20 +179,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         claseId,
         esMesCompleto,
         deudasAPagar,
-        fecha, // Nueva fecha proporcionada
-        fechaEfecto // Nueva fecha de efecto proporcionada
+        fecha,  // Nueva fecha proporcionada// Nueva fecha de efecto proporcionada
       } = req.body;
    
       const fechaArgentina = getArgentinaDateTime();
       const printerService = new PrinterService();
 
+      const { start } = fecha ? 
+      getArgentinaDayRange(fecha) : 
+      getArgentinaDayRange();
+
       const fechaCreacion = fecha ? 
       new Date(new Date(fecha).toLocaleString('en-US', { timeZone: 'America/Argentina/Buenos_Aires' })) : 
       getArgentinaDateTime();
-    
-    const fechaEfectoFinal = fechaEfecto ? 
-      new Date(new Date(fechaEfecto).toLocaleString('en-US', { timeZone: 'America/Argentina/Buenos_Aires' })) : 
-      fechaCreacion;
     
       const result = await prisma.$transaction(async (tx) => {
         const recibo = await tx.recibo.create({
@@ -200,8 +199,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             monto: parseFloat(monto),
             montoOriginal: parseFloat(montoOriginal || monto),
             descuento: descuento ? parseFloat(descuento) : null,
-            fecha: fechaCreacion,
-            fechaEfecto: fechaEfectoFinal,
+            fecha: start,
+            fechaEfecto: start,
             periodoPago,
             tipoPago,
             esClaseSuelta,
@@ -257,7 +256,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 deudaId: deuda.deudaId,
                 reciboId: recibo.id,
                 monto: deuda.monto,
-                fecha: fechaCreacion // Usar la fecha de creación del recibo
+                fecha: start// Usar la fecha de creación del recibo
               }
             });
             
@@ -265,7 +264,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               where: { id: deuda.deudaId },
               data: {
                 pagada: true,
-                fechaPago: fechaCreacion 
+                fechaPago: start
               }
             });
    
@@ -274,7 +273,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 where: { id: parseInt(alumnoId) },
                 data: {
                   inscripcionPagada: true,
-                  fechaPagoInscripcion: fechaArgentina
+                  fechaPagoInscripcion: start
                 }
               });
             }
