@@ -138,53 +138,35 @@ export class PrinterService {
   }
 
   async printReceipt(recibo: ReciboWithRelations): Promise<{ success: boolean; message?: string }> {
-  // Configurar un AbortController para el timeout
-  const controller = new AbortController();
-  const timeout = setTimeout(() => {
-    controller.abort();
-  }, 5000); // 5 segundos de timeout
-
-  try {
-    const operaciones = this.prepareReceiptOperations(recibo);
-    
-    const response = await this.retryFetch(`${this.bridgeUrl}/imprimir`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        nombre_impresora: 'POS-58',
-        operaciones: operaciones
-      }),
-      signal: controller.signal
-    });
-
-    clearTimeout(timeout);
-    
-    const result = await response.json();
-    
-    if (!result.success) {
-      console.warn('Fallo impresión normal, intentando fallback...');
-      return await this.fallbackPrint(recibo);
+    try {
+      // Usar retryFetch en lugar de fetch directo
+      const response = await this.retryFetch(`${this.bridgeUrl}/imprimir`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          nombre_impresora: 'POS-58',
+          operaciones: this.prepareReceiptOperations(recibo)
+        })
+      });
+  
+      const result = await response.json();
+      
+      if (!result.success) {
+        console.warn('Error en impresión:', result.message);
+        return { success: false, message: result.message };
+      }
+  
+      return { success: true };
+    } catch (error) {
+      console.error('Error al imprimir:', error);
+      return { 
+        success: false, 
+        message: error instanceof Error ? error.message : 'Error desconocido' 
+      };
     }
-
-    return { success: true, message: 'Impresión exitosa' };
-
-  } catch (error) {
-    clearTimeout(timeout);
-    
-    if (error === 'AbortError') {
-      console.warn('Timeout en impresión, intentando fallback...');
-      return await this.fallbackPrint(recibo);
-    }
-
-    console.error('Error en impresión:', error);
-    return { 
-      success: false, 
-      message: 'Error en impresión: ' + (error instanceof Error ? error.message : 'Error desconocido')
-    };
   }
-}
 
 private async fallbackPrint(recibo: ReciboWithRelations): Promise<{ success: boolean; message?: string }> {
   try {
