@@ -2,215 +2,215 @@ import { ReciboWithRelations } from '@/types/recibos';
 import type { Prisma } from '@prisma/client';
 
 export class PrinterService {
-  private bridgeUrl = 'http://localhost:3001';
-  private maxRetries = 3;
-  private retryDelay = 2000; // 2 segundos entre reintentos
+ private bridgeUrl = 'http://localhost:3001';
+ private maxRetries = 3;
+ private retryDelay = 2000;
 
-  private async retryFetch(url: string, options: RequestInit = {}, retries = this.maxRetries): Promise<Response> {
-    try {
-      const response = await fetch(url, options);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      return response;
-    } catch (error) {
-      if (retries > 0) {
-        console.warn(`Reintento ${this.maxRetries - retries + 1}...`, error);
-        await new Promise(resolve => setTimeout(resolve, this.retryDelay));
-        return this.retryFetch(url, options, retries - 1);
-      }
-      throw error;
-    }
-  }
-  
+ private async retryFetch(url: string, options: RequestInit = {}, retries = this.maxRetries): Promise<Response> {
+   try {
+     const response = await fetch(url, options);
+     if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+     return response;
+   } catch (error) {
+     if (retries > 0) {
+       await new Promise(resolve => setTimeout(resolve, this.retryDelay));
+       return this.retryFetch(url, options, retries - 1);
+     }
+     throw error;
+   }
+ }
 
-  async init(): Promise<boolean> {
-    try {
-      const response = await this.retryFetch(`${this.bridgeUrl}/getprinters`);
-      const impresoras = await response.json();
-      return impresoras.length > 0;
-    } catch (error) {
-      console.warn('Error inicializando impresora:', error);
-      return false;
-    }
-  }
+ async init(): Promise<boolean> {
+   try {
+     const response = await this.retryFetch(`${this.bridgeUrl}/status`);
+     const status = await response.json();
+     return status.running === true;
+   } catch {
+     return false;
+   }
+ }
 
-  async checkDriver(): Promise<boolean> {
-    try {
-      const response = await this.retryFetch(`${this.bridgeUrl}/status`);
-      const status = await response.json();
-      return status.running === true;
-    } catch (error) {
-      console.warn('Error verificando driver:', error);
-      return false;
-    }
-  }
+ async checkDriver(): Promise<boolean> {
+   try {
+     const response = await this.retryFetch(`${this.bridgeUrl}/status`);
+     const status = await response.json();
+     return status.running === true;
+   } catch {
+     return false;
+   }
+ }
 
-  async detectPrinter(): Promise<boolean> {
-    try {
-      const response = await this.retryFetch(`${this.bridgeUrl}/getprinters`);
-      const impresoras = await response.json();
-      return impresoras.length > 0;
-    } catch (error) {
-      console.warn('Error detectando impresoras:', error);
-      return false;
-    }
-  }
+ async detectPrinter(): Promise<boolean> {
+   try {
+     const response = await this.retryFetch(`${this.bridgeUrl}/getprinters`);
+     const impresoras = await response.json();
+     return impresoras.includes('POS-58');
+   } catch {
+     return false;
+   }
+ }
 
-  async checkPermissions(): Promise<boolean> {
-    try {
-      const response = await this.retryFetch(`${this.bridgeUrl}/getprinters`);
-      const impresoras = await response.json();
-      return impresoras.length > 0;
-    } catch (error) {
-      console.warn('Error verificando permisos:', error);
-      return false;
-    }
-  }
+ async checkPermissions(): Promise<boolean> {
+   try {
+     const response = await this.retryFetch(`${this.bridgeUrl}/status`);
+     const status = await response.json();
+     return status.running === true;
+   } catch {
+     return false;
+   }
+ }
 
-  async printTest(): Promise<boolean> {
-    try {
-      const response = await this.retryFetch(`${this.bridgeUrl}/imprimir`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          nombre_impresora: 'POS-58',
-          operaciones: [
-            { accion: 'text', datos: '=== TEST DE IMPRESIÓN ===' },
-            { accion: 'text', datos: new Date().toLocaleString() }
-          ]
-        })
-      });
-      
-      const result = await response.json();
-      return result.success;
-    } catch (error) {
-      console.error('Error en impresión de prueba:', error);
-      return false;
-    }
-  }
+ async printTest(): Promise<boolean> {
+   try {
+     const response = await this.retryFetch(`${this.bridgeUrl}/imprimir`, {
+       method: 'POST',
+       headers: { 'Content-Type': 'application/json' },
+       body: JSON.stringify({
+         nombre_impresora: 'POS-58',
+         operaciones: [
+           { accion: 'text', datos: '\n=== TEST DE IMPRESIÓN ===\n' },
+           { accion: 'text', datos: `${new Date().toLocaleString()}\n\n\n` }
+         ]
+       })
+     });
+     const result = await response.json();
+     return result.success;
+   } catch {
+     return false;
+   }
+ }
 
-  private prepareReceiptOperations(recibo: ReciboWithRelations): Array<{accion: string, datos: string}> {
-    return [
-      { accion: 'text', datos: 'ESTUDIO DE DANZAS' },
-      { accion: 'text', datos: 'DE MICAELA MEINDL' },
-      { accion: 'text', datos: `Recibo #: ${recibo.numeroRecibo || 'N/A'}` },
-      { accion: 'text', datos: `Fecha: ${new Date(recibo.fecha).toLocaleDateString()}` },
-      { accion: 'text', datos: `Hora: ${new Date(recibo.fecha).toLocaleTimeString()}` },
-      { 
-        accion: 'text', 
-        datos: recibo.alumno 
-          ? `Alumno: ${recibo.alumno.nombre} ${recibo.alumno.apellido}`
-          : recibo.alumnoSuelto
-          ? `Alumno Suelto: ${recibo.alumnoSuelto.nombre} ${recibo.alumnoSuelto.apellido}`
-          : 'Cliente no identificado'
-      },
-      { accion: 'text', datos: `Concepto: ${recibo.concepto.nombre}` },
-      { accion: 'text', datos: `Monto Original: $${recibo.montoOriginal.toFixed(2)}` },
-      // Descuentos
-      ...(recibo.descuento ? [
-        { 
-          accion: 'text', 
-          datos: `Descuento: ${(recibo.descuento * 100).toFixed(0)}%` 
-        },
-        { 
-          accion: 'text', 
-          datos: `Monto Descuento: -$${(recibo.montoOriginal * recibo.descuento).toFixed(2)}` 
-        }
-      ] : []),
-      // Deudas pagadas
-      ...(recibo.pagosDeuda?.length > 0 
-        ? [{ accion: 'text', datos: 'Deudas Canceladas:' }]
-        : []),
-      ...(recibo.pagosDeuda?.map(pago => ({
-        accion: 'text', 
-        datos: `- ${pago.deuda.estilo.nombre}: $${pago.monto.toFixed(2)}`
-      })) || []),
-      { accion: 'text', datos: `TOTAL: $${recibo.monto.toFixed(2)}` },
-      { accion: 'text', datos: `Forma de pago: ${recibo.tipoPago}` },
-      { accion: 'text', datos: '¡Gracias por su pago!' }
-    ];
+ async printReceipt(recibo: ReciboWithRelations): Promise<{ success: boolean; message?: string }> {
+   try {
+     const operaciones = [
+       { accion: 'text', datos: '\n\nESTUDIO DE DANZAS' },
+       { accion: 'text', datos: 'DE MICAELA MEINDL' },
+       { accion: 'text', datos: `\nRecibo #: ${recibo.numeroRecibo || 'N/A'}` },
+       { accion: 'text', datos: `Fecha: ${new Date(recibo.fecha).toLocaleDateString()}` },
+       { accion: 'text', datos: `Hora: ${new Date(recibo.fecha).toLocaleTimeString()}` },
+       { accion: 'text', datos: recibo.alumno 
+           ? `Alumno: ${recibo.alumno.nombre} ${recibo.alumno.apellido}`
+           : `Alumno Suelto: ${recibo.alumnoSuelto?.nombre} ${recibo.alumnoSuelto?.apellido}`
+       },
+       { accion: 'text', datos: `\nConcepto: ${recibo.concepto.nombre}` },
+       { accion: 'text', datos: `Monto Original: $${recibo.montoOriginal.toFixed(2)}` },
+       ...(recibo.descuento ? [
+         { accion: 'text', datos: `Descuento: ${(recibo.descuento * 100).toFixed(0)}%` },
+         { accion: 'text', datos: `Monto Descuento: -$${(recibo.montoOriginal * recibo.descuento).toFixed(2)}` }
+       ] : []),
+       ...(recibo.pagosDeuda?.length ? [
+         { accion: 'text', datos: '\nDeudas Canceladas:' },
+         ...recibo.pagosDeuda.map(pago => ({
+           accion: 'text', 
+           datos: `- ${pago.deuda.estilo.nombre}: $${pago.monto.toFixed(2)}`
+         }))
+       ] : []),
+       { accion: 'text', datos: `\nTOTAL: $${recibo.monto.toFixed(2)}` },
+       { accion: 'text', datos: `Forma de pago: ${recibo.tipoPago}` },
+       { accion: 'text', datos: '\n¡Gracias por su pago!\n\n\n' }
+     ];
 
-    
-  }
+     const response = await this.retryFetch(`${this.bridgeUrl}/imprimir`, {
+       method: 'POST',
+       headers: { 'Content-Type': 'application/json' },
+       body: JSON.stringify({
+         nombre_impresora: 'POS-58',
+         operaciones
+       })
+     });
 
-  async printReceipt(recibo: ReciboWithRelations): Promise<{ success: boolean; message?: string }> {
-    try {
-      // Usar retryFetch en lugar de fetch directo
-      const response = await this.retryFetch(`${this.bridgeUrl}/imprimir`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          nombre_impresora: 'POS-58',
-          operaciones: this.prepareReceiptOperations(recibo)
-        })
-      });
-  
-      const result = await response.json();
-      
-      if (!result.success) {
-        console.warn('Error en impresión:', result.message);
-        return { success: false, message: result.message };
-      }
-  
-      return { success: true };
-    } catch (error) {
-      console.error('Error al imprimir:', error);
-      return { 
-        success: false, 
-        message: error instanceof Error ? error.message : 'Error desconocido' 
-      };
-    }
-  }
+     const result = await response.json();
+     if (!result.success) {
+       return await this.fallbackPrint(recibo);
+     }
+     return { success: true };
+   } catch (error) {
+     return { 
+       success: false, 
+       message: error instanceof Error ? error.message : 'Error en impresión'
+     };
+   }
+ }
 
-private async fallbackPrint(recibo: ReciboWithRelations): Promise<{ success: boolean; message?: string }> {
-  try {
-    const texto = this.prepareReceiptOperations(recibo)
-      .map(op => op.datos)
-      .join('\n');
-      
-    const response = await this.retryFetch(`${this.bridgeUrl}/imprimir`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        nombre_impresora: 'POS-58',
-        operaciones: [{ accion: 'text', datos: texto }]
-      })
-    });
-    
-    const result = await response.json();
-    if (!result.success) {
-      return { success: false, message: 'Método alternativo de impresión falló' };
-    }
-    
-    return { success: true, message: 'Impreso usando método alternativo' };
-  } catch (error) {
-    return { 
-      success: false, 
-      message: error instanceof Error ? error.message : 'Error en impresión alternativa'
-    };
-  }
-}
-  async checkStatus(): Promise<{ connected: boolean; error?: string }> {
-    try {
-      const response = await this.retryFetch(`${this.bridgeUrl}/getprinters`);
-      const impresoras = await response.json();
-      return { 
-        connected: impresoras.length > 0 
-      };
-    } catch (error) {
-      return {
-        connected: false,
-        error: 'No se puede conectar con el servidor de impresión'
-      };
-    }
-  }
+ private async fallbackPrint(recibo: ReciboWithRelations): Promise<{ success: boolean; message?: string }> {
+   try {
+     const texto = this.prepareReceiptOperations(recibo)
+       .map(op => op.datos)
+       .join('\n');
+       
+     const response = await this.retryFetch(`${this.bridgeUrl}/imprimir`, {
+       method: 'POST',
+       headers: { 'Content-Type': 'application/json' },
+       body: JSON.stringify({
+         nombre_impresora: 'POS-58',
+         operaciones: [{ accion: 'text', datos: texto }]
+       })
+     });
+     
+     const result = await response.json();
+     return result.success
+       ? { success: true, message: 'Impreso usando método alternativo' }
+       : { success: false, message: 'Método alternativo de impresión falló' };
+   } catch (error) {
+     return { 
+       success: false, 
+       message: error instanceof Error ? error.message : 'Error en impresión alternativa'
+     };
+   }
+ }
+
+ private prepareReceiptOperations(recibo: ReciboWithRelations): Array<{accion: string, datos: string}> {
+   return [
+     { accion: 'text', datos: 'ESTUDIO DE DANZAS' },
+     { accion: 'text', datos: 'DE MICAELA MEINDL' },
+     { accion: 'text', datos: `Recibo #: ${recibo.numeroRecibo || 'N/A'}` },
+     { accion: 'text', datos: `Fecha: ${new Date(recibo.fecha).toLocaleDateString()}` },
+     { accion: 'text', datos: `Hora: ${new Date(recibo.fecha).toLocaleTimeString()}` },
+     { 
+       accion: 'text', 
+       datos: recibo.alumno 
+         ? `Alumno: ${recibo.alumno.nombre} ${recibo.alumno.apellido}`
+         : recibo.alumnoSuelto
+         ? `Alumno Suelto: ${recibo.alumnoSuelto.nombre} ${recibo.alumnoSuelto.apellido}`
+         : 'Cliente no identificado'
+     },
+     { accion: 'text', datos: `Concepto: ${recibo.concepto.nombre}` },
+     { accion: 'text', datos: `Monto Original: $${recibo.montoOriginal.toFixed(2)}` },
+     ...(recibo.descuento ? [
+       { accion: 'text', datos: `Descuento: ${(recibo.descuento * 100).toFixed(0)}%` },
+       { accion: 'text', datos: `Monto Descuento: -$${(recibo.montoOriginal * recibo.descuento).toFixed(2)}` }
+     ] : []),
+     ...(recibo.pagosDeuda?.length ? [
+       { accion: 'text', datos: 'Deudas Canceladas:' },
+       ...recibo.pagosDeuda.map(pago => ({
+         accion: 'text', 
+         datos: `- ${pago.deuda.estilo.nombre}: $${pago.monto.toFixed(2)}`
+       }))
+     ] : []),
+     { accion: 'text', datos: `TOTAL: $${recibo.monto.toFixed(2)}` },
+     { accion: 'text', datos: `Forma de pago: ${recibo.tipoPago}` },
+     { accion: 'text', datos: '¡Gracias por su pago!' }
+   ];
+ }
+
+ async checkStatus(): Promise<{ connected: boolean; error?: string }> {
+   try {
+     const [statusResponse, printersResponse] = await Promise.all([
+       this.retryFetch(`${this.bridgeUrl}/status`),
+       this.retryFetch(`${this.bridgeUrl}/getprinters`)
+     ]);
+
+     const status = await statusResponse.json();
+     const printers = await printersResponse.json();
+
+     return { 
+       connected: status.running && printers.includes('POS-58')
+     };
+   } catch {
+     return {
+       connected: false,
+       error: 'Error de conexión con el servidor de impresión'
+     };
+   }
+ }
 }
