@@ -15,6 +15,7 @@ import PrinterIcon from '@heroicons/react/24/outline/PrinterIcon';
 import { PrinterService } from '@/lib/printer/printer.service';
 import { PrinterStatus } from '../PrinterStatus';
 import { useUserRole } from '@/hooks/useUserRole';
+import { getArgentinaDateTime } from '@/utils/dateUtils';
 
 // Styled Components
 const Container = styled.div`
@@ -492,8 +493,8 @@ const Recibos: React.FC = () => {
     fueraDeTermino: false,
     esClaseSuelta: false,
     esMesCompleto: false,
-    fecha: format(new Date(), 'yyyy-MM-dd'),
-    fechaEfecto: format(new Date(), 'yyyy-MM-dd'),
+    fecha: format(getArgentinaDateTime(), 'yyyy-MM-dd'),
+    fechaEfecto: format(getArgentinaDateTime(), 'yyyy-MM-dd'),
     descuentoManual: 0,
 });
 
@@ -881,7 +882,11 @@ const crearRecibosPendientes = async () => {
         ...prev,
         [name]: type === 'checkbox' ? checked : value
       };
-
+  
+      if (name === 'fecha') {
+        newState.fechaEfecto = value;
+      }
+  
       if (name === 'esClaseSuelta') {
         newState.alumnoId = '';
         newState.alumnoSueltoId = '';

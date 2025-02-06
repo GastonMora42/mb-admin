@@ -14,6 +14,7 @@ export const config = {
   },
 }
 
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   res.setTimeout(30000); // 30 segundos
   if (req.method === 'GET') {
@@ -177,11 +178,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         esClaseSuelta,
         claseId,
         esMesCompleto,
-        deudasAPagar
+        deudasAPagar,
+        fecha, // Nueva fecha proporcionada
+        fechaEfecto // Nueva fecha de efecto proporcionada
       } = req.body;
    
       const fechaArgentina = getArgentinaDateTime();
       const printerService = new PrinterService();
+
+      const fechaCreacion = fecha ? new Date(fecha) : getArgentinaDateTime();
+      const fechaEfectoFinal = fechaEfecto ? new Date(fechaEfecto) : fechaCreacion;
+  
    
       const result = await prisma.$transaction(async (tx) => {
         const recibo = await tx.recibo.create({
@@ -189,8 +196,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             monto: parseFloat(monto),
             montoOriginal: parseFloat(montoOriginal || monto),
             descuento: descuento ? parseFloat(descuento) : null,
-            fecha: fechaArgentina,
-            fechaEfecto: fechaArgentina,
+            fecha: fechaCreacion,
+            fechaEfecto: fechaEfectoFinal,
             periodoPago,
             tipoPago,
             esClaseSuelta,
@@ -246,7 +253,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 deudaId: deuda.deudaId,
                 reciboId: recibo.id,
                 monto: deuda.monto,
-                fecha: fechaArgentina
+                fecha: fechaCreacion // Usar la fecha de creación del recibo
               }
             });
             
@@ -254,7 +261,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               where: { id: deuda.deudaId },
               data: {
                 pagada: true,
-                fechaPago: fechaArgentina
+                fechaPago: fechaCreacion 
               }
             });
    
