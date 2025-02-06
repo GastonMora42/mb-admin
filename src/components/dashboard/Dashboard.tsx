@@ -157,7 +157,7 @@ const Dashboard: React.FC = () => {
         <HeaderInfo>
           <Title>Dashboard de estadísticas</Title>
           <Subtitle>
-            {periodo.mes.charAt(0).toUpperCase() + periodo.mes.slice(1)} {periodo.anio} En MB Academia de danzas
+            {periodo.mes.charAt(0).toUpperCase() + periodo.mes.slice(1)} {periodo.anio} En MB Estudio de danzas ✨💃
           </Subtitle>
         </HeaderInfo>
         <LastUpdate>

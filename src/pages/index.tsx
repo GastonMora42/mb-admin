@@ -89,10 +89,10 @@ export default function Page() {
     <PageContainer>
       <ContentWrapper>
         <LogoContainer>
-          <Image src="/mb-logo.png" alt="MB Academia de Danzas Logo" width={200} height={80} />
+          <Image src="/mb-logo.png" alt="MB Estudio de Danzas Logo" width={200} height={80} />
         </LogoContainer>
         <WelcomeCard>
-          <Title>Bienvenido al panel de Administradores de MB Academia de Danzas</Title>
+          <Title>Bienvenido al panel de Administradores de MB Estudio de Danzas ✨💃</Title>
           <ButtonContainer>
             <LoginButton href="/login">
               Iniciar sesión
