@@ -93,6 +93,31 @@ const InputGroup = styled.div`
   min-width: 200px;
 `;
 
+// Agregar estas reglas en tus styled components
+const Form = styled.form`
+  &.white-bg * {
+    color: #000000 !important;
+  }
+`;
+
+const DeudaSection = styled.div`
+  &.white-bg * {
+    color: #000000 !important;
+  }
+`;
+
+const PreviewSection = styled.div`
+  &.white-bg * {
+    color: #000000 !important;
+  }
+`;
+
+const PreviewReciboItem = styled.div`
+  &.white-bg * {
+    color: #000000 !important;
+  }
+`;
+
 const InputLabel = styled.label`
   font-weight: 500;
   color: #333;
@@ -108,16 +133,6 @@ const PreviewRecibos = styled.div`
   border: 1px solid #eee;
 `;
 
-const PreviewReciboItem = styled.div`
-  display: flex;
-  justify-content: space-between;
-  padding: 10px;
-  border-bottom: 1px solid #eee;
-  
-  &:last-child {
-    border-bottom: none;
-  }
-`;
 
 const TableContainer = styled.div`
   width: 100%;
@@ -130,12 +145,6 @@ const Title = styled.h2`
   margin-bottom: 20px;
 `;
 
-const Form = styled.form`
-  display: flex;
-  flex-wrap: wrap;
-  gap: 15px;
-  margin-bottom: 30px;
-`;
 
 const Input = styled.input`
   padding: 10px;
@@ -239,15 +248,6 @@ const Tr = styled.tr`
   &:nth-child(even) {
     background-color: #F9F8F8;
   }
-`;
-
-const DeudaSection = styled.div`
-  margin: 15px 0;
-  padding: 15px;
-  background-color: #f9f9f9;
-  border-radius: 4px;
-  position: relative;
-  z-index: 1;
 `;
 
 const Message = styled.div<{ isError?: boolean }>`
@@ -369,13 +369,6 @@ const ActionButton = styled(Button)`
   &:not(:disabled):active {
     transform: translateY(0);
   }
-`;
-
-const PreviewSection = styled.div`
-  background-color: #f9f9f9;
-  padding: 20px;
-  border-radius: 4px;
-  margin-bottom: 20px;
 `;
 
 const PreviewTitle = styled.h3`
@@ -1004,7 +997,7 @@ return (
           </Button>
         </div>
         {/* Formulario Principal */}
-        <Form onSubmit={(e) => { e.preventDefault(); agregarReciboPendiente(); }}>
+        <Form className="white-bg" onSubmit={(e) => { e.preventDefault(); agregarReciboPendiente(); }}>
           <InputGroup>
             <InputLabel>Tipo de Alumno</InputLabel>
             <CheckboxLabel>
@@ -1223,7 +1216,7 @@ return (
           </InputGroup>
 {/* Sección de Deudas */}
 {nuevoRecibo.alumnoId && !nuevoRecibo.esClaseSuelta && (
-  <DeudaSection>
+  <DeudaSection className="white-bg">
     <InputLabel>Deudas Pendientes</InputLabel>
     <CheckboxLabel style={{ marginBottom: '10px' }}>
       <input
@@ -1279,7 +1272,7 @@ return (
 
     {/* Vista previa del total seleccionado */}
     {Object.keys(deudasSeleccionadas).length > 0 && (
-      <PreviewSection style={{ marginTop: '20px' }}>
+      <PreviewSection className="white-bg" style={{ marginTop: '20px' }}>
         <PreviewTitle>Deudas Seleccionadas</PreviewTitle>
         {Object.entries(deudasSeleccionadas).map(([deudaId, deuda]) => (
           <PreviewDetail key={deudaId}>

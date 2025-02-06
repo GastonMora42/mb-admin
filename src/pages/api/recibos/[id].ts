@@ -1,4 +1,3 @@
-//src/pages/api/recibos/[id].ts
 import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 
@@ -9,7 +8,47 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(400).json({ error: 'ID no válido' });
   }
 
-  if (req.method === 'PATCH') {
+  if (req.method === 'GET') {
+    try {
+      const recibo = await prisma.recibo.findUnique({
+        where: { id: parseInt(id) },
+        include: {
+          alumno: true,
+          alumnoSuelto: true,
+          concepto: {
+            include: {
+              estilo: true
+            }
+          },
+          clase: {
+            include: {
+              profesor: true,
+              estilo: true
+            }
+          },
+          pagosDeuda: {
+            include: {
+              deuda: {
+                include: {
+                  estilo: true,
+                  concepto: true
+                }
+              }
+            }
+          }
+        }
+      });
+
+      if (!recibo) {
+        return res.status(404).json({ error: 'Recibo no encontrado' });
+      }
+
+      res.status(200).json(recibo);
+    } catch (error) {
+      console.error('Error al obtener recibo:', error);
+      res.status(500).json({ error: 'Error al obtener recibo' });
+    }
+  } else if (req.method === 'PATCH') {
     try {
       const recibo = await prisma.recibo.update({
         where: { id: parseInt(id) },
@@ -44,7 +83,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       res.status(500).json({ error: 'Error al eliminar recibo' });
     }
   } else {
-    res.setHeader('Allow', ['PATCH', 'DELETE']);
+    res.setHeader('Allow', ['GET', 'PATCH', 'DELETE']);
     res.status(405).end(`Method ${req.method} Not Allowed`);
   }
 }

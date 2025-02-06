@@ -50,23 +50,29 @@ export function usePrinter() {
       if (!recibo || !recibo.id) {
         throw new Error('Recibo inválido');
       }
-
+  
+      // Log antes del fetch
+      console.log('Intentando obtener recibo:', recibo.id);
+  
       // Fetch del recibo completo
-      const reciboCompleto = await fetch(`/api/recibos/${recibo.id}?include=all`)
-        .then(res => {
-          if (!res.ok) throw new Error('No se pudo obtener el recibo completo');
-          return res.json();
-        }) as ReciboWithRelations;
+      const response = await fetch(`/api/recibos/${recibo.id}`);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Error al obtener recibo: ${response.status} - ${errorText}`);
+      }
+  
+      const reciboCompleto = await response.json();
       
       // Log de depuración
-      console.log('Imprimiendo recibo:', reciboCompleto);
-
+      console.log('Recibo completo obtenido:', reciboCompleto);
+  
       // Imprimir
       const printResult = await printerService.printReceipt(reciboCompleto);
       
       // Log del resultado de impresión
       console.log('Resultado de impresión:', printResult);
-
+  
       return printResult;
     } catch (error) {
       console.error('Error en impresión de recibo:', error);
