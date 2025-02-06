@@ -15,7 +15,6 @@ interface ApiError {
   error: string;
 }
 
-
 // Tipos para Prisma
 type ReciboWithRelations = Prisma.ReciboGetPayload<{
   include: {
