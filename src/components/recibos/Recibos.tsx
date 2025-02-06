@@ -1342,7 +1342,7 @@ return (
 
 {/* Vista previa de recibos pendientes con mejoras visuales */}
 {recibosPendientes.length > 0 && (
-  <PreviewSection>
+  <PreviewSection className="white-bg">
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
       <PreviewTitle>Recibos Pendientes de Crear</PreviewTitle>
       <span style={{ color: '#666' }}>
@@ -1410,7 +1410,7 @@ return (
       </PreviewReciboItem>
     ))}
 
-    <PreviewTotal>
+    <PreviewTotal className="white-bg">
       <div>
         <span>Total a Crear:</span>
         <div style={{ color: '#666', fontSize: '0.9em', marginTop: '5px' }}>

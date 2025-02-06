@@ -134,7 +134,7 @@ export class PrinterService {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          nombre_impresora: 'NEXUSPOSNX-58', // Nombre exacto de tu impresora
+          nombre_impresora: 'POS-58', // Nombre exacto de tu impresora
           operaciones: operaciones
         })
       });
