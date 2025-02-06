@@ -78,10 +78,8 @@ export class PrinterService {
   async printReceipt(recibo: ReciboWithRelations): Promise<{ success: boolean; message?: string }> {
     try {
       const operaciones = [
-        // Encabezado
         { accion: 'text', datos: 'ESTUDIO DE DANZAS' },
         { accion: 'text', datos: 'DE MICAELA MEINDL' },
-        
         // Información del recibo
         { accion: 'text', datos: `Recibo #: ${recibo.numeroRecibo}` },
         { accion: 'text', datos: `Fecha: ${new Date(recibo.fecha).toLocaleDateString()}` },
@@ -136,7 +134,7 @@ export class PrinterService {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          nombre_impresora: 'NEXUSPOSNX-58', // Nombre de tu impresora
+          nombre_impresora: 'NEXUSPOSNX-58', // Nombre exacto de tu impresora
           operaciones: operaciones
         })
       });

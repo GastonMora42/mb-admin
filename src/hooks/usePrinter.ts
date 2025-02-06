@@ -1,4 +1,3 @@
-// hooks/usePrinter.ts
 import { useState, useEffect, useCallback } from 'react';
 import { PrinterService } from '@/lib/printer/printer.service';
 import type { Prisma } from '@prisma/client';
@@ -25,33 +24,66 @@ export function usePrinter() {
   const [isPrinterAvailable, setIsPrinterAvailable] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
 
-  useEffect(() => {
-    async function initPrinter() {
-      setIsInitializing(true);
-      try {
-        const isAvailable = await printerService.init();
-        setIsPrinterAvailable(isAvailable);
-      } catch (error) {
-        console.error('Error inicializando impresora:', error);
-        setIsPrinterAvailable(false);
-      } finally {
-        setIsInitializing(false);
-      }
+  const checkPrinterAvailability = useCallback(async () => {
+    setIsInitializing(true);
+    try {
+      const isAvailable = await printerService.init();
+      setIsPrinterAvailable(isAvailable);
+      
+      // Añadir log adicional
+      console.log('Estado de impresora:', isAvailable ? 'Disponible' : 'No disponible');
+    } catch (error) {
+      console.error('Error verificando impresora:', error);
+      setIsPrinterAvailable(false);
+    } finally {
+      setIsInitializing(false);
     }
-    initPrinter();
   }, [printerService]);
 
+  useEffect(() => {
+    checkPrinterAvailability();
+  }, [checkPrinterAvailability]);
+
   const printReceipt = useCallback(async (recibo: any) => {
-    // Asegurarse de que el recibo tenga todas las relaciones necesarias
-    const reciboCompleto = await fetch(`/api/recibos/${recibo.id}?include=all`)
-      .then(res => res.json()) as ReciboWithRelations;
-    
-    return printerService.printReceipt(reciboCompleto);
+    try {
+      // Validación adicional
+      if (!recibo || !recibo.id) {
+        throw new Error('Recibo inválido');
+      }
+
+      // Fetch del recibo completo
+      const reciboCompleto = await fetch(`/api/recibos/${recibo.id}?include=all`)
+        .then(res => {
+          if (!res.ok) throw new Error('No se pudo obtener el recibo completo');
+          return res.json();
+        }) as ReciboWithRelations;
+      
+      // Log de depuración
+      console.log('Imprimiendo recibo:', reciboCompleto);
+
+      // Imprimir
+      const printResult = await printerService.printReceipt(reciboCompleto);
+      
+      // Log del resultado de impresión
+      console.log('Resultado de impresión:', printResult);
+
+      return printResult;
+    } catch (error) {
+      console.error('Error en impresión de recibo:', error);
+      return { 
+        success: false, 
+        message: error instanceof Error ? error.message : 'Error desconocido al imprimir' 
+      };
+    }
   }, [printerService]);
+
+  // Método para forzar verificación
+  const refreshPrinterStatus = checkPrinterAvailability;
 
   return {
     isPrinterAvailable,
     isInitializing,
-    printReceipt
+    printReceipt,
+    refreshPrinterStatus  // Añadido para poder forzar refresco manual
   };
 }
