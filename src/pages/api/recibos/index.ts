@@ -186,10 +186,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const fechaArgentina = getArgentinaDateTime();
       const printerService = new PrinterService();
 
-      const fechaCreacion = fecha ? new Date(fecha) : getArgentinaDateTime();
-      const fechaEfectoFinal = fechaEfecto ? new Date(fechaEfecto) : fechaCreacion;
-  
-   
+      const fechaCreacion = fecha ? 
+      new Date(new Date(fecha).toLocaleString('en-US', { timeZone: 'America/Argentina/Buenos_Aires' })) : 
+      getArgentinaDateTime();
+    
+    const fechaEfectoFinal = fechaEfecto ? 
+      new Date(new Date(fechaEfecto).toLocaleString('en-US', { timeZone: 'America/Argentina/Buenos_Aires' })) : 
+      fechaCreacion;
+    
       const result = await prisma.$transaction(async (tx) => {
         const recibo = await tx.recibo.create({
           data: {
