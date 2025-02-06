@@ -81,44 +81,50 @@ export class PrinterService {
  }
 
  async printReceipt(recibo: ReciboWithRelations): Promise<{ success: boolean; message?: string }> {
-   try {
-     const operaciones = [
-       { accion: 'text', datos: '\n\nESTUDIO DE DANZAS' },
-       { accion: 'text', datos: 'DE MICAELA MEINDL' },
-       { accion: 'text', datos: `\nRecibo #: \n\n\n${recibo.numeroRecibo || 'N/A'}` },
-       { accion: 'text', datos: `Fecha: \n\n\n${new Date(recibo.fecha).toLocaleDateString()}` },
-       { accion: 'text', datos: `Hora: \n\n\n${new Date(recibo.fecha).toLocaleTimeString()}` },
-       { accion: 'text', datos: recibo.alumno 
-           ? `Alumno: \n\n\n${recibo.alumno.nombre} ${recibo.alumno.apellido}`
-           : `Alumno Suelto: \n\n\n ${recibo.alumnoSuelto?.nombre} ${recibo.alumnoSuelto?.apellido}`
-       },
-       { accion: 'text', datos: `\nConcepto:\n\n\n ${recibo.concepto.nombre}` },
-       { accion: 'text', datos: `Monto Original:\n\n\n $${recibo.montoOriginal.toFixed(2)}` },
-       ...(recibo.descuento ? [
-         { accion: 'text', datos: `Descuento: ${(recibo.descuento * 100).toFixed(0)}%` },
-         { accion: 'text', datos: `Monto Descuento: -$\n\n\n${(recibo.montoOriginal * recibo.descuento).toFixed(2)}` }
-       ] : []),
-       ...(recibo.pagosDeuda?.length ? [
-         { accion: 'text', datos: '\nDeudas Canceladas: \n\n\n' },
-         ...recibo.pagosDeuda.map(pago => ({
-           accion: 'text', 
-           datos: `- ${pago.deuda.estilo.nombre}: $${pago.monto.toFixed(2)}`
-         }))
-       ] : []),
-       { accion: 'text', datos: `\nTOTAL:\n\n\n $${recibo.monto.toFixed(2)}` },
-       { accion: 'text', datos: `Forma de pago: \n\n\n${recibo.tipoPago}` },
-       { accion: 'text', datos: '\n¡Gracias por su pago!\n\n\n' }
-     ];
-
-     const response = await this.retryFetch(`${this.bridgeUrl}/imprimir`, {
-       method: 'POST',
-       headers: { 'Content-Type': 'application/json' },
-       body: JSON.stringify({
-         nombre_impresora: 'POS-58',
-         operaciones
-       })
-     });
-
+  try {
+    const operaciones = [
+      { accion: 'text', datos: '\n\n       ESTUDIO DE DANZAS\n' },
+      { accion: 'text', datos: '       DE MICAELA MEINDL\n' },
+      { accion: 'text', datos: '\n----------------------------------------\n' },
+      { accion: 'text', datos: `Recibo #: ${recibo.numeroRecibo || 'N/A'}\n` },
+      { accion: 'text', datos: `Fecha: ${new Date(recibo.fecha).toLocaleDateString()}\n` },
+      { accion: 'text', datos: `Hora: ${new Date(recibo.fecha).toLocaleTimeString()}\n` },
+      { 
+        accion: 'text', 
+        datos: recibo.alumno 
+          ? `Alumno: ${recibo.alumno.nombre} ${recibo.alumno.apellido}\n`
+          : `Alumno Suelto: ${recibo.alumnoSuelto?.nombre} ${recibo.alumnoSuelto?.apellido}\n`
+      },
+      { accion: 'text', datos: `Concepto: ${recibo.concepto.nombre}\n` },
+      { accion: 'text', datos: '\n----------------------------------------\n' },
+      { accion: 'text', datos: `Monto Original: $${recibo.montoOriginal.toFixed(2)}\n` },
+      ...(recibo.descuento ? [
+        { accion: 'text', datos: `Descuento: ${(recibo.descuento * 100).toFixed(0)}%\n` },
+        { accion: 'text', datos: `Monto Descuento: -$${(recibo.montoOriginal * recibo.descuento).toFixed(2)}\n` }
+      ] : []),
+      ...(recibo.pagosDeuda?.length ? [
+        { accion: 'text', datos: '\nDeudas Canceladas:\n' },
+        ...recibo.pagosDeuda.map(pago => ({
+          accion: 'text', 
+          datos: `- ${pago.deuda.estilo.nombre}: $${pago.monto.toFixed(2)}\n`
+        }))
+      ] : []),
+      { accion: 'text', datos: '\n----------------------------------------\n' },
+      { accion: 'text', datos: `TOTAL: $${recibo.monto.toFixed(2)}\n` },
+      { accion: 'text', datos: `Forma de pago: ${recibo.tipoPago}\n` },
+      { accion: 'text', datos: '\n----------------------------------------\n' },
+      { accion: 'text', datos: '         ¡Gracias por su pago!\n\n\n' }
+    ];
+ 
+    const response = await this.retryFetch(`${this.bridgeUrl}/imprimir`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        nombre_impresora: 'POS-58',
+        operaciones
+      })
+    });
+    
      const result = await response.json();
      if (!result.success) {
        return await this.fallbackPrint(recibo);

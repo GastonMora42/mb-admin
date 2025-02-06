@@ -164,41 +164,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   } 
   
   else if (req.method === 'POST') {
-      try {
-        console.log('Body recibido:', req.body);
-        const { 
-          monto,
-          montoOriginal,
-          descuento,
-          fechaEfecto,
-          periodoPago, 
-          tipoPago, 
-          alumnoId, 
-          alumnoSueltoId, 
-          conceptoId, 
-          esClaseSuelta,
-          claseId,
-          esMesCompleto,
-          deudasAPagar
-        } = req.body;
-    
-        console.log('Datos parseados:', {
-          monto,
-          montoOriginal,
-          tipoPago,
-          alumnoId,
-          conceptoId,
-          deudasAPagar
-        });
-    
-  
-      // Ajustamos la fecha a la zona horaria de Argentina
+    try {
+      const { 
+        monto,
+        montoOriginal,
+        descuento,
+        periodoPago, 
+        tipoPago, 
+        alumnoId, 
+        alumnoSueltoId, 
+        conceptoId, 
+        esClaseSuelta,
+        claseId,
+        esMesCompleto,
+        deudasAPagar
+      } = req.body;
+   
       const fechaArgentina = getArgentinaDateTime();
-
       const printerService = new PrinterService();
-
+   
       const result = await prisma.$transaction(async (tx) => {
-        // 1. Crear el recibo
         const recibo = await tx.recibo.create({
           data: {
             monto: parseFloat(monto),
@@ -240,84 +225,59 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               include: {
                 deuda: {
                   include: {
-                    estilo: true
+                    estilo: true,
+                    concepto: true
                   }
                 }
               }
             }
           }
         });
-  
-// Si hay deudas a pagar, procesarlas
-if (alumnoId && deudasAPagar?.length > 0) {
-  // Crear los pagos de deuda y actualizar estados
-  for (const deuda of deudasAPagar) {
-    // Obtener la deuda original para verificar si es de inscripción
-    const deudaOriginal = await tx.deuda.findUnique({
-      where: { id: deuda.deudaId },
-      include: {
-        concepto: true // Incluir el concepto para verificar si es inscripción
-      }
-    });
-
-    // Crear el pago usando la fecha de Argentina
-    const fechaPagoArgentina = new Date(new Date().toLocaleString('en-US', {
-      timeZone: 'America/Argentina/Buenos_Aires'
-    }));
-
-    // Crear el pago
-    await tx.pagoDeuda.create({
-      data: {
-        deudaId: deuda.deudaId,
-        reciboId: recibo.id,
-        monto: deuda.monto,
-        fecha: fechaPagoArgentina
-      }
-    });
-    
-    // Actualizar la deuda con la misma fecha de Argentina
-    await tx.deuda.update({
-      where: { id: deuda.deudaId },
-      data: {
-        pagada: true,
-        fechaPago: fechaPagoArgentina
-      }
-    });
-
-    // Si es deuda de inscripción, actualizar el estado en el alumno
-    if (deudaOriginal?.concepto?.esInscripcion) {
-      await tx.alumno.update({
-        where: { id: parseInt(alumnoId) },
-        data: {
-          inscripcionPagada: true,
-          fechaPagoInscripcion: fechaPagoArgentina
+   
+        if (alumnoId && deudasAPagar?.length > 0) {
+          await Promise.all(deudasAPagar.map(async (deuda: { deudaId: any; monto: any; }) => {
+            const deudaOriginal = await tx.deuda.findUnique({
+              where: { id: deuda.deudaId },
+              include: { concepto: true }
+            });
+   
+            await tx.pagoDeuda.create({
+              data: {
+                deudaId: deuda.deudaId,
+                reciboId: recibo.id,
+                monto: deuda.monto,
+                fecha: fechaArgentina
+              }
+            });
+            
+            await tx.deuda.update({
+              where: { id: deuda.deudaId },
+              data: {
+                pagada: true,
+                fechaPago: fechaArgentina
+              }
+            });
+   
+            if (deudaOriginal?.concepto?.esInscripcion) {
+              await tx.alumno.update({
+                where: { id: parseInt(alumnoId) },
+                data: {
+                  inscripcionPagada: true,
+                  fechaPagoInscripcion: fechaArgentina
+                }
+              });
+            }
+          }));
         }
-      });
-    }
-  }
-}
-  
-        try {
-          const printPromise = printerService.printReceipt(recibo);
-          const timeoutPromise = new Promise<{ success: boolean; message?: string }>((_, reject) => 
-            setTimeout(() => reject(new Error('Timeout de impresión')), 8000)
-          );
-  
-          const printResult = await Promise.race([printPromise, timeoutPromise])
-            .catch(error => ({
-              success: false,
-              message: error instanceof Error ? error.message : 'Error desconocido'
-            }));
-  
-          if (!printResult.success) {
-            console.warn('Problema al imprimir:', printResult.message);
-          }
-        } catch (printError) {
-          console.error('Error en impresión:', printError);
-        }
-  
-
-        // Retornar el recibo creado con toda la información actualizada
+   
+        // Intentar imprimir fuera de la transacción principal
+        Promise.race([
+          printerService.printReceipt(recibo),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout de impresión')), 8000))
+        ]).catch(error => {
+          console.error('Error en impresión:', error);
+        });
+   
         return await tx.recibo.findUnique({
           where: { id: recibo.id },
           include: {
@@ -340,7 +300,8 @@ if (alumnoId && deudasAPagar?.length > 0) {
               include: {
                 deuda: {
                   include: {
-                    estilo: true
+                    estilo: true,
+                    concepto: true
                   }
                 }
               }
@@ -348,18 +309,17 @@ if (alumnoId && deudasAPagar?.length > 0) {
           }
         });
       });
-  
+   
       return res.status(201).json(result);
-  
+   
     } catch (error) {
-      console.error('Error completo:', error);
-      console.error('Stack trace:', error instanceof Error ? error.stack : '');
+      console.error('Error al crear recibo:', error);
       res.status(400).json({ 
         error: error instanceof Error ? error.message : 'Error al crear recibo',
         details: error instanceof Error ? error.stack : undefined
       });
     }
-  }
+   }
   
   else if (req.method === 'DELETE') {
     const { id } = req.query;
