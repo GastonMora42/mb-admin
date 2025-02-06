@@ -220,123 +220,39 @@ const CajaDiaria = () => {
 
  const userRole = useUserRole();
 
- useEffect(() => {
-  // Actualización inicial
-  fetchCajaDiaria();
-  lastUpdate.current = new Date();
-  
-  // Actualizar cada minuto
-  const interval = setInterval(() => {
-    const now = new Date();
-    const argentinaDate = new Date(now.toLocaleString('en-US', {
-      timeZone: 'America/Argentina/Buenos_Aires'
-    }));
-    
-    // Si cambió el día, actualizar
-    if (argentinaDate.getDate() !== lastUpdate.current.getDate()) {
-      fetchCajaDiaria();
-      lastUpdate.current = argentinaDate;
-    }
-  }, 60000);
+ const getArgentinaDate = () => {
+  return new Date(new Date().toLocaleString('en-US', {
+    timeZone: 'America/Argentina/Buenos_Aires'
+  }));
+};
 
-  return () => clearInterval(interval);
-}, []);
+// Función para formatear fechas
+const formatArgentinaDate = (date: string | Date) => {
+  return new Date(date).toLocaleString('es-AR', {
+    timeZone: 'America/Argentina/Buenos_Aires',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  });
+};
 
- useEffect(() => {
-   const handleClickOutside = (event: MouseEvent) => {
-     const target = event.target as HTMLElement;
-     if (!target.closest('.autocomplete-container')) {
-       setShowAlumnoSuggestions(false);
-       setShowConceptoSuggestions(false);
-     }
-   };
-
-   document.addEventListener('mousedown', handleClickOutside);
-   return () => {
-     document.removeEventListener('mousedown', handleClickOutside);
-   };
- }, []);
-
- useEffect(() => {
-  if (userRole === 'Dueño' || userRole === 'Secretaria') {
-    // Actualización inicial
-    fetchCajaDiaria();
-    
-    // Configurar actualización automática cada 30 segundos
-    const interval = setInterval(() => {
-      fetchCajaDiaria();
-    }, 30000);
-    
-    setAutoUpdateInterval(interval);
-    
-    // Limpiar el intervalo cuando el componente se desmonte
-    return () => {
-      if (interval) {
-        clearInterval(interval);
-      }
-    };
-  }
-}, [userRole]); // Solo depende del userRole
-
- const filteredAlumnos = useMemo(() => {
-   if (!searchAlumno) return [];
-   const searchTermLower = searchAlumno.toLowerCase();
-   return alumnos.filter(alumno => 
-     `${alumno.apellido} ${alumno.nombre}`.toLowerCase().includes(searchTermLower)
-   );
- }, [searchAlumno, alumnos]);
-
- const filteredConceptos = useMemo(() => {
-   if (!searchConcepto) return [];
-   const searchTermLower = searchConcepto.toLowerCase();
-   return conceptos.filter(concepto => 
-     concepto.nombre.toLowerCase().includes(searchTermLower)
-   );
- }, [searchConcepto, conceptos]);
-
- const fetchAlumnos = async () => {
-   try {
-     const res = await fetch('/api/alumnos');
-     if (res.ok) {
-       const data = await res.json();
-       setAlumnos(data);
-     }
-   } catch (error) {
-     console.error('Error fetching alumnos:', error);
-   }
- };
-
- const fetchConceptos = async () => {
-   try {
-     const res = await fetch('/api/conceptos');
-     if (res.ok) {
-       const data = await res.json();
-       setConceptos(data);
-     }
-   } catch (error) {
-     console.error('Error fetching conceptos:', error);
-   }
- };
-
- const fetchCajaDiaria = async () => {
+const fetchCajaDiaria = async () => {
   if (userRole !== 'Dueño' && userRole !== 'Secretaria') return;
   
   setLoading(true);
   try {
-    const today = new Date().toISOString().split('T')[0];
+    const argentinaDate = getArgentinaDate();
+    const today = argentinaDate.toISOString().split('T')[0];
     const queryParams = new URLSearchParams();
 
-    // Si es Dueño y ha seleccionado fechas, usa esas fechas
     if (userRole === 'Dueño' && (fechaInicio || fechaFin)) {
       queryParams.append('fechaInicio', fechaInicio || today);
       queryParams.append('fechaFin', fechaFin || today);
     } else {
-      // Para Secretaria o cuando el Dueño no ha seleccionado fechas
       queryParams.append('fechaInicio', today);
       queryParams.append('fechaFin', today);
     }
 
-    // Agregar otros filtros solo si es Dueño
     if (userRole === 'Dueño') {
       Object.entries(filtros).forEach(([key, value]) => {
         if (value) queryParams.append(key, value);
@@ -362,6 +278,63 @@ const CajaDiaria = () => {
     setLoading(false);
   }
 };
+
+// Modificar el useEffect para la actualización automática
+useEffect(() => {
+  if (userRole === 'Dueño' || userRole === 'Secretaria') {
+    // Función para verificar cambio de día
+    const checkDayChange = () => {
+      const argentinaDate = getArgentinaDate();
+      const currentDate = lastUpdate.current;
+      
+      if (argentinaDate.getDate() !== currentDate.getDate() ||
+          argentinaDate.getMonth() !== currentDate.getMonth() ||
+          argentinaDate.getFullYear() !== currentDate.getFullYear()) {
+        fetchCajaDiaria();
+        lastUpdate.current = argentinaDate;
+      }
+    };
+
+    // Actualización inicial
+    fetchCajaDiaria();
+    lastUpdate.current = getArgentinaDate();
+
+    // Verificar cambio de día cada minuto
+    const dayCheckInterval = setInterval(checkDayChange, 60000);
+    
+    // Actualizar datos cada 30 segundos
+    const updateInterval = setInterval(fetchCajaDiaria, 30000);
+
+    return () => {
+      clearInterval(dayCheckInterval);
+      clearInterval(updateInterval);
+    };
+  }
+}, [userRole]);
+
+ const fetchAlumnos = async () => {
+   try {
+     const res = await fetch('/api/alumnos');
+     if (res.ok) {
+       const data = await res.json();
+       setAlumnos(data);
+     }
+   } catch (error) {
+     console.error('Error fetching alumnos:', error);
+   }
+ };
+
+ const fetchConceptos = async () => {
+   try {
+     const res = await fetch('/api/conceptos');
+     if (res.ok) {
+       const data = await res.json();
+       setConceptos(data);
+     }
+   } catch (error) {
+     console.error('Error fetching conceptos:', error);
+   }
+ };
 
  const renderAlumnoNombre = (recibo: Recibo) => {
    if (recibo.alumno) {

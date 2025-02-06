@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import prisma from '@/lib/prisma'
 import { PrinterService } from '@/lib/printer/printer.service'
+import { getArgentinaDateTime } from '@/utils/dateUtils';
 
 export const config = {
   api: {
@@ -180,12 +181,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       } = req.body;
   
       // Ajustamos la fecha a la zona horaria de Argentina
-      const fechaEfectoArgentina = new Date(fechaEfecto);
-      fechaEfectoArgentina.setUTCHours(fechaEfectoArgentina.getUTCHours() - 3); // UTC-3 para Argentina
-  
-      const fechaArgentina = new Date(new Date().toLocaleString('en-US', {
-        timeZone: 'America/Argentina/Buenos_Aires'
-      }));
+      const fechaArgentina = getArgentinaDateTime();
 
       const printerService = new PrinterService();
 
@@ -240,38 +236,54 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           }
         });
   
-        // 2. Si hay deudas a pagar, procesarlas
-        if (alumnoId && deudasAPagar?.length > 0) {
-          // Crear los pagos de deuda y actualizar estados
-          for (const deuda of deudasAPagar) {
-            // Obtener la deuda original para verificar si es de inscripción
-            const deudaOriginal = await tx.deuda.findUnique({
-              where: { id: deuda.deudaId },
-              include: {
-                concepto: true // Incluir el concepto para verificar si es inscripción
-              }
-            });
-        
-            // Crear el pago
-            await tx.pagoDeuda.create({
-              data: {
-                deudaId: deuda.deudaId,
-                reciboId: recibo.id,
-                monto: deuda.monto,
-                fecha: fechaEfectoArgentina // Usamos la misma fecha ajustada
-              }
-            });
-            
-            // Actualizar la deuda
-            await tx.deuda.update({
-              where: { id: deuda.deudaId },
-              data: {
-                pagada: true,
-                fechaPago: new Date()
-              }
-            });
-          }
+// Si hay deudas a pagar, procesarlas
+if (alumnoId && deudasAPagar?.length > 0) {
+  // Crear los pagos de deuda y actualizar estados
+  for (const deuda of deudasAPagar) {
+    // Obtener la deuda original para verificar si es de inscripción
+    const deudaOriginal = await tx.deuda.findUnique({
+      where: { id: deuda.deudaId },
+      include: {
+        concepto: true // Incluir el concepto para verificar si es inscripción
+      }
+    });
+
+    // Crear el pago usando la fecha de Argentina
+    const fechaPagoArgentina = new Date(new Date().toLocaleString('en-US', {
+      timeZone: 'America/Argentina/Buenos_Aires'
+    }));
+
+    // Crear el pago
+    await tx.pagoDeuda.create({
+      data: {
+        deudaId: deuda.deudaId,
+        reciboId: recibo.id,
+        monto: deuda.monto,
+        fecha: fechaPagoArgentina
+      }
+    });
+    
+    // Actualizar la deuda con la misma fecha de Argentina
+    await tx.deuda.update({
+      where: { id: deuda.deudaId },
+      data: {
+        pagada: true,
+        fechaPago: fechaPagoArgentina
+      }
+    });
+
+    // Si es deuda de inscripción, actualizar el estado en el alumno
+    if (deudaOriginal?.concepto?.esInscripcion) {
+      await tx.alumno.update({
+        where: { id: parseInt(alumnoId) },
+        data: {
+          inscripcionPagada: true,
+          fechaPagoInscripcion: fechaPagoArgentina
         }
+      });
+    }
+  }
+}
   
         try {
           const printPromise = printerService.printReceipt(recibo);
