@@ -273,16 +273,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           }
         }
   
-        // Imprimir recibo
         try {
-          const printResult = await printerService.printReceipt(recibo);
-          
+          const printPromise = printerService.printReceipt(recibo);
+          const timeoutPromise = new Promise<{ success: boolean; message?: string }>((_, reject) => 
+            setTimeout(() => reject(new Error('Timeout de impresión')), 8000)
+          );
+  
+          const printResult = await Promise.race([printPromise, timeoutPromise])
+            .catch(error => ({
+              success: false,
+              message: error instanceof Error ? error.message : 'Error desconocido'
+            }));
+  
           if (!printResult.success) {
-            console.warn('No se pudo imprimir el recibo:', printResult.message);
+            console.warn('Problema al imprimir:', printResult.message);
           }
         } catch (printError) {
-          console.error('Error al intentar imprimir:', printError);
+          console.error('Error en impresión:', printError);
         }
+  
 
         // Retornar el recibo creado con toda la información actualizada
         return await tx.recibo.findUnique({

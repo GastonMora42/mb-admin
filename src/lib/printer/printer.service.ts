@@ -136,60 +136,62 @@ export class PrinterService {
 
     
   }
-  
-  async printReceipt(recibo: ReciboWithRelations): Promise<{ success: boolean; message?: string }> {
-    try {
-      // Preparar las operaciones de impresión
-      const operaciones = this.prepareReceiptOperations(recibo);
-  
-      // Usar retryFetch en lugar de fetch directo
-      const response = await this.retryFetch(`${this.bridgeUrl}/imprimir`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          nombre_impresora: 'POS-58',
-          operaciones: operaciones
-        })
-      });
-  
-      const result = await response.json();
-      
-      if (!result.success) {
-        console.warn('Intento de impresión fallido, probando método alternativo...');
-        await this.fallbackPrint(recibo);
-        return { success: true, message: 'Impreso usando método alternativo' };
-      }
-  
-      return { 
-        success: true, 
-        message: 'Recibo impreso correctamente' 
-      };
-  
-    } catch (error) {
-      console.error('Error al imprimir:', error);
-      try {
-        // Intentar método alternativo si falla el principal
-        await this.fallbackPrint(recibo);
-        return { 
-          success: true, 
-          message: 'Impreso usando método alternativo después de error' 
-        };
-      } catch (fallbackError) {
-        return { 
-          success: false, 
-          message: error instanceof Error ? error.message : 'Error desconocido en la impresión' 
-        };
-      }
-    }
-  }
 
-  private async fallbackPrint(recibo: ReciboWithRelations): Promise<void> {
+  async printReceipt(recibo: ReciboWithRelations): Promise<{ success: boolean; message?: string }> {
+  // Configurar un AbortController para el timeout
+  const controller = new AbortController();
+  const timeout = setTimeout(() => {
+    controller.abort();
+  }, 5000); // 5 segundos de timeout
+
+  try {
+    const operaciones = this.prepareReceiptOperations(recibo);
+    
+    const response = await this.retryFetch(`${this.bridgeUrl}/imprimir`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        nombre_impresora: 'POS-58',
+        operaciones: operaciones
+      }),
+      signal: controller.signal
+    });
+
+    clearTimeout(timeout);
+    
+    const result = await response.json();
+    
+    if (!result.success) {
+      console.warn('Fallo impresión normal, intentando fallback...');
+      return await this.fallbackPrint(recibo);
+    }
+
+    return { success: true, message: 'Impresión exitosa' };
+
+  } catch (error) {
+    clearTimeout(timeout);
+    
+    if (error === 'AbortError') {
+      console.warn('Timeout en impresión, intentando fallback...');
+      return await this.fallbackPrint(recibo);
+    }
+
+    console.error('Error en impresión:', error);
+    return { 
+      success: false, 
+      message: 'Error en impresión: ' + (error instanceof Error ? error.message : 'Error desconocido')
+    };
+  }
+}
+
+private async fallbackPrint(recibo: ReciboWithRelations): Promise<{ success: boolean; message?: string }> {
+  try {
     const texto = this.prepareReceiptOperations(recibo)
       .map(op => op.datos)
       .join('\n');
-
+      
     const response = await this.retryFetch(`${this.bridgeUrl}/imprimir`, {
       method: 'POST',
       headers: {
@@ -200,13 +202,20 @@ export class PrinterService {
         operaciones: [{ accion: 'text', datos: texto }]
       })
     });
-
+    
     const result = await response.json();
     if (!result.success) {
-      throw new Error('Método alternativo de impresión falló');
+      return { success: false, message: 'Método alternativo de impresión falló' };
     }
+    
+    return { success: true, message: 'Impreso usando método alternativo' };
+  } catch (error) {
+    return { 
+      success: false, 
+      message: error instanceof Error ? error.message : 'Error en impresión alternativa'
+    };
   }
-
+}
   async checkStatus(): Promise<{ connected: boolean; error?: string }> {
     try {
       const response = await this.retryFetch(`${this.bridgeUrl}/getprinters`);
