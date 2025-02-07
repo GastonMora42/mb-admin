@@ -1,6 +1,6 @@
 // components/Asistencias/index.tsx
 import React, { useState, useEffect, useCallback } from 'react';
-import styled from 'styled-components';
+import styled, { createGlobalStyle } from 'styled-components';
 import { Profesor, Estilo, Alumno } from '@/types';
 import { Button } from '../button';
 
@@ -181,6 +181,166 @@ const CheckboxWrapper = styled.div`
   }
 `;
 
+const ModalOverlay = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+`;
+
+const ModalContent = styled.div`
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  width: 90%;
+  max-width: 500px;
+  max-height: 80vh;
+  overflow-y: auto;
+
+  @media (max-width: 768px) {
+    width: 95%;
+    margin: 10px;
+  }
+`;
+
+const SearchInput = styled(Input)`
+  margin: 10px 0;
+  width: 100%;
+`;
+
+const ActionIcons = styled.div`
+  display: flex;
+  gap: 8px;
+`;
+
+const IconButton = styled.button<{ color?: string }>`
+  padding: 6px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  background: ${props => 
+    props.color === "success" ? "#4caf50" :
+    props.color === "danger" ? "#f44336" :
+    "#e0e0e0"};
+  color: white;
+  
+  &:hover {
+    opacity: 0.8;
+  }
+`;
+
+const ResponsiveTable = styled.div`
+  width: 100%;
+  overflow-x: auto;
+  
+  @media (max-width: 768px) {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+`;
+
+const Card = styled.div`
+  display: none;
+  
+  @media (max-width: 768px) {
+    display: flex;
+    flex-direction: column;
+    background: white;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  }
+`;
+
+const CardRow = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid #eee;
+  
+  &:last-child {
+    border-bottom: none;
+  }
+`;
+
+const Value = styled.span`
+  color: #333;
+`;
+
+// Add these global styles
+const GlobalStyle = createGlobalStyle`
+  @media (max-width: 768px) {
+    .desktop-only {
+      display: none;
+    }
+  }
+  
+  @media (min-width: 769px) {
+    .mobile-only {
+      display: none;
+    }
+  }
+`;
+
+const Icon = styled.span`
+  margin-right: 8px;
+`;
+
+const ModalHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #eee;
+`;
+
+const CloseButton = styled.button`
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  padding: 0 8px;
+  color: #666;
+  
+  &:hover {
+    color: #000;
+  }
+`;
+
+const AlumnosList = styled.div`
+  max-height: 300px;
+  overflow-y: auto;
+`;
+
+const AlumnoItem = styled.div`
+  padding: 10px;
+  border-bottom: 1px solid #eee;
+  cursor: pointer;
+  &:hover {
+    background: #f5f5f5;
+  }
+`;
+
+const ActionButtons = styled.div`
+  display: flex;
+  gap: 10px;
+  margin: 20px 0;
+  flex-wrap: wrap;
+
+  @media (max-width: 768px) {
+    flex-direction: column;
+  }
+`;
+
 const Message = styled.div<{ type: 'success' | 'error' }>`
   margin-top: 20px;
   padding: 15px;
@@ -191,6 +351,17 @@ const Message = styled.div<{ type: 'success' | 'error' }>`
   font-size: 14px;
   line-height: 1.5;
 `;
+
+interface SearchableAlumno extends Alumno {
+  searchText?: string;
+}
+
+interface SearchModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSelect: (alumno: Alumno) => void;
+  alumnos: SearchableAlumno[];
+}
 
 // Interfaces actualizadas
 interface AlumnoConAsistencia extends Alumno {
@@ -215,6 +386,8 @@ const TomarAsistencia: React.FC = () => {
   const [alumnosSeleccionados, setAlumnosSeleccionados] = useState<AlumnoConAsistencia[]>([]);
   const [alumnosSueltos, setAlumnosSueltos] = useState<AlumnoSuelto[]>([]);
   const [mostrarFormularioSuelto, setMostrarFormularioSuelto] = useState(false);
+  const [showSearchModal, setShowSearchModal] = useState(false);
+  const [todosLosAlumnos, setTodosLosAlumnos] = useState<Alumno[]>([]);
   const [nuevoAlumnoSuelto, setNuevoAlumnoSuelto] = useState<AlumnoSuelto>({
     nombre: '',
     apellido: '',
@@ -286,6 +459,23 @@ const TomarAsistencia: React.FC = () => {
       setMessage({ text: 'Error al cargar alumnos', type: 'error' });
     }
   };
+
+  const fetchTodosLosAlumnos = async () => {
+    try {
+      const res = await fetch('/api/alumnos');
+      if (!res.ok) throw new Error('Error al obtener alumnos');
+      const data = await res.json();
+      setTodosLosAlumnos(data);
+    } catch (error) {
+      console.error('Error:', error);
+      setMessage({ text: 'Error al cargar alumnos', type: 'error' });
+    }
+  };
+  
+  // Add to useEffect
+  useEffect(() => {
+    fetchTodosLosAlumnos();
+  }, []);
 
   // Handlers
   const handleProfesorChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -390,7 +580,56 @@ const TomarAsistencia: React.FC = () => {
     setMostrarFormularioSuelto(false);
   };
 
+  const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose, onSelect, alumnos }) => {
+    const [searchTerm, setSearchTerm] = useState('');
+    const [filteredAlumnos, setFilteredAlumnos] = useState<SearchableAlumno[]>([]);
+  
+    useEffect(() => {
+      const filtered = alumnos.filter(alumno => 
+        `${alumno.nombre} ${alumno.apellido} ${alumno.dni}`
+          .toLowerCase()
+          .includes(searchTerm.toLowerCase())
+      );
+      setFilteredAlumnos(filtered);
+    }, [searchTerm, alumnos]);
+  
+    if (!isOpen) return null;
+  
+    return (
+      <ModalOverlay>
+        <ModalContent>
+          <ModalHeader>
+            <h3>Buscar Alumno Regular</h3>
+            <CloseButton onClick={onClose}>&times;</CloseButton>
+          </ModalHeader>
+          <SearchInput
+            type="text"
+            placeholder="Buscar por nombre, apellido o DNI..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            autoFocus
+          />
+          <AlumnosList>
+            {filteredAlumnos.map(alumno => (
+              <AlumnoItem
+                key={alumno.id}
+                onClick={() => {
+                  onSelect(alumno);
+                  onClose();
+                }}
+              >
+                {alumno.nombre} {alumno.apellido} - DNI: {alumno.dni}
+              </AlumnoItem>
+            ))}
+          </AlumnosList>
+        </ModalContent>
+      </ModalOverlay>
+    );
+  };
+
   return (
+    <>
+  <GlobalStyle />
     <PageContainer>
       <Container>
         <Title>Registro de Asistencia</Title>
@@ -431,13 +670,25 @@ const TomarAsistencia: React.FC = () => {
           <AlumnosSection>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
               <h3>Alumnos del Estilo</h3>
-              <Button 
-                type="button" 
-                onClick={() => setMostrarFormularioSuelto(true)}
-                disabled={loading}
-              >
-                Agregar Alumno Suelto
-              </Button>
+              <ActionButtons>
+  <Button onClick={() => setMostrarFormularioSuelto(true)}>
+    <Icon>+</Icon> Alumno Suelto
+  </Button>
+  <Button onClick={() => setShowSearchModal(true)}>
+    <Icon>🔍</Icon> Buscar Alumno Regular
+  </Button>
+</ActionButtons>
+
+<SearchModal
+  isOpen={showSearchModal}
+  onClose={() => setShowSearchModal(false)}
+  onSelect={(alumno) => {
+    if (!alumnosSeleccionados.find(a => a.id === alumno.id)) {
+      setAlumnosSeleccionados(prev => [...prev, { ...alumno, asistio: true }]);
+    }
+  }}
+  alumnos={todosLosAlumnos}
+/>
             </div>
 
             {mostrarFormularioSuelto && (
@@ -522,7 +773,9 @@ const TomarAsistencia: React.FC = () => {
 
             {/* Tabla de Asistencias */}
             {(alumnosSeleccionados.length > 0 || alumnosSueltos.length > 0) && (
-              <Table>
+  <ResponsiveTable>
+  {/* Desktop View */}
+  <Table className="desktop-only">
                 <thead>
                   <tr>
                     <Th>Nombre</Th>
@@ -539,23 +792,21 @@ const TomarAsistencia: React.FC = () => {
                       <Td>{alumno.apellido}</Td>
                       <Td>Regular</Td>
                       <Td>
-                        <CheckboxWrapper>
-                          <input
-                            type="checkbox"
-                            checked={alumno.asistio}
-                            onChange={(e) => handleAsistenciaChange(alumno.id, e.target.checked)}
-                            disabled={loading}
-                          />
-                        </CheckboxWrapper>
-                      </Td>
-                      <Td>
-                        <DeleteButton 
-                          onClick={() => handleRemoveAlumno(alumno.id)}
-                          disabled={loading}
-                        >
-                          Eliminar
-                        </DeleteButton>
-                      </Td>
+  <ActionIcons>
+    <IconButton 
+      onClick={() => handleAsistenciaChange(alumno.id, !alumno.asistio)}
+      color={alumno.asistio ? "success" : "default"}
+    >
+      {alumno.asistio ? "✓" : "✗"}
+    </IconButton>
+    <IconButton 
+      onClick={() => handleRemoveAlumno(alumno.id)}
+      color="danger"
+    >
+      🗑️
+    </IconButton>
+  </ActionIcons>
+</Td>
                     </Tr>
                   ))}
                   {alumnosSueltos.map((alumno, index) => (
@@ -584,7 +835,87 @@ const TomarAsistencia: React.FC = () => {
                   ))}
                 </tbody>
               </Table>
-            )}
+
+                  {/* Mobile View */}
+    <div className="mobile-only">
+      {alumnosSeleccionados.map(alumno => (
+        <Card key={alumno.id}>
+          <CardRow>
+            <Label>Nombre:</Label>
+            <Value>{alumno.nombre}</Value>
+          </CardRow>
+          <CardRow>
+            <Label>Apellido:</Label>
+            <Value>{alumno.apellido}</Value>
+          </CardRow>
+          <CardRow>
+            <Label>Tipo:</Label>
+            <Value>Regular</Value>
+          </CardRow>
+          <CardRow>
+            <Label>Asistió:</Label>
+            <CheckboxWrapper>
+              <input
+                type="checkbox"
+                checked={alumno.asistio}
+                onChange={(e) => handleAsistenciaChange(alumno.id, e.target.checked)}
+                disabled={loading}
+              />
+            </CheckboxWrapper>
+          </CardRow>
+          <CardRow>
+            <Label>Acciones:</Label>
+            <ActionIcons>
+              <IconButton 
+                onClick={() => handleRemoveAlumno(alumno.id)}
+                color="danger"
+              >
+                Eliminar
+              </IconButton>
+            </ActionIcons>
+          </CardRow>
+        </Card>
+      ))}
+      {alumnosSueltos.map((alumno, index) => (
+        <Card key={`suelto-${index}`}>
+          <CardRow>
+            <Label>Nombre:</Label>
+            <Value>{alumno.nombre}</Value>
+          </CardRow>
+          <CardRow>
+            <Label>Apellido:</Label>
+            <Value>{alumno.apellido}</Value>
+          </CardRow>
+          <CardRow>
+            <Label>Tipo:</Label>
+            <Value>Suelto</Value>
+          </CardRow>
+          <CardRow>
+            <Label>Asistió:</Label>
+            <CheckboxWrapper>
+              <input
+                type="checkbox"
+                checked={true}
+                disabled
+              />
+            </CheckboxWrapper>
+          </CardRow>
+          <CardRow>
+            <Label>Acciones:</Label>
+            <ActionIcons>
+              <IconButton 
+                onClick={() => handleRemoveAlumnoSuelto(index)}
+                color="danger"
+              >
+                Eliminar
+              </IconButton>
+            </ActionIcons>
+          </CardRow>
+        </Card>
+      ))}
+    </div>
+  </ResponsiveTable>
+)}
 
             {/* Botón Finalizar Clase */}
             {(alumnosSeleccionados.length > 0 || alumnosSueltos.length > 0) && (
@@ -609,6 +940,7 @@ const TomarAsistencia: React.FC = () => {
         )}
       </Container>
     </PageContainer>
+    </>
   );
 };
 
