@@ -744,16 +744,40 @@ const crearRecibosPendientes = async () => {
         };
       }, []);
 
-  const fetchAlumnos = async () => {
-    try {
-      const res = await fetch('/api/alumnos');
-      if (!res.ok) throw new Error('Error al obtener alumnos');
-      const data = await res.json();
-      setAlumnos(data);
-    } catch (error) {
-      console.error('Error fetching alumnos:', error);
-    }
-  };
+// En la función fetchAlumnos
+const fetchAlumnos = async () => {
+  try {
+    const res = await fetch('/api/alumnos');
+    if (!res.ok) throw new Error('Error al obtener alumnos');
+    const data = await res.json();
+    // Filtrar solo alumnos activos antes de setear el estado
+    const alumnosActivos = data.filter((alumno: Alumno) => alumno.activo);
+    setAlumnos(alumnosActivos);
+  } catch (error) {
+    console.error('Error fetching alumnos:', error);
+  }
+};
+
+// En el useMemo de filteredAlumnosForm
+const filteredAlumnosForm = useMemo(() => {
+  if (!searchAlumno) return [];
+  const searchTermLower = searchAlumno.toLowerCase();
+  return (nuevoRecibo.esClaseSuelta ? alumnosSueltos : alumnos)
+    .filter(alumno => 
+      `${alumno.apellido} ${alumno.nombre}`.toLowerCase().includes(searchTermLower)
+    );
+}, [searchAlumno, alumnos, alumnosSueltos, nuevoRecibo.esClaseSuelta]);
+
+// También en filteredAlumnos para el panel de filtros
+const filteredAlumnos = useMemo(() => {
+  if (!searchTerm) return [];
+  const searchTermLower = searchTerm.toLowerCase();
+  return alumnos
+    .filter(alumno => 
+      `${alumno.apellido} ${alumno.nombre}`.toLowerCase().includes(searchTermLower) &&
+      alumno.activo
+    );
+}, [searchTerm, alumnos]);
 
   const fetchAlumnosSueltos = async () => {
     try {
@@ -813,14 +837,6 @@ const crearRecibosPendientes = async () => {
     }
   };
   
-  const filteredAlumnos = useMemo(() => {
-    if (!searchTerm) return [];
-    const searchTermLower = searchTerm.toLowerCase();
-    return alumnos.filter(alumno => 
-      `${alumno.apellido} ${alumno.nombre}`.toLowerCase().includes(searchTermLower)
-    );
-  }, [searchTerm, alumnos]);
-
   const calcularVistaPrevia = () => {
     const montoBase = parseFloat(nuevoRecibo.monto) || 0;
     const deudasTotal = Object.values(deudasSeleccionadas).reduce(
@@ -845,15 +861,6 @@ const crearRecibosPendientes = async () => {
       deudasAPagar
     });
   };
-
-  const filteredAlumnosForm = useMemo(() => {
-    if (!searchAlumno) return [];
-    const searchTermLower = searchAlumno.toLowerCase();
-    return (nuevoRecibo.esClaseSuelta ? alumnosSueltos : alumnos)
-      .filter(alumno => 
-        `${alumno.apellido} ${alumno.nombre}`.toLowerCase().includes(searchTermLower)
-      );
-  }, [searchAlumno, alumnos, alumnosSueltos, nuevoRecibo.esClaseSuelta]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
