@@ -4,8 +4,8 @@ import ConfigureAmplifyClientSide from '@/amplify-cognito-config'
 import ProtectedRoute from '@/components/ProtectedRoutes'
 import { useRouter } from 'next/router'
 import { useEffect, useState } from 'react'
-import { getCurrentUser } from 'aws-amplify/auth'
-import { Hub as AWSHub } from '@aws-amplify/core'
+import { fetchAuthSession } from 'aws-amplify/auth'
+import { Hub } from 'aws-amplify/utils'
 import { createGlobalStyle } from 'styled-components'
 
 const GlobalStyle = createGlobalStyle`
@@ -99,25 +99,32 @@ function AppContent({ Component, pageProps }: AppProps) {
  useEffect(() => {
    const checkAuth = async () => {
      try {
-       await getCurrentUser()
-       setIsAuthenticated(true)
+       const session = await fetchAuthSession()
+       setIsAuthenticated(!!session.tokens)
      } catch {
        setIsAuthenticated(false)
      }
    }
    
-   const listener = AWSHub.listen('auth', ({ payload }) => {
+   const listener = Hub.listen('auth', ({ payload }) => {
     const { event } = payload
     if (event === 'signedIn') setIsAuthenticated(true)
     if (event === 'signedOut') setIsAuthenticated(false)
    })
   
    checkAuth()
-   return () => listener()
+   
+   // Verificar la sesión periódicamente
+   const intervalId = setInterval(checkAuth, 15 * 60 * 1000) // cada 15 minutos
+   
+   return () => {
+     listener()
+     clearInterval(intervalId)
+   }
  }, [])
 
  useEffect(() => {
-   if (!isAuthenticated && !publicPaths.includes(router.pathname)) {
+   if (isAuthenticated === false && !publicPaths.includes(router.pathname)) {
      router.push('/login')
    }
  }, [isAuthenticated, router, router.pathname])

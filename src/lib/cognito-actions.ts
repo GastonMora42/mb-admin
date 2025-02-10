@@ -11,6 +11,7 @@ import {
 } from "aws-amplify/auth";
 import { Amplify } from 'aws-amplify';
 import { getErrorMessage } from "@/utils/get-error-message";
+import { authConfig } from '@/amplify-cognito-config'; // Asegúrate de que la ruta sea correcta
 
 // Interfaces
 interface AuthResponse {
@@ -129,7 +130,14 @@ export async function setAuthCookie() {
     const session = await getCurrentUser();
     const userAttributes = await fetchUserAttributes();
     const token = JSON.stringify({ session, userAttributes });
-    document.cookie = `auth-token=${token}; path=/; max-age=3600; secure`;
+    
+    // Aumentamos el tiempo de vida de la cookie a 7 días (en segundos)
+    const maxAge = 7 * 24 * 60 * 60;
+    
+    document.cookie = `auth-token=${token}; path=/; max-age=${maxAge}; secure; samesite=strict`;
+    
+    // Guardamos también en localStorage como respaldo
+    localStorage.setItem('auth-session', token);
   } catch (error) {
     console.error('Error setting auth cookie:', error);
   }
@@ -165,33 +173,40 @@ export async function handleConfirmSignUp(email: string, code: string): Promise<
   }
 }
 
-// Inicio de sesión
+// src/lib/cognito-actions.ts
+// src/lib/cognito-actions.ts
 export async function handleSignIn(email: string, password: string): Promise<AuthResponse> {
   if (!email || !password) {
     throw new Error("El correo y la contraseña son requeridos");
   }
 
   try {
-    // Cerrar sesión existente si la hay
-    try {
-      await handleSignOut();
-    } catch (error) {
-      console.log("No había sesión activa");
-    }
-
     const { isSignedIn, nextStep } = await signIn({
       username: email,
       password
     });
 
     if (isSignedIn) {
-      await setAuthCookie();
-      const userAttributes = await fetchUserAttributes();
-      return { 
-        success: true, 
-        redirectTo: "/dashboard",
-        user: userAttributes
-      };
+      // Esperar a que la sesión esté completamente establecida
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      try {
+        const userAttributes = await fetchUserAttributes();
+        await setAuthCookie();
+        
+        return { 
+          success: true, 
+          redirectTo: "/dashboard",
+          user: userAttributes
+        };
+      } catch (attributeError) {
+        console.error('Error fetching user attributes:', attributeError);
+        return {
+          success: false,
+          redirectTo: "/login",
+          error: "Error al obtener los datos del usuario"
+        };
+      }
     }
 
     if (nextStep.signInStep === "CONFIRM_SIGN_UP") {

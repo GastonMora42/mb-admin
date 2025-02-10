@@ -9,10 +9,11 @@ import {
   LockClosedIcon
 } from "@heroicons/react/24/outline";
 import { Button } from "@/components/button";
-import { handleSignIn, checkAuthStatus, signOut } from "@/lib/cognito-actions";
+import { handleSignIn } from "@/lib/cognito-actions";
 import Link from "next/link";
 import { useRouter } from 'next/router';
 import Image from 'next/image';
+import { fetchAuthSession } from 'aws-amplify/auth';
 
 const LoginForm: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string | undefined>(undefined);
@@ -21,12 +22,11 @@ const LoginForm: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const router = useRouter();
 
-  // Verificar el estado de autenticación al cargar el componente
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const authStatus = await checkAuthStatus();
-        if (authStatus.isAuthenticated) {
+        const session = await fetchAuthSession()
+        if (session.tokens) {
           setIsAuthenticated(true);
           router.push('/dashboard');
         }
@@ -48,31 +48,21 @@ const LoginForm: React.FC = () => {
     const password = formData.get('password') as string;
 
     try {
-      // Si ya hay una sesión activa, cerrarla primero
-      if (isAuthenticated) {
-        await signOut();
-      }
-
       const result = await handleSignIn(email, password);
       
       if (result.success) {
         setIsAuthenticated(true);
-        // Guardar token en localStorage o en un estado global (context/redux)
-        localStorage.setItem('authToken', result.token);
-        
-        // Redirigir al dashboard o a la página anterior si existe
         const returnUrl = router.query.returnUrl as string;
         router.push(returnUrl || '/dashboard');
       } else if (result.redirectTo) {
         router.push(result.redirectTo);
       } else {
-        setErrorMessage('Inicio de sesión fallido. Por favor, verifica tus credenciales.');
+        setErrorMessage(result.error || 'Inicio de sesión fallido. Por favor, verifica tus credenciales.');
       }
     } catch (error) {
       let errorMsg = 'Ocurrió un error durante el inicio de sesión';
       
       if (error instanceof Error) {
-        // Manejar diferentes tipos de errores
         switch (error.name) {
           case 'NotAuthorizedException':
             errorMsg = 'Credenciales incorrectas';
@@ -251,12 +241,13 @@ const LoginForm: React.FC = () => {
   );
 }
 
+
 // Agregar protección de ruta HOC
 export const getServerSideProps = async (context: any) => {
   try {
-    const authStatus = await checkAuthStatus(context);
+    const session = await fetchAuthSession();
     
-    if (authStatus.isAuthenticated) {
+    if (session.tokens) {
       return {
         redirect: {
           destination: '/dashboard',

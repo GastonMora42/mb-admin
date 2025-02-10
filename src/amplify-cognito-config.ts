@@ -4,7 +4,7 @@ import React from "react";
 import dotenv from 'dotenv';
 dotenv.config();
 
-const authConfig: ResourcesConfig["Auth"] = { 
+export const authConfig: ResourcesConfig["Auth"] = { 
   Cognito: {
     userPoolId: "us-east-1_OpCljWDF7",
     userPoolClientId: "7tmctt10ht1q3tff359eii7jv0",
@@ -61,6 +61,7 @@ function handleSessionExpiration() {
     window.removeEventListener('keypress', resetTimer);
   };
 }
+
 
 // Componente para usar en _app.tsx o similar
 export default function ConfigureAmplifyClientSide() {
