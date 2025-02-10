@@ -14,6 +14,7 @@ export interface DashboardData {
       inactivos: number;
       sueltos: number;
       bajas: number;  // Nueva línea agregada
+      inscripciones: number; // Añadimos esta métrica
       tasaCrecimiento: string;
     };
     clases: {
