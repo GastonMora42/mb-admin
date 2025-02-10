@@ -112,7 +112,7 @@ export default async function handler(
         fecha: 'desc'
       } as Prisma.ReciboOrderByWithRelationInput,
     });
-    
+
     const { start, end } = getArgentinaDayRange();
     
     console.log('Recibos encontrados:', recibos.length);
@@ -125,18 +125,23 @@ export default async function handler(
     console.log('Start:', start.toISOString());
     console.log('End:', end.toISOString());
     
-    const totalMonto = recibos.reduce((sum, recibo) => sum + recibo.monto, 0);
+    // Modificar el cálculo de totales para excluir recibos anulados
+    const totalMonto = recibos
+      .filter(recibo => !recibo.anulado)
+      .reduce((sum, recibo) => sum + recibo.monto, 0);
 
-    const totalPorTipoPago = recibos.reduce<Record<string, number>>((acc, recibo) => {
-      const tipo = recibo.tipoPago || 'sin_tipo';
-      acc[tipo] = (acc[tipo] || 0) + recibo.monto;
-      return acc;
-    }, {});
+    const totalPorTipoPago = recibos
+      .filter(recibo => !recibo.anulado)
+      .reduce<Record<string, number>>((acc, recibo) => {
+        const tipo = recibo.tipoPago || 'sin_tipo';
+        acc[tipo] = (acc[tipo] || 0) + recibo.monto;
+        return acc;
+      }, {});
 
     res.status(200).json({
-      recibos,
-      totalMonto,
-      totalPorTipoPago
+      recibos, // Enviamos todos los recibos, anulados y no anulados
+      totalMonto, // Solo suma los no anulados
+      totalPorTipoPago // Solo incluye los no anulados
     });
   } catch (error) {
     console.error('Error al obtener recibos:', error);

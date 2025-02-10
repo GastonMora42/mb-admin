@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import styled from 'styled-components';
 import { useUserRole } from '@/hooks/useUserRole';
+import recibos from '@/pages/api/recibos';
 
 const Container = styled.div`
  background-color: #FFFFFF;
@@ -175,6 +176,7 @@ const SuggestionItem = styled.li`
 `;
 
 interface Recibo {
+ anulado: any;
  id: number;
  numeroRecibo: number;
  fecha: string;
@@ -335,6 +337,7 @@ useEffect(() => {
      console.error('Error fetching conceptos:', error);
    }
  };
+
 
  const renderAlumnoNombre = (recibo: Recibo) => {
    if (recibo.alumno) {
@@ -557,31 +560,48 @@ useEffect(() => {
            </thead>
            <tbody>
              {cajaData.recibos.map((recibo) => (
-               <Tr key={recibo.id}>
-                 <Td>{recibo.numeroRecibo}</Td>
-                 <Td>{new Date(recibo.fecha).toLocaleDateString()}</Td>
-                 <Td>{renderAlumnoNombre(recibo)}</Td>
-                 <Td>{recibo.concepto.nombre}</Td>
-                 <Td>{recibo.periodoPago}</Td>
-                 <Td>{recibo.fueraDeTermino ? 'Sí' : 'No'}</Td>
-                 <Td>${recibo.monto.toFixed(0)}</Td>
-                 <Td>{recibo.tipoPago}</Td>
-               </Tr>
+<Tr key={recibo.id} style={{
+  color: recibo.anulado ? '#ff0000' : 'inherit',
+  backgroundColor: recibo.anulado ? '#ffebee' : undefined
+}}>
+  <Td>{recibo.numeroRecibo}</Td>
+  <Td>{new Date(recibo.fecha).toLocaleDateString()}</Td>
+  <Td>{renderAlumnoNombre(recibo)}</Td>
+  <Td>{recibo.concepto.nombre}</Td>
+  <Td>{recibo.periodoPago}</Td>
+  <Td>{recibo.fueraDeTermino ? 'Sí' : 'No'}</Td>
+  <Td style={{
+    textDecoration: recibo.anulado ? 'line-through' : 'none'
+  }}>${recibo.monto.toFixed(0)}</Td>
+  <Td>{recibo.tipoPago}</Td>
+</Tr>
              ))}
            </tbody>
          </Table>
          
-         <TotalesContainer>
-           <TotalGeneral>Total General: ${cajaData.totalMonto.toFixed(0)}</TotalGeneral>
-           <TotalesPorTipo>
-             {Object.entries(cajaData.totalPorTipoPago).map(([tipo, total]) => (
-               <TotalTipo key={tipo}>
-                 <TipoLabel>{tipo}</TipoLabel>
-                 <TipoMonto>${total.toFixed(0)}</TipoMonto>
-               </TotalTipo>
-             ))}
-           </TotalesPorTipo>
-         </TotalesContainer>
+<TotalesContainer>
+  <TotalGeneral>
+    Total General: ${cajaData.totalMonto.toFixed(0)}
+    {cajaData.recibos.some(r => r.anulado) && (
+      <span style={{ 
+        fontSize: '0.8em', 
+        color: '#666',
+        display: 'block',
+        marginTop: '5px'
+      }}>
+        (No incluye recibos anulados)
+      </span>
+    )}
+  </TotalGeneral>
+  <TotalesPorTipo>
+    {Object.entries(cajaData.totalPorTipoPago).map(([tipo, total]) => (
+      <TotalTipo key={tipo}>
+        <TipoLabel>{tipo}</TipoLabel>
+        <TipoMonto>${total.toFixed(0)}</TipoMonto>
+      </TotalTipo>
+    ))}
+  </TotalesPorTipo>
+</TotalesContainer>
        </>
      )}
    </Container>
