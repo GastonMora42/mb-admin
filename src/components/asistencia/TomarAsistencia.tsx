@@ -4,6 +4,130 @@ import styled, { createGlobalStyle } from 'styled-components';
 import { Profesor, Estilo, Alumno } from '@/types';
 import { Button } from '../button';
 
+const Input = styled.input`
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+  transition: border-color 0.3s ease;
+  color: #000000;
+  -webkit-text-fill-color: #000000;
+  background-color: #FFFFFF;
+
+  &::placeholder {
+    color: #666666;
+    -webkit-text-fill-color: #666666;
+  }
+
+  &:focus {
+    border-color: #FFC001;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(255, 192, 1, 0.1);
+  }
+
+  &:disabled {
+    background-color: #f5f5f5;
+    cursor: not-allowed;
+  }
+
+  &:-webkit-autofill,
+  &:-webkit-autofill:hover,
+  &:-webkit-autofill:focus {
+    -webkit-text-fill-color: #000000;
+    -webkit-box-shadow: 0 0 0px 1000px white inset;
+  }
+`;
+
+const SearchInput = styled(Input)`
+  margin: 10px 0;
+  width: 100%;
+  color: #000000;
+  -webkit-text-fill-color: #000000;
+  background-color: #FFFFFF;
+  
+  &::placeholder {
+    color: #666666;
+    -webkit-text-fill-color: #666666;
+  }
+`;
+
+const ModalContent = styled.div`
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  width: 90%;
+  max-width: 500px;
+  max-height: 80vh;
+  overflow-y: auto;
+  color: #000000;
+  -webkit-text-fill-color: #000000;
+
+  h3 {
+    color: #000000;
+    -webkit-text-fill-color: #000000;
+  }
+
+  @media (max-width: 768px) {
+    width: 95%;
+    margin: 10px;
+  }
+`;
+
+const AlumnoItem = styled.div`
+  padding: 10px;
+  border-bottom: 1px solid #eee;
+  cursor: pointer;
+  color: #000000;
+  -webkit-text-fill-color: #000000;
+  background-color: #FFFFFF;
+  
+  &:hover {
+    background: #f5f5f5;
+    color: #000000;
+    -webkit-text-fill-color: #000000;
+  }
+`;
+
+const ModalHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #eee;
+  color: #000000;
+  -webkit-text-fill-color: #000000;
+
+  h3 {
+    color: #000000;
+    -webkit-text-fill-color: #000000;
+    margin: 0;
+  }
+`;
+
+const AlumnosList = styled.div`
+  max-height: 300px;
+  overflow-y: auto;
+  background-color: #FFFFFF;
+  border: 1px solid #eee;
+  border-radius: 4px;
+`;
+
+const CloseButton = styled.button`
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  padding: 0 8px;
+  color: #666666;
+  -webkit-text-fill-color: #666666;
+  
+  &:hover {
+    color: #000000;
+    -webkit-text-fill-color: #000000;
+  }
+`;
 
 const PageContainer = styled.div`
   max-width: 1200px;
@@ -50,48 +174,6 @@ const Label = styled.label`
   margin-bottom: 8px;
   color: #555;
   font-weight: 500;
-`;
-
-// Form Components
-const Input = styled.input`
-  width: 100%;
-  padding: 12px;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  font-size: 14px;
-  transition: border-color 0.3s ease;
-
-  &:focus {
-    border-color: #FFC001;
-    outline: none;
-    box-shadow: 0 0 0 2px rgba(255, 192, 1, 0.1);
-  }
-
-  &:disabled {
-    background-color: #f5f5f5;
-    cursor: not-allowed;
-  }
-`;
-
-const Select = styled.select`
-  width: 100%;
-  padding: 12px;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  background-color: white;
-  font-size: 14px;
-  transition: border-color 0.3s ease;
-  
-  &:focus {
-    border-color: #FFC001;
-    outline: none;
-    box-shadow: 0 0 0 2px rgba(255, 192, 1, 0.1);
-  }
-
-  &:disabled {
-    background-color: #f5f5f5;
-    cursor: not-allowed;
-  }
 `;
 
 // Group Components
@@ -194,26 +276,6 @@ const ModalOverlay = styled.div`
   z-index: 1000;
 `;
 
-const ModalContent = styled.div`
-  background: white;
-  padding: 20px;
-  border-radius: 8px;
-  width: 90%;
-  max-width: 500px;
-  max-height: 80vh;
-  overflow-y: auto;
-
-  @media (max-width: 768px) {
-    width: 95%;
-    margin: 10px;
-  }
-`;
-
-const SearchInput = styled(Input)`
-  margin: 10px 0;
-  width: 100%;
-`;
-
 const ActionIcons = styled.div`
   display: flex;
   gap: 8px;
@@ -275,7 +337,50 @@ const Value = styled.span`
   color: #333;
 `;
 
-// Add these global styles
+const Icon = styled.span`
+  margin-right: 8px;
+`;
+
+const Select = styled.select`
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background-color: white;
+  font-size: 14px;
+  transition: border-color 0.3s ease;
+  color: #000000;
+  -webkit-text-fill-color: #000000;
+  
+  option {
+    color: #000000;
+    -webkit-text-fill-color: #000000;
+    background-color: #FFFFFF;
+  }
+
+  &:focus {
+    border-color: #FFC001;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(255, 192, 1, 0.1);
+  }
+
+  &:disabled {
+    background-color: #f5f5f5;
+    cursor: not-allowed;
+  }
+`;
+
+const ActionButtons = styled.div`
+  display: flex;
+  gap: 10px;
+  margin: 20px 0;
+  flex-wrap: wrap;
+
+  @media (max-width: 768px) {
+    flex-direction: column;
+  }
+`;
+
 const GlobalStyle = createGlobalStyle`
   @media (max-width: 768px) {
     .desktop-only {
@@ -288,56 +393,23 @@ const GlobalStyle = createGlobalStyle`
       display: none;
     }
   }
-`;
 
-const Icon = styled.span`
-  margin-right: 8px;
-`;
-
-const ModalHeader = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid #eee;
-`;
-
-const CloseButton = styled.button`
-  background: none;
-  border: none;
-  font-size: 24px;
-  cursor: pointer;
-  padding: 0 8px;
-  color: #666;
-  
-  &:hover {
-    color: #000;
+  /* Estilos específicos para Windows */
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  input:-webkit-autofill:active {
+    -webkit-text-fill-color: #000000 !important;
+    -webkit-box-shadow: 0 0 0 30px white inset !important;
   }
-`;
 
-const AlumnosList = styled.div`
-  max-height: 300px;
-  overflow-y: auto;
-`;
-
-const AlumnoItem = styled.div`
-  padding: 10px;
-  border-bottom: 1px solid #eee;
-  cursor: pointer;
-  &:hover {
-    background: #f5f5f5;
-  }
-`;
-
-const ActionButtons = styled.div`
-  display: flex;
-  gap: 10px;
-  margin: 20px 0;
-  flex-wrap: wrap;
-
-  @media (max-width: 768px) {
-    flex-direction: column;
+  /* Asegurar contraste en campos de texto */
+  input, 
+  select, 
+  textarea {
+    color: #000000 !important;
+    -webkit-text-fill-color: #000000 !important;
+    background-color: #FFFFFF !important;
   }
 `;
 
@@ -943,6 +1015,7 @@ const TomarAsistencia: React.FC = () => {
     </>
   );
 };
+
 
 
 export default TomarAsistencia;

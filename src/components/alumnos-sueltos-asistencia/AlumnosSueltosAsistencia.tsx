@@ -5,10 +5,13 @@ import { fetchAuthSession } from 'aws-amplify/auth';
 const Container = styled.div`
   padding: 20px;
   background-color: #FFFFFF;
+  color: #000000;
+  -webkit-text-fill-color: #000000;
 `;
 
 const SectionTitle = styled.h2`
   color: #000000;
+  -webkit-text-fill-color: #000000;
   font-size: 1.8em;
   font-weight: 600;
   text-transform: uppercase;
@@ -32,18 +35,14 @@ const SectionTitle = styled.h2`
 
 const Title = styled.h2`
   color: #000000;
+  -webkit-text-fill-color: #000000;
   margin-bottom: 20px;
-`;
-
-const Table = styled.table`
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 20px;
 `;
 
 const Th = styled.th`
   background-color: #000000;
   color: #FFFFFF;
+  -webkit-text-fill-color: #FFFFFF;
   padding: 12px;
   text-align: left;
 `;
@@ -51,15 +50,20 @@ const Th = styled.th`
 const Td = styled.td`
   padding: 12px;
   border-bottom: 1px solid #F9F8F8;
+  color: #000000;
+  -webkit-text-fill-color: #000000;
+  background-color: #FFFFFF;
 `;
 
 const Button = styled.button`
   background-color: #FFC001;
   color: #000000;
+  -webkit-text-fill-color: #000000;
   border: none;
   padding: 10px 20px;
   border-radius: 4px;
   cursor: pointer;
+  font-weight: 500;
   &:hover {
     background-color: #e6ac00;
   }
@@ -67,7 +71,8 @@ const Button = styled.button`
 
 const DeleteButton = styled(Button)`
   background-color: #ff4d4d;
-  color: white;
+  color: #FFFFFF;
+  -webkit-text-fill-color: #FFFFFF;
   &:hover {
     background-color: #ff3333;
   }
@@ -78,6 +83,21 @@ const Input = styled.input`
   border: 1px solid #ccc;
   border-radius: 4px;
   margin-right: 10px;
+  color: #000000;
+  -webkit-text-fill-color: #000000;
+  background-color: #FFFFFF;
+  
+  &::placeholder {
+    color: #666666;
+    -webkit-text-fill-color: #666666;
+  }
+
+  &:-webkit-autofill,
+  &:-webkit-autofill:hover,
+  &:-webkit-autofill:focus {
+    -webkit-text-fill-color: #000000;
+    -webkit-box-shadow: 0 0 0px 1000px white inset;
+  }
 `;
 
 const ExpandButton = styled.button`
@@ -85,6 +105,15 @@ const ExpandButton = styled.button`
   border: none;
   cursor: pointer;
   font-size: 1.2em;
+  color: #000000;
+  -webkit-text-fill-color: #000000;
+`;
+
+const Table = styled.table`
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 20px;
+  background-color: #FFFFFF;
 `;
 
 interface AlumnoSuelto {

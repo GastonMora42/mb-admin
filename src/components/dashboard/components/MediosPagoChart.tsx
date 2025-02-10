@@ -74,8 +74,8 @@ const formatCurrency = (value: number): string => {
 };
 
 const CHART_COLORS = {
-  EFECTIVO: '#60a5fa',
-  MERCADO_PAGO: '#34d399',
+  EFECTIVO: '#34d399',
+  MERCADO_PAGO: '#60a5fa',
   TRANSFERENCIA: '#fbbf24',
   DEBITO_AUTOMATICO: '#f87171',
   OTRO: '#a78bfa'
