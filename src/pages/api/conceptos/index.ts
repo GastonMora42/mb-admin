@@ -35,28 +35,21 @@ export default async function handler(
   
   else if (req.method === 'POST') {
     try {
-      const { nombre, descripcion, monto, estiloId } = req.body;
-
-      if (!nombre || !monto) {
-        return res.status(400).json({ 
-          error: 'Nombre y monto son requeridos' 
-        });
-      }
-
-      // Creamos el objeto de datos básico
-      const conceptoData: any = {
+      const { nombre, descripcion, monto, estiloId, esInscripcion } = req.body;
+  
+      const conceptoData = {
         nombre,
         descripcion,
-        monto: Number(monto)
+        monto: Number(monto),
+        esInscripcion: Boolean(esInscripcion),
+        activo: true,
+        ...(estiloId && {
+          estilo: {
+            connect: { id: Number(estiloId) }
+          }
+        })
       };
-
-      // Si hay estiloId, agregamos la conexión
-      if (estiloId) {
-        conceptoData.estilo = {
-          connect: { id: Number(estiloId) }
-        };
-      }
-
+  
       const concepto = await prisma.concepto.create({
         data: conceptoData,
         include: {
@@ -73,17 +66,13 @@ export default async function handler(
           }
         }
       });
-
+  
       res.status(201).json(concepto);
     } catch (error) {
-      console.error('Error al crear concepto:', error);
-      res.status(400).json({ 
-        error: 'Error al crear concepto',
-        details: error instanceof Error ? error.message : 'Error desconocido'
-      });
+      res.status(400).json({ error: 'Error al crear concepto' });
     }
   }
-
+  
   else {
     res.setHeader('Allow', ['GET', 'POST']);
     res.status(405).end(`Method ${req.method} Not Allowed`);

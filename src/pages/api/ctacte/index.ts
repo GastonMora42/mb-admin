@@ -178,24 +178,27 @@ const deudasProcesadas = alumnoInfo.deudas.map(deuda => {
 console.log('Deudas procesadas:', deudasProcesadas);
   
 
-        // Calcular estadísticas y totales
-        const estadisticas = {
-          totalPagado: todosLosRecibos
-            .filter(r => !r.anulado)
-            .reduce((sum, recibo) => sum + recibo.monto, 0),
-          deudaTotal: deudasProcesadas
-            .filter(d => !d.pagada)
-            .reduce((sum, deuda) => sum + deuda.saldoPendiente, 0),
-          cantidadDeudas: deudasProcesadas.filter(d => !d.pagada).length,
-          deudasPagadas: deudasProcesadas.filter(d => d.pagada).length,
-          estilosActivos: alumnoInfo.alumnoEstilos.length,
-          ultimoPago: todosLosRecibos.find(r => !r.anulado)?.fecha || null,
-          descuentosActivos: alumnoInfo.descuentosVigentes.map(dv => ({
-            tipo: dv.descuento.esAutomatico ? 'Automático' : 'Manual',
-            porcentaje: dv.descuento.porcentaje
-          }))
-        };
-
+const estadisticas = {
+  totalPagado: todosLosRecibos
+    .filter(r => !r.anulado)
+    .reduce((sum, recibo) => sum + recibo.monto, 0),
+  deudaTotal: deudasProcesadas
+    .filter(d => !d.pagada)
+    .reduce((sum, deuda) => sum + deuda.saldoPendiente, 0),
+  cantidadDeudas: deudasProcesadas.filter(d => !d.pagada).length,
+  deudasPagadas: deudasProcesadas.filter(d => d.pagada).length,
+  estilosActivos: alumnoInfo.alumnoEstilos.length,
+  ultimoPago: todosLosRecibos.find(r => !r.anulado)?.fecha || null,
+  descuentosActivos: alumnoInfo.descuentosVigentes.map(dv => ({
+    tipo: dv.descuento.esAutomatico ? 'Automático' : 'Manual',
+    porcentaje: dv.descuento.porcentaje
+  })),
+  inscripcion: {
+    pagada: alumnoInfo.inscripcionPagada,
+    fechaPago: alumnoInfo.fechaPagoInscripcion,
+    deuda: deudasProcesadas.find(d => d.concepto?.esInscripcion && !d.pagada)?.monto || 0
+  }
+};
         // Verificar estado de pagos
         const mesActual = new Date().getMonth() + 1;
         const anioActual = new Date().getFullYear();

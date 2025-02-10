@@ -680,6 +680,7 @@ const CtaCte: React.FC = () => {
                 active={activeTab === 'recibos'}
                 onClick={() => setActiveTab('recibos')}
               >
+                
                 Recibos
               </TabButton>
               <TabButton 

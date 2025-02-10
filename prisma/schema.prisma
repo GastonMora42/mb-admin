@@ -49,8 +49,8 @@ model Alumno {
   deudas                   Deuda[]
   recibos                  Recibo[]
   estilos                  Estilo[]                 @relation("AlumnoEstilos")
-  inscripcionPagada      Boolean   @default(false)
-  fechaPagoInscripcion   DateTime?
+  inscripcionPagada    Boolean   @default(false)
+  fechaPagoInscripcion DateTime?
 }
 
 model ConfiguracionPagoAlumno {

@@ -75,6 +75,7 @@ export type Deuda = {
 };
   
   export type Concepto = {
+    esInscripcion: unknown;
     id: number;
     nombre: string;
     descripcion: string | null;

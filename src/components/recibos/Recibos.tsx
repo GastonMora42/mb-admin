@@ -419,13 +419,13 @@ interface Filtros {
   tipoPago: string; // Agregamos tipoPago
 }
 
-
 interface DeudaSeleccionada {
   estiloId: any;
   periodo: any;
   deudaId: number;
   monto: number;
   montoOriginal: number;
+  esInscripcion?: boolean;
 }
 
 interface ReciboPendiente {
@@ -479,6 +479,8 @@ const Recibos: React.FC = () => {
   const { isPrinterAvailable, printReceipt } = usePrinter();
   const [searchTerm, setSearchTerm] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const deudasInscripcion = deudasAlumno.filter(d => d.concepto?.esInscripcion);
+  const deudaComun = deudasAlumno.filter(d => !d.concepto?.esInscripcion);
   const [searchAlumno, setSearchAlumno] = useState('');
   const [showAlumnoSuggestions, setShowAlumnoSuggestions] = useState(false);
  
@@ -907,30 +909,53 @@ const crearRecibosPendientes = async () => {
       return newState;
     });
   };
-
+  
   const handleDeudaSelect = (deudaId: number, checked: boolean) => {
     if (checked) {
       const deuda = deudasAlumno.find(d => d.id === deudaId);
       if (deuda) {
+        if (deuda.concepto?.esInscripcion) {
+          // Si es inscripción, usar el concepto de inscripción
+          const conceptoInscripcion = conceptos.find(c => c.esInscripcion);
+          setNuevoRecibo(prev => ({
+            ...prev,
+            conceptoId: conceptoInscripcion?.id.toString() || '',
+            monto: deuda.monto.toString()
+          }));
+        }
+  
         setDeudasSeleccionadas(prev => ({
           ...prev,
           [deudaId]: {
             deudaId,
             monto: deuda.monto,
             montoOriginal: deuda.montoOriginal,
-            estiloId: deuda.estilo.id,  // Agregar esto
-            periodo: `${deuda.mes}-${deuda.anio}` // Agregar esto
+            estiloId: deuda.estilo.id,
+            periodo: `${deuda.mes}-${deuda.anio}`,
+            esInscripcion: deuda.concepto?.esInscripcion || false
           }
         }));
       }
+    
     } else {
       setDeudasSeleccionadas(prev => {
         const newState = { ...prev };
+        const deudaRemovida = deudasAlumno.find(d => d.id === deudaId);
+        
+        // Si se desmarca inscripción, limpiar concepto
+        if (deudaRemovida?.concepto?.esInscripcion) {
+          setNuevoRecibo(prev => ({
+            ...prev,
+            conceptoId: '',
+            monto: ''
+          }));
+        }
+        
         delete newState[deudaId];
         return newState;
       });
     }
-  };
+   };
 
   const handleDeudaMontoChange = (deudaId: number, valor: string) => {
     const monto = parseFloat(valor);
@@ -968,6 +993,28 @@ const crearRecibosPendientes = async () => {
       setDeudasSeleccionadas({});
     }
   };
+
+  // En el componente Recibos
+const handlePagoInscripcion = async (alumnoId: number) => {
+  const conceptoInscripcion = conceptos.find(c => c.esInscripcion);
+  if (!conceptoInscripcion) return;
+
+  setNuevoRecibo({
+    ...nuevoRecibo,
+    alumnoId: alumnoId.toString(),
+    conceptoId: conceptoInscripcion.id.toString(),
+    monto: conceptoInscripcion.monto.toString(),
+    periodoPago: format(new Date(), 'yyyy-MM')
+  });
+
+  // Buscar deuda de inscripción
+  const deudaInscripcion = deudasAlumno.find(
+    d => d.concepto?.esInscripcion && !d.pagada
+  );
+  if (deudaInscripcion) {
+    handleDeudaSelect(deudaInscripcion.id, true);
+  }
+};
 
 
 return (
@@ -1219,91 +1266,157 @@ return (
   Mes Completo
 </CheckboxLabel>
           </InputGroup>
-{/* Sección de Deudas */}
-{nuevoRecibo.alumnoId && !nuevoRecibo.esClaseSuelta && (
-  <DeudaSection className="white-bg">
-    <InputLabel>Deudas Pendientes</InputLabel>
-    <CheckboxLabel style={{ marginBottom: '10px' }}>
-      <input
-        type="checkbox"
-        checked={mostrarSoloInscripcion}
-        onChange={(e) => setMostrarSoloInscripcion(e.target.checked)}
-      />
-      Mostrar solo deudas de inscripción
-    </CheckboxLabel>
-    
-    {Array.isArray(deudasAlumno) && deudasAlumno.length > 0 ? (
-  deudasAlumno
-    .filter(deuda => !mostrarSoloInscripcion || deuda.esInscripcion)
-    .map(deuda => (
-      <DeudaItem 
-      key={deuda.id}
-      style={{
-        backgroundColor: deuda.concepto?.esInscripcion ? '#fff3cd' : 'white',
-        border: deuda.concepto?.esInscripcion ? '2px solid #ffc107' : '1px solid #eee'
-      }}
-    >
-      <CheckboxLabel>
-        <input
-          type="checkbox"
-          checked={!!deudasSeleccionadas[deuda.id]}
-          onChange={(e) => handleDeudaSelect(deuda.id, e.target.checked)}
-        />
-        <span style={{
-          fontWeight: deuda.concepto?.esInscripcion ? 'bold' : 'normal',
-          color: deuda.concepto?.esInscripcion ? '#856404' : 'inherit'
-        }}>
-          {deuda.concepto?.esInscripcion 
-            ? `INSCRIPCIÓN - $${deuda.monto}`
-            : `${deuda.estilo.nombre} - ${deuda.mes}/${deuda.anio} - $${deuda.monto}`}
-        </span>
-      </CheckboxLabel>
-      {deudasSeleccionadas[deuda.id] && (
-        <Input
-          type="number"
-          value={deudasSeleccionadas[deuda.id].monto}
-          onChange={(e) => handleDeudaMontoChange(deuda.id, e.target.value)}
-          placeholder="Monto a pagar"
-          step="0.01"
-          min="0"
-          max={deuda.monto}
-        />
-      )}
-    </DeudaItem>
-    ))
-) : (
-  <NoDeudas>No hay deudas pendientes</NoDeudas>
+
+          {nuevoRecibo.alumnoId && !nuevoRecibo.esClaseSuelta && (
+ <DeudaSection className="white-bg">
+   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+     <InputLabel>Deudas Pendientes</InputLabel>
+     <CheckboxLabel>
+       <input
+         type="checkbox"
+         checked={mostrarSoloInscripcion}
+         onChange={(e) => setMostrarSoloInscripcion(e.target.checked)}
+       />
+       Ver solo inscripción
+     </CheckboxLabel>
+   </div>
+
+   {/* Sección de Inscripción */}
+   <div style={{ marginBottom: '20px' }}>
+     {deudasAlumno.filter(d => d.concepto?.esInscripcion && !d.pagada).map(deuda => (
+       <div key={deuda.id} style={{
+         padding: '15px',
+         backgroundColor: '#fff3cd',
+         border: '1px solid #ffeeba',
+         borderRadius: '4px',
+         marginBottom: '10px',
+         display: 'flex',
+         justifyContent: 'space-between',
+         alignItems: 'center'
+       }}>
+         <span style={{ color: '#856404' }}>
+           Inscripción pendiente - ${deuda.monto}
+         </span>
+         <Button
+           onClick={() => handleDeudaSelect(deuda.id, true)}
+           style={{
+             backgroundColor: '#ffc107',
+             color: '#000'
+           }}
+         >
+           Seleccionar para Pago
+         </Button>
+       </div>
+     ))}
+   </div>
+
+   {/* Listado de deudas */}
+   {Array.isArray(deudasAlumno) && deudasAlumno.length > 0 ? (
+     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+       {deudasAlumno
+         .filter(deuda => !mostrarSoloInscripcion || deuda.concepto?.esInscripcion)
+         .map(deuda => (
+           <DeudaItem 
+             key={deuda.id}
+             style={{
+               backgroundColor: deuda.concepto?.esInscripcion ? '#fff3cd' : 'white',
+               border: deuda.concepto?.esInscripcion ? '2px solid #ffc107' : '1px solid #eee'
+             }}
+           >
+             <div style={{ flex: 1 }}>
+               <CheckboxLabel>
+                 <input
+                   type="checkbox"
+                   checked={!!deudasSeleccionadas[deuda.id]}
+                   onChange={(e) => handleDeudaSelect(deuda.id, e.target.checked)}
+                 />
+                 <span style={{
+                   fontWeight: deuda.concepto?.esInscripcion ? 'bold' : 'normal',
+                   color: deuda.concepto?.esInscripcion ? '#856404' : 'inherit'
+                 }}>
+                   {deuda.concepto?.esInscripcion 
+                     ? `INSCRIPCIÓN - $${deuda.monto}`
+                     : `${deuda.estilo.nombre} - ${deuda.mes}/${deuda.anio} - $${deuda.monto}`}
+                 </span>
+               </CheckboxLabel>
+
+               {deuda.fechaVencimiento && new Date(deuda.fechaVencimiento) < new Date() && (
+                 <span style={{ 
+                   color: '#dc3545', 
+                   fontSize: '0.9em',
+                   marginLeft: '10px'
+                 }}>
+                   Vencida
+                 </span>
+               )}
+             </div>
+
+             {deudasSeleccionadas[deuda.id] && (
+               <div style={{ width: '150px' }}>
+                 <Input
+                   type="number"
+                   value={deudasSeleccionadas[deuda.id].monto}
+                   onChange={(e) => handleDeudaMontoChange(deuda.id, e.target.value)}
+                   placeholder="Monto a pagar"
+                   step="0.01"
+                   min="0"
+                   max={deuda.monto}
+                 />
+               </div>
+             )}
+           </DeudaItem>
+         ))}
+     </div>
+   ) : (
+     <NoDeudas>No hay deudas pendientes</NoDeudas>
+   )}
+
+   {/* Resumen de deudas seleccionadas */}
+   {Object.keys(deudasSeleccionadas).length > 0 && (
+     <div style={{ 
+       marginTop: '20px', 
+       padding: '15px',
+       backgroundColor: '#f8f9fa',
+       borderRadius: '4px'
+     }}>
+       <h4 style={{ marginBottom: '10px' }}>Resumen de Deudas Seleccionadas</h4>
+       <div style={{ 
+         display: 'flex', 
+         flexDirection: 'column',
+         gap: '5px'
+       }}>
+         {Object.entries(deudasSeleccionadas).map(([deudaId, deuda]) => (
+           <div key={deudaId} style={{ 
+             display: 'flex', 
+             justifyContent: 'space-between'
+           }}>
+             <span>{deuda.esInscripcion ? 'INSCRIPCIÓN' : 
+               `${deudasAlumno.find(d => d.id === parseInt(deudaId))?.estilo.nombre} - 
+               ${deudasAlumno.find(d => d.id === parseInt(deudaId))?.mes}/
+               ${deudasAlumno.find(d => d.id === parseInt(deudaId))?.anio}`}
+             </span>
+             <span>${deuda.monto}</span>
+           </div>
+         ))}
+         <div style={{ 
+           borderTop: '1px solid #dee2e6',
+           marginTop: '10px',
+           paddingTop: '10px',
+           fontWeight: 'bold'
+         }}>
+           <span>Total:</span>
+           <span>
+             ${Object.values(deudasSeleccionadas)
+               .reduce((sum, deuda) => sum + deuda.monto, 0)
+               .toFixed(2)}
+           </span>
+         </div>
+       </div>
+     </div>
+   )}
+ </DeudaSection>
 )}
 
-    {/* Vista previa del total seleccionado */}
-    {Object.keys(deudasSeleccionadas).length > 0 && (
-      <PreviewSection className="white-bg" style={{ marginTop: '20px' }}>
-        <PreviewTitle>Deudas Seleccionadas</PreviewTitle>
-        {Object.entries(deudasSeleccionadas).map(([deudaId, deuda]) => (
-          <PreviewDetail key={deudaId}>
-            <span>
-              {deudasAlumno.find(d => d.id === parseInt(deudaId))?.esInscripcion
-                ? 'INSCRIPCIÓN'
-                : `${deudasAlumno.find(d => d.id === parseInt(deudaId))?.estilo.nombre} - 
-                   ${deudasAlumno.find(d => d.id === parseInt(deudaId))?.mes}/
-                   ${deudasAlumno.find(d => d.id === parseInt(deudaId))?.anio}`
-              }
-            </span>
-            <span>${deuda.monto}</span>
-          </PreviewDetail>
-        ))}
-        <PreviewTotal>
-          <span>Total Deudas:</span>
-          <span>
-            ${Object.values(deudasSeleccionadas)
-              .reduce((sum, deuda) => sum + deuda.monto, 0)
-              .toFixed(2)}
-          </span>
-        </PreviewTotal>
-      </PreviewSection>
-    )}
-  </DeudaSection>
-)}
 <ActionButton 
   type="submit" 
   disabled={loading}

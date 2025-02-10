@@ -183,30 +183,30 @@ if (req.method === 'POST') {
           }
         }
 
-        const conceptoInscripcion = await tx.concepto.findFirst({
-          where: {
-            esInscripcion: true,
-            activo: true // Asumiendo que agregaremos este campo a Concepto
-          }
-        });
+// Al crear un alumno en la transacción
+const conceptoInscripcion = await tx.concepto.findFirst({
+  where: {
+    esInscripcion: true,
+    activo: true
+  }
+});
 
-
-        if (conceptoInscripcion) {
-          // Crear la deuda de inscripción
-          await tx.deuda.create({
-            data: {
-              alumnoId: nuevoAlumno.id,
-              monto: conceptoInscripcion.monto,
-              montoOriginal: conceptoInscripcion.monto,
-              mes: 'INSCRIPCION',
-              anio: new Date().getFullYear(),
-              estiloId: estilosIds[0], // Usar el primer estilo
-              pagada: false,
-              fechaVencimiento: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 días desde hoy
-              conceptoId: conceptoInscripcion.id
-            }
-          });
-        }
+if (conceptoInscripcion) {
+  await tx.deuda.create({
+    data: {
+      alumnoId: nuevoAlumno.id,
+      monto: conceptoInscripcion.monto,
+      montoOriginal: conceptoInscripcion.monto,
+      mes: (new Date()).getMonth() + 1 + '',
+      anio: new Date().getFullYear(),
+      estiloId: estilosIds[0],
+      conceptoId: conceptoInscripcion.id,
+      esInscripcion: true,
+      pagada: false,
+      fechaVencimiento: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+    }
+  });
+}
 
         if (descuentoManual) {
           const descuentoCreado = await tx.descuento.create({
