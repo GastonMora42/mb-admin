@@ -393,6 +393,37 @@ const PreviewTotal = styled.div`
   border-top: 2px solid #FFC001;
   font-weight: bold;
 `;
+const PaginationContainer = styled.div`
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  margin: 20px 0;
+`;
+
+const PageButton = styled.button<{ isActive?: boolean }>`
+  padding: 8px 12px;
+  border: 1px solid ${props => props.isActive ? '#FFC001' : '#ddd'};
+  background-color: ${props => props.isActive ? '#FFC001' : 'white'};
+  color: ${props => props.isActive ? 'black' : '#666'};
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover {
+    background-color: ${props => props.isActive ? '#FFC001' : '#f5f5f5'};
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+`;
+
+const PageInfo = styled.span`
+  color: #666;
+  font-size: 0.9em;
+`;
 
 interface VistaPrevia {
   subtotal: number;
@@ -484,7 +515,6 @@ const Recibos: React.FC = () => {
   const [searchAlumno, setSearchAlumno] = useState('');
   const [showAlumnoSuggestions, setShowAlumnoSuggestions] = useState(false);
  
-
   const [nuevoRecibo, setNuevoRecibo] = useState({
     monto: '',
     periodoPago: format(new Date(), 'yyyy-MM'),
@@ -519,6 +549,25 @@ const [filtros, setFiltros] = useState<Filtros>({
   const [mostrarSoloInscripcion, setMostrarSoloInscripcion] = useState(false);
   const [showPrinterAlert, setShowPrinterAlert] = useState(true);
 
+  const handlePageChange = (newPage: number) => {
+    setCurrentPage(newPage);
+  };
+
+  const handleFiltros = (newFiltros: Filtros) => {
+    setCurrentPage(1); // Resetear a la primera página
+    setFiltros(newFiltros);
+    fetchRecibos(); // Llamar a fetchRecibos inmediatamente
+  };
+
+  const ITEMS_PER_PAGE = 15;
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pagination, setPagination] = useState({
+    total: 0,
+    pages: 1, // Cambiar de 0 a 1 para evitar NaN
+    currentPage: 1,
+    itemsPerPage: ITEMS_PER_PAGE
+  });
+
   useEffect(() => {
     fetchRecibos();
     fetchAlumnos();
@@ -548,29 +597,44 @@ const [filtros, setFiltros] = useState<Filtros>({
     setLoading(true);
     try {
       const queryParams = new URLSearchParams();
+      
+      // Agregar parámetros de paginación
+      queryParams.append('page', currentPage.toString());
+      queryParams.append('limit', ITEMS_PER_PAGE.toString());
+      
+      // Agregar otros filtros
       Object.entries(filtros).forEach(([key, value]) => {
         if (value) queryParams.append(key, value);
       });
       
       const res = await fetch(`/api/recibos?${queryParams}`);
       if (!res.ok) throw new Error('Error al obtener recibos');
+      
       const data = await res.json();
-      setRecibos(data);
+      
+      if (data.recibos && Array.isArray(data.recibos)) {
+        setRecibos(data.recibos);
+        setPagination({
+          total: data.pagination.total || 0,
+          pages: Math.max(1, data.pagination.pages) || 1, // Asegurar mínimo 1 página
+          currentPage: data.pagination.currentPage || 1,
+          itemsPerPage: ITEMS_PER_PAGE
+        });
+        
+        // Si la página actual es mayor que el total de páginas, resetear a la página 1
+        if (data.pagination.currentPage > data.pagination.pages) {
+          setCurrentPage(1);
+        }
+      }
+      
     } catch (error) {
       console.error('Error fetching recibos:', error);
       setMessage({ text: 'Error al cargar recibos', isError: true });
     } finally {
       setLoading(false);
     }
-  }, [filtros]); // Solo depende de filtros
-
-  useEffect(() => {
-    fetchRecibos();
-    fetchAlumnos();
-    fetchAlumnosSueltos();
-    fetchConceptos();
-  }, []); // Sin dependencias
-
+  }, [currentPage, filtros, ITEMS_PER_PAGE]);
+  
   const handleAnularRecibo = async (id: number) => {
     if (!confirm('¿Está seguro que desea anular este recibo?')) return;
     
@@ -1023,6 +1087,14 @@ const handlePagoInscripcion = async (alumnoId: number) => {
   }
 };
 
+useEffect(() => {
+  fetchRecibos();
+}, [currentPage, fetchRecibos]);
+
+// Agrega un useEffect separado para resetear la página cuando cambian los filtros
+useEffect(() => {
+  setCurrentPage(1);
+}, [filtros]);
 
 return (
   <Container>
@@ -1678,17 +1750,55 @@ return (
 
           <Button type="submit">Aplicar Filtros</Button>
           <Button 
-            type="button" 
-            onClick={() => {
-              setFiltros(initialFiltros);
-              fetchRecibos();
-            }}
-            style={{ marginTop: '10px' }}
-          >
-            Limpiar Filtros
-          </Button>
+  type="button" 
+  onClick={() => {
+    setCurrentPage(1);
+    setFiltros(initialFiltros);
+    setSearchTerm(''); // Limpiar también el término de búsqueda
+    fetchRecibos();
+  }}
+  style={{ marginTop: '10px' }}
+>
+  Limpiar Filtros
+</Button>
         </FiltersForm>
       </FiltersPanel>
+
+
+<PaginationContainer>
+  <PageButton 
+    onClick={() => handlePageChange(1)} 
+    disabled={pagination.currentPage === 1 || loading}
+  >
+    {'<<'}
+  </PageButton>
+  
+  <PageButton 
+    onClick={() => handlePageChange(Math.max(1, pagination.currentPage - 1))}
+    disabled={pagination.currentPage === 1 || loading}
+  >
+    {'<'}
+  </PageButton>
+  
+  <PageInfo>
+    Página {pagination.currentPage} de {pagination.pages || 1} 
+    ({pagination.total} recibos en total)
+  </PageInfo>
+  
+  <PageButton 
+    onClick={() => handlePageChange(Math.min(pagination.pages, pagination.currentPage + 1))}
+    disabled={pagination.currentPage === pagination.pages || loading}
+  >
+    {'>'}
+  </PageButton>
+  
+  <PageButton 
+    onClick={() => handlePageChange(pagination.pages)}
+    disabled={pagination.currentPage === pagination.pages || loading}
+  >
+    {'>>'}
+  </PageButton>
+</PaginationContainer>
 
 {/* Tabla de Recibos Mejorada */}
 <TableContainer>

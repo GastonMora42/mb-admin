@@ -29,7 +29,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       esMesCompleto,
       fechaDesde,
       fechaHasta,
-      anulado
+      anulado,
+      // Nuevos parámetros de paginación
+      page = '1',
+      limit = '15'
     } = req.query;
     
     interface DateRange {
@@ -99,6 +102,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
     
     try {
+      // Calcular el skip basado en la página actual
+      const currentPage = parseInt(page.toString());
+      const itemsPerPage = parseInt(limit.toString());
+      const skip = (currentPage - 1) * itemsPerPage;
+
+      // Primero obtener el total de registros
+      const total = await prisma.recibo.count({
+        where: whereClause
+      });
+
+      // Luego obtener los recibos paginados
       const recibos = await prisma.recibo.findMany({
         where: whereClause,
         include: { 
@@ -143,7 +157,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             }
           }
         },
-        orderBy: { fecha: 'desc' }
+        orderBy: [
+          { fecha: 'desc' },
+          { numeroRecibo: 'desc' } // Agregar ordenamiento secundario
+        ],
+        skip,
+        take: itemsPerPage
       });
 
       const procesedRecibos = recibos.map(recibo => {
@@ -157,12 +176,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return recibo;
       });
 
-      res.status(200).json(procesedRecibos);
+      // Devolver los datos paginados
+      res.status(200).json({
+        recibos: procesedRecibos,
+        pagination: {
+          total,
+          pages: Math.ceil(total / itemsPerPage),
+          currentPage,
+          itemsPerPage
+        }
+      });
     } catch (error) {
       console.error('Error al obtener recibos:', error);
       res.status(500).json({ error: 'Error al obtener recibos' });
     }
-  } 
+  }
   
   else if (req.method === 'POST') {
     try {

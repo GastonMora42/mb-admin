@@ -2,6 +2,7 @@ import React, { useEffect, useState, useMemo, useRef } from 'react';
 import styled from 'styled-components';
 import { useUserRole } from '@/hooks/useUserRole';
 import recibos from '@/pages/api/recibos';
+import { getArgentinaDateTime } from '@/utils/dateUtils';
 
 const Container = styled.div`
  background-color: #FFFFFF;
@@ -196,123 +197,123 @@ interface CajaDiariaData {
 }
 
 const CajaDiaria = () => {
- const [cajaData, setCajaData] = useState<CajaDiariaData>({ recibos: [], totalMonto: 0, totalPorTipoPago: {} });
- const [fechaInicio, setFechaInicio] = useState('');
- const [fechaFin, setFechaFin] = useState('');
- const [filtros, setFiltros] = useState({
-   numeroRecibo: '',
-   alumnoId: '',
-   conceptoId: '',
-   periodoPago: '',
-   fueraDeTermino: '',
-   tipoPago: ''
- });
- const [loading, setLoading] = useState(false);
- const [message, setMessage] = useState<{ text: string; isError: boolean } | null>(null);
- const [alumnos, setAlumnos] = useState<{ id: number; nombre: string; apellido: string }[]>([]);
- const [conceptos, setConceptos] = useState<{ id: number; nombre: string }[]>([]);
- const [showAlumnoSuggestions, setShowAlumnoSuggestions] = useState(false);
- const [showConceptoSuggestions, setShowConceptoSuggestions] = useState(false);
- const [searchAlumno, setSearchAlumno] = useState('');
- const [searchConcepto, setSearchConcepto] = useState('');
- const [alumnosFiltrados, setAlumnosFiltrados] = useState<any[]>([]);
- const [conceptosFiltrados, setConceptosFiltrados] = useState<any[]>([]);
- const [autoUpdateInterval, setAutoUpdateInterval] = useState<NodeJS.Timeout | null>(null);
- const lastUpdate = useRef(new Date());
+  // Función para obtener la fecha actual en formato YYYY-MM-DD
+  const getTodayDate = () => {
+    const today = getArgentinaDateTime();
+    return today.toISOString().split('T')[0];
+  };
 
- const userRole = useUserRole();
-
- const getArgentinaDate = () => {
-  return new Date(new Date().toLocaleString('en-US', {
-    timeZone: 'America/Argentina/Buenos_Aires'
-  }));
-};
-
-// Función para formatear fechas
-const formatArgentinaDate = (date: string | Date) => {
-  return new Date(date).toLocaleString('es-AR', {
-    timeZone: 'America/Argentina/Buenos_Aires',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit'
+  const [cajaData, setCajaData] = useState<CajaDiariaData>({ 
+    recibos: [], 
+    totalMonto: 0, 
+    totalPorTipoPago: {} 
   });
-};
-
-const fetchCajaDiaria = async () => {
-  if (userRole !== 'Dueño' && userRole !== 'Secretaria') return;
   
-  setLoading(true);
-  try {
-    const argentinaDate = getArgentinaDate();
-    const today = argentinaDate.toISOString().split('T')[0];
-    const queryParams = new URLSearchParams();
+  // Inicializar fechas con el día actual
+  const [fechaInicio, setFechaInicio] = useState(getTodayDate());
+  const [fechaFin, setFechaFin] = useState(getTodayDate());
+  const [filtros, setFiltros] = useState({
+    numeroRecibo: '',
+    alumnoId: '',
+    conceptoId: '',
+    periodoPago: '',
+    fueraDeTermino: '',
+    tipoPago: ''
+  });
 
-    if (userRole === 'Dueño' && (fechaInicio || fechaFin)) {
-      queryParams.append('fechaInicio', fechaInicio || today);
-      queryParams.append('fechaFin', fechaFin || today);
-    } else {
-      queryParams.append('fechaInicio', today);
-      queryParams.append('fechaFin', today);
-    }
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState<{ text: string; isError: boolean } | null>(null);
+  const [alumnos, setAlumnos] = useState<{ id: number; nombre: string; apellido: string }[]>([]);
+  const [conceptos, setConceptos] = useState<{ id: number; nombre: string }[]>([]);
+  const [searchAlumno, setSearchAlumno] = useState('');
+  const [searchConcepto, setSearchConcepto] = useState('');
+  const [alumnosFiltrados, setAlumnosFiltrados] = useState<any[]>([]);
+  const [conceptosFiltrados, setConceptosFiltrados] = useState<any[]>([]);
+  const lastUpdate = useRef(new Date());
 
-    if (userRole === 'Dueño') {
-      Object.entries(filtros).forEach(([key, value]) => {
-        if (value) queryParams.append(key, value);
-      });
-    }
+  const userRole = useUserRole();
 
-    const res = await fetch(`/api/cajadiaria?${queryParams}`);
-    if (!res.ok) throw new Error('Error al obtener recibos');
+  const fetchCajaDiaria = async () => {
+    if (userRole !== 'Dueño' && userRole !== 'Secretaria') return;
     
-    const data = await res.json();
-    setCajaData(data);
-    
-    setMessage({ 
-      text: userRole === 'Dueño' && (fechaInicio || fechaFin) ? 
-        "Este es el historial de caja en las fechas seleccionadas" : 
-        "Esta es la caja del día corriente", 
-      isError: false 
-    });
-  } catch (error) {
-    console.error('Error fetching recibos:', error);
-    setMessage({ text: 'Error al cargar recibos', isError: true });
-  } finally {
-    setLoading(false);
-  }
-};
+    setLoading(true);
+    try {
+      const queryParams = new URLSearchParams();
 
-// Modificar el useEffect para la actualización automática
-useEffect(() => {
-  if (userRole === 'Dueño' || userRole === 'Secretaria') {
-    // Función para verificar cambio de día
-    const checkDayChange = () => {
-      const argentinaDate = getArgentinaDate();
-      const currentDate = lastUpdate.current;
-      
-      if (argentinaDate.getDate() !== currentDate.getDate() ||
-          argentinaDate.getMonth() !== currentDate.getMonth() ||
-          argentinaDate.getFullYear() !== currentDate.getFullYear()) {
-        fetchCajaDiaria();
-        lastUpdate.current = argentinaDate;
+      // Siempre usar la fecha actual para la secretaria
+      if (userRole === 'Secretaria') {
+        const today = getTodayDate();
+        queryParams.append('fechaInicio', today);
+        queryParams.append('fechaFin', today);
+      } else {
+        queryParams.append('fechaInicio', fechaInicio);
+        queryParams.append('fechaFin', fechaFin);
       }
-    };
 
-    // Actualización inicial
-    fetchCajaDiaria();
-    lastUpdate.current = getArgentinaDate();
+      // Agregar filtros solo si es Dueño
+      if (userRole === 'Dueño') {
+        Object.entries(filtros).forEach(([key, value]) => {
+          if (value) queryParams.append(key, value);
+        });
+      }
 
-    // Verificar cambio de día cada minuto
-    const dayCheckInterval = setInterval(checkDayChange, 60000);
-    
-    // Actualizar datos cada 30 segundos
-    const updateInterval = setInterval(fetchCajaDiaria, 30000);
+      const res = await fetch(`/api/cajadiaria?${queryParams}`);
+      if (!res.ok) throw new Error('Error al obtener recibos');
+      
+      const data = await res.json();
+      setCajaData(data);
+      
+      setMessage({ 
+        text: userRole === 'Dueño' && fechaInicio !== getTodayDate() ? 
+          "Este es el historial de caja en las fechas seleccionadas" : 
+          "Esta es la caja del día corriente", 
+        isError: false 
+      });
+    } catch (error) {
+      console.error('Error fetching recibos:', error);
+      setMessage({ text: 'Error al cargar recibos', isError: true });
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    return () => {
-      clearInterval(dayCheckInterval);
-      clearInterval(updateInterval);
-    };
-  }
-}, [userRole]);
+  // Cargar datos iniciales
+  useEffect(() => {
+    if (userRole === 'Dueño' || userRole === 'Secretaria') {
+      fetchAlumnos();
+      fetchConceptos();
+      
+      // Establecer fecha inicial
+      const today = getTodayDate();
+      setFechaInicio(today);
+      setFechaFin(today);
+    }
+  }, [userRole]);
+
+  // Efecto para verificar cambio de día
+  useEffect(() => {
+    if (userRole === 'Dueño' || userRole === 'Secretaria') {
+      const checkDayChange = () => {
+        const argentinaDate = getArgentinaDateTime();
+        const currentDate = lastUpdate.current;
+        
+        if (argentinaDate.getDate() !== currentDate.getDate() ||
+            argentinaDate.getMonth() !== currentDate.getMonth() ||
+            argentinaDate.getFullYear() !== currentDate.getFullYear()) {
+          const today = getTodayDate();
+          setFechaInicio(today);
+          setFechaFin(today);
+          lastUpdate.current = argentinaDate;
+        }
+      };
+
+      const dayCheckInterval = setInterval(checkDayChange, 300000); // 5 minutos
+      
+      return () => {
+        clearInterval(dayCheckInterval);
+      };
+    }
+  }, [userRole]);
 
  const fetchAlumnos = async () => {
    try {
@@ -396,72 +397,82 @@ useEffect(() => {
  }
 
  return (
-   <Container>
-     <Title>Caja Diaria</Title>
-     {userRole === 'Dueño' && (
-       <Form onSubmit={handleSubmit}>
-         <FormRow>
-           <InputGroup>
-             <Label>Desde:</Label>
-             <Input
-               type="date"
-               value={fechaInicio}
-               onChange={(e) => setFechaInicio(e.target.value)}
-             />
-           </InputGroup>
-           <InputGroup>
-             <Label>Hasta:</Label>
-             <Input
-               type="date"
-               value={fechaFin}
-               onChange={(e) => setFechaFin(e.target.value)}
-             />
-           </InputGroup>
-         </FormRow>
-         <FormRow>
-           <InputGroup>
-             <Label>N° Recibo:</Label>
-             <Input
-               type="text"
-               name="numeroRecibo"
-               value={filtros.numeroRecibo}
-               onChange={(e) => handleFiltroChange(e.target.name, e.target.value)}
-               placeholder="Número de Recibo"
-             />
-           </InputGroup>
-           <InputGroup>
-  <Label>Alumno:</Label>
-  <AutocompleteContainer className="autocomplete-container">
-    <SearchInput
-      type="text"
-      value={searchAlumno}
-      onChange={(e) => {
-        setSearchAlumno(e.target.value);
-        if (!e.target.value) {
-          handleFiltroChange('alumnoId', '');
-        }
-      }}
-      placeholder="Buscar alumno..."
-    />
-    {searchAlumno && alumnosFiltrados.length > 0 && (
-      <SuggestionsList>
-        {alumnosFiltrados.map(alumno => (
-          <SuggestionItem
-            key={alumno.id}
-            onClick={() => {
-              handleFiltroChange('alumnoId', alumno.id.toString());
-              setSearchAlumno(`${alumno.apellido} ${alumno.nombre}`);
-              fetchCajaDiaria();
-            }}
-          >
-            {alumno.apellido} {alumno.nombre}
-          </SuggestionItem>
-        ))}
-      </SuggestionsList>
-    )}
-  </AutocompleteContainer>
-</InputGroup>
+  <Container>
+    <Title>Caja Diaria</Title>
+    
+    <Form onSubmit={handleSubmit}>
+      <FormRow>
+        <InputGroup>
+          <Label>Desde:</Label>
+          <Input
+            type="date"
+            value={fechaInicio}
+            onChange={(e) => setFechaInicio(e.target.value)}
+            readOnly={userRole === 'Secretaria'}
+            style={userRole === 'Secretaria' ? { backgroundColor: '#f5f5f5' } : {}}
+          />
+        </InputGroup>
+        {userRole === 'Dueño' && (
+          <>
+            <InputGroup>
+              <Label>Hasta:</Label>
+              <Input
+                type="date"
+                value={fechaFin}
+                onChange={(e) => setFechaFin(e.target.value)}
+              />
+            </InputGroup>
 
+            {/* Filtros adicionales solo para Dueño */}
+            <InputGroup>
+              <Label>N° Recibo:</Label>
+              <Input
+                type="text"
+                name="numeroRecibo"
+                value={filtros.numeroRecibo}
+                onChange={(e) => handleFiltroChange(e.target.name, e.target.value)}
+                placeholder="Número de Recibo"
+              />
+            </InputGroup>
+          </>
+        )}
+      </FormRow>
+
+      {userRole === 'Dueño' && (
+        <>
+          <FormRow>
+            <InputGroup>
+              <Label>Alumno:</Label>
+              <AutocompleteContainer className="autocomplete-container">
+                <SearchInput
+                  type="text"
+                  value={searchAlumno}
+                  onChange={(e) => {
+                    setSearchAlumno(e.target.value);
+                    if (!e.target.value) {
+                      handleFiltroChange('alumnoId', '');
+                    }
+                  }}
+                  placeholder="Buscar alumno..."
+                />
+                {searchAlumno && alumnosFiltrados.length > 0 && (
+                  <SuggestionsList>
+                    {alumnosFiltrados.map(alumno => (
+                      <SuggestionItem
+                        key={alumno.id}
+                        onClick={() => {
+                          handleFiltroChange('alumnoId', alumno.id.toString());
+                          setSearchAlumno(`${alumno.apellido} ${alumno.nombre}`);
+                          fetchCajaDiaria();
+                        }}
+                      >
+                        {alumno.apellido} {alumno.nombre}
+                      </SuggestionItem>
+                    ))}
+                  </SuggestionsList>
+                )}
+              </AutocompleteContainer>
+            </InputGroup>
 <InputGroup>
   <Label>Concepto:</Label>
   <AutocompleteContainer className="autocomplete-container">
@@ -494,51 +505,55 @@ useEffect(() => {
     )}
   </AutocompleteContainer>
 </InputGroup>
-         </FormRow>
-         <FormRow>
-           <InputGroup>
-             <Label>Periodo:</Label>
-             <Input
-               type="month"
-               name="periodoPago"
-               value={filtros.periodoPago}
-               onChange={(e) => handleFiltroChange(e.target.name, e.target.value)}
-             />
-           </InputGroup>
-           <InputGroup>
-             <Label>Término:</Label>
-             <Select
-               name="fueraDeTermino"
-               value={filtros.fueraDeTermino}
-               onChange={(e) => handleFiltroChange(e.target.name, e.target.value)}
-             >
-               <option value="">Todos</option>
-               <option value="true">Fuera de término</option>
-               <option value="false">En término</option>
-             </Select>
-           </InputGroup>
-           <InputGroup>
-             <Label>Tipo de Pago:</Label>
-             <Select
-               name="tipoPago"
-               value={filtros.tipoPago}
-               onChange={(e) => handleFiltroChange(e.target.name, e.target.value)}
-             >
-               <option value="">Todos</option>
-               <option value="EFECTIVO">Efectivo</option>
-               <option value="MERCADO_PAGO">Mercado Pago</option>
-               <option value="TRANSFERENCIA">Transferencia</option>
-               <option value="DEBITO_AUTOMATICO">Débito Automático</option>
-               <option value="OTRO">Otro</option>
-             </Select>
-           </InputGroup>
-         </FormRow>
-         <Button type="submit" disabled={loading}>
-           {loading ? 'Cargando...' : 'Buscar'}
-         </Button>
-       </Form>
-     )}
+</FormRow>
 
+<FormRow>
+  <InputGroup>
+    <Label>Periodo:</Label>
+    <Input
+      type="month"
+      name="periodoPago"
+      value={filtros.periodoPago}
+      onChange={(e) => handleFiltroChange(e.target.name, e.target.value)}
+    />
+  </InputGroup>
+
+  <InputGroup>
+    <Label>Término:</Label>
+    <Select
+      name="fueraDeTermino"
+      value={filtros.fueraDeTermino}
+      onChange={(e) => handleFiltroChange(e.target.name, e.target.value)}
+    >
+      <option value="">Todos</option>
+      <option value="true">Fuera de término</option>
+      <option value="false">En término</option>
+    </Select>
+  </InputGroup>
+
+  <InputGroup>
+    <Label>Tipo de Pago:</Label>
+    <Select
+      name="tipoPago"
+      value={filtros.tipoPago}
+      onChange={(e) => handleFiltroChange(e.target.name, e.target.value)}
+    >
+      <option value="">Todos</option>
+      <option value="EFECTIVO">Efectivo</option>
+      <option value="MERCADO_PAGO">Mercado Pago</option>
+      <option value="TRANSFERENCIA">Transferencia</option>
+      <option value="DEBITO_AUTOMATICO">Débito Automático</option>
+      <option value="OTRO">Otro</option>
+    </Select>
+  </InputGroup>
+</FormRow>
+</>
+)}
+
+<Button type="submit" disabled={loading}>
+{loading ? 'Cargando...' : 'Mostrar caja'}
+</Button>
+</Form>
      {message && (
        <Message isError={message.isError}>{message.text}</Message>
      )}
@@ -579,33 +594,33 @@ useEffect(() => {
            </tbody>
          </Table>
          
-<TotalesContainer>
-  <TotalGeneral>
-    Total General: ${cajaData.totalMonto.toFixed(0)}
-    {cajaData.recibos.some(r => r.anulado) && (
-      <span style={{ 
-        fontSize: '0.8em', 
-        color: '#666',
-        display: 'block',
-        marginTop: '5px'
-      }}>
-        (No incluye recibos anulados)
-      </span>
-    )}
-  </TotalGeneral>
-  <TotalesPorTipo>
-    {Object.entries(cajaData.totalPorTipoPago).map(([tipo, total]) => (
-      <TotalTipo key={tipo}>
-        <TipoLabel>{tipo}</TipoLabel>
-        <TipoMonto>${total.toFixed(0)}</TipoMonto>
-      </TotalTipo>
-    ))}
-  </TotalesPorTipo>
-</TotalesContainer>
-       </>
-     )}
-   </Container>
- );
+         <TotalesContainer>
+            <TotalGeneral>
+              Total General: ${cajaData.totalMonto.toFixed(0)}
+              {cajaData.recibos.some(r => r.anulado) && (
+                <span style={{ 
+                  fontSize: '0.8em', 
+                  color: '#666',
+                  display: 'block',
+                  marginTop: '5px'
+                }}>
+                  (No incluye recibos anulados)
+                </span>
+              )}
+            </TotalGeneral>
+            <TotalesPorTipo>
+              {Object.entries(cajaData.totalPorTipoPago).map(([tipo, total]) => (
+                <TotalTipo key={tipo}>
+                  <TipoLabel>{tipo}</TipoLabel>
+                  <TipoMonto>${total.toFixed(0)}</TipoMonto>
+                </TotalTipo>
+              ))}
+            </TotalesPorTipo>
+          </TotalesContainer>
+        </>
+      )}
+    </Container>
+  );
 };
 
 export default CajaDiaria;
