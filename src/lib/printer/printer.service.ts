@@ -89,14 +89,13 @@ export class PrinterService {
         accion: 'image', 
         datos: this.LOGO_PATH
       },
-      { accion: 'text', datos: '\n\n\n\n' },
-      { accion: 'text', datos: '\n\n         ESTUDIO DE DANZAS\n\n' },
-      { accion: 'text', datos: '         DE MICAELA MEINDL\n\n' },
-      { accion: 'text', datos: '\n\n\n' },
+      { accion: 'text', datos: '\n\n\n\n' },  // Espacio después del logo
+      { accion: 'text', datos: '\n         ESTUDIO DE DANZAS\n' },
+      { accion: 'text', datos: '\n\n\n' },    // Separación después del encabezado
       { accion: 'text', datos: `Recibo #: ${recibo.numeroRecibo || 'N/A'}\n\n` },
-      { accion: 'text', datos: `Fecha: ${new Date(recibo.fecha).toLocaleDateString()}\n\n` },
+      { accion: 'text', datos: `Fecha: ${new Date(recibo.fecha).toLocaleDateString()}\n` },
       { accion: 'text', datos: `Hora: ${new Date(recibo.fecha).toLocaleTimeString()}\n\n` },
-      { accion: 'text', datos: '\n\n' },
+      { accion: 'text', datos: '\n' },
       { 
         accion: 'text', 
         datos: recibo.alumno 
@@ -104,10 +103,10 @@ export class PrinterService {
           : `Alumno Suelto: ${recibo.alumnoSuelto?.nombre} ${recibo.alumnoSuelto?.apellido}\n\n`
       },
       { accion: 'text', datos: `Concepto: ${recibo.concepto.nombre}\n\n` },
-      { accion: 'text', datos: '\n\n\n' },
+      { accion: 'text', datos: '\n\n' },      // Separación antes de los montos
       { accion: 'text', datos: `Monto Original: $${recibo.montoOriginal.toFixed(2)}\n\n` },
       ...(recibo.descuento ? [
-        { accion: 'text', datos: `Descuento: ${(recibo.descuento * 100).toFixed(0)}%\n\n` },
+        { accion: 'text', datos: `Descuento: ${(recibo.descuento * 100).toFixed(0)}%\n` },
         { accion: 'text', datos: `Monto Descuento: -$${(recibo.montoOriginal * recibo.descuento).toFixed(2)}\n\n` }
       ] : []),
       ...(recibo.pagosDeuda?.length ? [
@@ -117,12 +116,12 @@ export class PrinterService {
           datos: `- ${pago.deuda.estilo.nombre}: $${pago.monto.toFixed(2)}\n\n`
         }))
       ] : []),
-      { accion: 'text', datos: '\n\n\n' },
+      { accion: 'text', datos: '\n\n' },      // Separación antes del total
       { accion: 'text', datos: `TOTAL: $${recibo.monto.toFixed(2)}\n\n` },
       { accion: 'text', datos: `Forma de pago: ${recibo.tipoPago}\n\n` },
-      { accion: 'text', datos: '\n\n\n' },
-      { accion: 'text', datos: '           ¡Gracias por su pago!\n\n' },
-      { accion: 'text', datos: '\n\n\n\n\n' }
+      { accion: 'text', datos: '\n\n' },
+      { accion: 'text', datos: '           ¡Gracias por su pago!\n' },
+      { accion: 'text', datos: '\n\n\n\n\n\n' }  // Espacio final para corte
     ];
 
     const response = await this.retryFetch(`${this.bridgeUrl}/imprimir`, {
@@ -177,37 +176,41 @@ export class PrinterService {
  private prepareReceiptOperations(recibo: ReciboWithRelations): Array<{accion: string, datos: string}> {
   return [
     { accion: 'image', datos: 'mb-logo.png' },
-    { accion: 'text', datos: '\n\n         ESTUDIO DE DANZAS' },
-    { accion: 'text', datos: '         DE MICAELA MEINDL\n\n' },
-     { accion: 'text', datos: `Recibo #: ${recibo.numeroRecibo || 'N/A'}` },
-     { accion: 'text', datos: `Fecha: ${new Date(recibo.fecha).toLocaleDateString()}` },
-     { accion: 'text', datos: `Hora: ${new Date(recibo.fecha).toLocaleTimeString()}` },
-     { 
-       accion: 'text', 
-       datos: recibo.alumno 
-         ? `Alumno: ${recibo.alumno.nombre} ${recibo.alumno.apellido}`
-         : recibo.alumnoSuelto
-         ? `Alumno Suelto: ${recibo.alumnoSuelto.nombre} ${recibo.alumnoSuelto.apellido}`
-         : 'Cliente no identificado'
-     },
-     { accion: 'text', datos: `Concepto: ${recibo.concepto.nombre}` },
-     { accion: 'text', datos: `Monto Original: $${recibo.montoOriginal.toFixed(2)}` },
-     ...(recibo.descuento ? [
-       { accion: 'text', datos: `Descuento: ${(recibo.descuento * 100).toFixed(0)}%` },
-       { accion: 'text', datos: `Monto Descuento: -$${(recibo.montoOriginal * recibo.descuento).toFixed(2)}` }
-     ] : []),
-     ...(recibo.pagosDeuda?.length ? [
-       { accion: 'text', datos: 'Deudas Canceladas:' },
-       ...recibo.pagosDeuda.map(pago => ({
-         accion: 'text', 
-         datos: `- ${pago.deuda.estilo.nombre}: $${pago.monto.toFixed(2)}`
-       }))
-     ] : []),
-     { accion: 'text', datos: `TOTAL: $${recibo.monto.toFixed(2)}` },
-     { accion: 'text', datos: `Forma de pago: ${recibo.tipoPago}` },
-     { accion: 'text', datos: '¡Gracias por su pago!' }
-   ];
- }
+    { accion: 'text', datos: '\n\n\n\n' },
+    { accion: 'text', datos: '\n         ESTUDIO DE DANZAS\n' },
+    { accion: 'text', datos: `Recibo #: ${recibo.numeroRecibo || 'N/A'}\n\n` },
+    { accion: 'text', datos: `Fecha: ${new Date(recibo.fecha).toLocaleDateString()}\n` },
+    { accion: 'text', datos: `Hora: ${new Date(recibo.fecha).toLocaleTimeString()}\n\n` },
+    { 
+      accion: 'text', 
+      datos: recibo.alumno 
+        ? `Alumno: ${recibo.alumno.nombre} ${recibo.alumno.apellido}\n\n`
+        : recibo.alumnoSuelto
+        ? `Alumno Suelto: ${recibo.alumnoSuelto.nombre} ${recibo.alumnoSuelto.apellido}\n\n`
+        : 'Cliente no identificado\n\n'
+    },
+    { accion: 'text', datos: `Concepto: ${recibo.concepto.nombre}\n\n` },
+    { accion: 'text', datos: '\n\n' },
+    { accion: 'text', datos: `Monto Original: $${recibo.montoOriginal.toFixed(2)}\n\n` },
+    ...(recibo.descuento ? [
+      { accion: 'text', datos: `Descuento: ${(recibo.descuento * 100).toFixed(0)}%\n` },
+      { accion: 'text', datos: `Monto Descuento: -$${(recibo.montoOriginal * recibo.descuento).toFixed(2)}\n\n` }
+    ] : []),
+    ...(recibo.pagosDeuda?.length ? [
+      { accion: 'text', datos: '\n\nDeudas Canceladas:\n\n' },
+      ...recibo.pagosDeuda.map(pago => ({
+        accion: 'text', 
+        datos: `- ${pago.deuda.estilo.nombre}: $${pago.monto.toFixed(2)}\n\n`
+      }))
+    ] : []),
+    { accion: 'text', datos: '\n\n' },
+    { accion: 'text', datos: `TOTAL: $${recibo.monto.toFixed(2)}\n\n` },
+    { accion: 'text', datos: `Forma de pago: ${recibo.tipoPago}\n\n` },
+    { accion: 'text', datos: '\n\n' },
+    { accion: 'text', datos: '           ¡Gracias por su pago!\n' },
+    { accion: 'text', datos: '\n\n\n\n\n\n' }
+  ];
+}
 
  async checkStatus(): Promise<{ connected: boolean; error?: string }> {
    try {
