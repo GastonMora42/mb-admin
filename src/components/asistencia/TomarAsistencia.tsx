@@ -4,6 +4,13 @@ import styled, { createGlobalStyle } from 'styled-components';
 import { Profesor, Estilo, Alumno } from '@/types';
 import { Button } from '../button';
 
+const Form = styled.form`
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  margin-bottom: 30px;
+`;
+
 const Input = styled.input`
   width: 100%;
   padding: 12px;
@@ -469,6 +476,24 @@ const TomarAsistencia: React.FC = () => {
   });
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [mostrarFormularioRegular, setMostrarFormularioRegular] = useState(false);
+const [nuevoAlumnoRegular, setNuevoAlumnoRegular] = useState({
+  nombre: '',
+  apellido: '',
+  dni: '',
+  fechaNacimiento: '',
+  email: '',
+  telefono: '',
+  numeroEmergencia: '',
+  direccion: '',
+  obraSocial: '',
+  nombreTutor: '',
+  dniTutor: '',
+  notas: '',
+  estilosIds: [] as string[],
+  descuentoManual: ''
+});
 
   // Efectos
   useEffect(() => {
@@ -574,6 +599,56 @@ const TomarAsistencia: React.FC = () => {
     setNuevoAlumnoSuelto(prev => ({ ...prev, [name]: value }));
   };
 
+  const handleCreateAlumnoRegular = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const alumnoData = {
+        ...nuevoAlumnoRegular,
+        fechaNacimiento: new Date(nuevoAlumnoRegular.fechaNacimiento).toISOString(),
+        activo: true,
+        estilosIds: nuevoAlumnoRegular.estilosIds.map(id => parseInt(id, 10)),
+        descuentoManual: nuevoAlumnoRegular.descuentoManual ? parseFloat(nuevoAlumnoRegular.descuentoManual) : undefined,
+        tipoAlumno: 'regular'
+      };
+  
+      const res = await fetch('/api/alumnos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(alumnoData),
+      });
+  
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Error al crear alumno');
+      }
+  
+      const alumnoCreado = await res.json();
+      // Agregar el nuevo alumno a la lista de asistencia
+      setAlumnosSeleccionados(prev => [...prev, { ...alumnoCreado, asistio: true }]);
+      
+      // Limpiar el formulario
+      setNuevoAlumnoRegular({
+        nombre: '', apellido: '', dni: '', fechaNacimiento: '', 
+        email: '', telefono: '', numeroEmergencia: '', direccion: '', 
+        obraSocial: '', nombreTutor: '', dniTutor: '', notas: '',
+        estilosIds: [], descuentoManual: ''
+      });
+      
+      setMostrarFormularioRegular(false);
+      await fetchTodosLosAlumnos();
+      setMessage({ text: 'Alumno regular creado con éxito', type: 'success' });
+    } catch (error) {
+      console.error('Error creating alumno:', error);
+      setMessage({ 
+        text: error instanceof Error ? error.message : 'Error al crear alumno', 
+        type: 'error' 
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleAgregarAlumnoSuelto = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
     if (!nuevoAlumnoSuelto.nombre || !nuevoAlumnoSuelto.apellido || !nuevoAlumnoSuelto.dni) {
@@ -652,52 +727,52 @@ const TomarAsistencia: React.FC = () => {
     setMostrarFormularioSuelto(false);
   };
 
-  const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose, onSelect, alumnos }) => {
-    const [searchTerm, setSearchTerm] = useState('');
-    const [filteredAlumnos, setFilteredAlumnos] = useState<SearchableAlumno[]>([]);
-  
-    useEffect(() => {
-      const filtered = alumnos.filter(alumno => 
-        `${alumno.nombre} ${alumno.apellido} ${alumno.dni}`
-          .toLowerCase()
-          .includes(searchTerm.toLowerCase())
+    const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose, onSelect, alumnos }) => {
+      const [searchTerm, setSearchTerm] = useState('');
+      const [filteredAlumnos, setFilteredAlumnos] = useState<SearchableAlumno[]>([]);
+    
+      useEffect(() => {
+        const filtered = alumnos.filter(alumno => 
+          `${alumno.nombre} ${alumno.apellido} ${alumno.dni}`
+            .toLowerCase()
+            .includes(searchTerm.toLowerCase())
+        );
+        setFilteredAlumnos(filtered);
+      }, [searchTerm, alumnos]);
+    
+      if (!isOpen) return null;
+    
+      return (
+        <ModalOverlay>
+          <ModalContent>
+            <ModalHeader>
+              <h3>Buscar Alumno Regular</h3>
+              <CloseButton onClick={onClose}>&times;</CloseButton>
+            </ModalHeader>
+            <SearchInput
+              type="text"
+              placeholder="Buscar por nombre, apellido o DNI..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              autoFocus
+            />
+            <AlumnosList>
+              {filteredAlumnos.map(alumno => (
+                <AlumnoItem
+                  key={alumno.id}
+                  onClick={() => {
+                    onSelect(alumno);
+                    onClose();
+                  }}
+                >
+                  {alumno.nombre} {alumno.apellido} - DNI: {alumno.dni}
+                </AlumnoItem>
+              ))}
+            </AlumnosList>
+          </ModalContent>
+        </ModalOverlay>
       );
-      setFilteredAlumnos(filtered);
-    }, [searchTerm, alumnos]);
-  
-    if (!isOpen) return null;
-  
-    return (
-      <ModalOverlay>
-        <ModalContent>
-          <ModalHeader>
-            <h3>Buscar Alumno Regular</h3>
-            <CloseButton onClick={onClose}>&times;</CloseButton>
-          </ModalHeader>
-          <SearchInput
-            type="text"
-            placeholder="Buscar por nombre, apellido o DNI..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            autoFocus
-          />
-          <AlumnosList>
-            {filteredAlumnos.map(alumno => (
-              <AlumnoItem
-                key={alumno.id}
-                onClick={() => {
-                  onSelect(alumno);
-                  onClose();
-                }}
-              >
-                {alumno.nombre} {alumno.apellido} - DNI: {alumno.dni}
-              </AlumnoItem>
-            ))}
-          </AlumnosList>
-        </ModalContent>
-      </ModalOverlay>
-    );
-  };
+    };
 
   return (
     <>
@@ -739,30 +814,34 @@ const TomarAsistencia: React.FC = () => {
           </SelectGroup>
         </FormSection>
         {estiloSeleccionado && (
-          <AlumnosSection>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
-              <h3>Alumnos del Estilo</h3>
-              <ActionButtons>
-  <Button onClick={() => setMostrarFormularioSuelto(true)}>
-    <Icon>+</Icon> Alumno Suelto
-  </Button>
-  <Button onClick={() => setShowSearchModal(true)}>
-    <Icon>🔍</Icon> Buscar Alumno Regular
-  </Button>
-</ActionButtons>
+  <AlumnosSection>
+    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
+      <h3>Alumnos del Estilo</h3>
+      <ActionButtons>
+        <Button onClick={() => setMostrarFormularioSuelto(true)}>
+          <Icon>+</Icon> Alumno Suelto
+        </Button>
+        <Button onClick={() => setShowSearchModal(true)}>
+          <Icon>🔍</Icon> Buscar Alumno Regular
+        </Button>
+        <Button onClick={() => setMostrarFormularioRegular(true)}>
+          <Icon>+</Icon> Nuevo Alumno Regular
+        </Button>
+      </ActionButtons>
+    </div>
 
-<SearchModal
-  isOpen={showSearchModal}
-  onClose={() => setShowSearchModal(false)}
-  onSelect={(alumno) => {
-    if (!alumnosSeleccionados.find(a => a.id === alumno.id)) {
-      setAlumnosSeleccionados(prev => [...prev, { ...alumno, asistio: true }]);
-    }
-  }}
-  alumnos={todosLosAlumnos}
-/>
-            </div>
-
+    {/* Modal de búsqueda */}
+    <SearchModal
+      isOpen={showSearchModal}
+      onClose={() => setShowSearchModal(false)}
+      onSelect={(alumno) => {
+        if (!alumnosSeleccionados.find(a => a.id === alumno.id)) {
+          setAlumnosSeleccionados(prev => [...prev, { ...alumno, asistio: true }]);
+        }
+      }}
+      alumnos={todosLosAlumnos}
+    />
+           
             {mostrarFormularioSuelto && (
               <FormSection>
                 <Title>Nuevo Alumno Suelto</Title>
@@ -842,6 +921,229 @@ const TomarAsistencia: React.FC = () => {
                 </ButtonGroup>
               </FormSection>
             )}
+
+{mostrarFormularioRegular && (
+  <FormSection>
+    <Title style={{ 
+      fontSize: '1.3em', 
+      marginBottom: '20px',
+      borderBottom: '2px solid #FFC001',
+      paddingBottom: '10px' 
+    }}>
+      Nuevo Alumno Regular
+    </Title>
+
+    <Form onSubmit={handleCreateAlumnoRegular}>
+      {/* Contenedor Grid Responsivo */}
+      <div style={{ 
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+        gap: '20px',
+        marginBottom: '30px'
+      }}>
+        {/* Datos Básicos */}
+        <div style={{ 
+          display: 'flex', 
+          flexDirection: 'column',
+          gap: '15px' 
+        }}>
+          <InputGroup>
+            <Label>Nombre *</Label>
+            <Input
+              type="text"
+              name="nombre"
+              value={nuevoAlumnoRegular.nombre}
+              onChange={(e) => setNuevoAlumnoRegular(prev => ({
+                ...prev,
+                [e.target.name]: e.target.value
+              }))}
+              required
+              style={{ width: '100%' }}
+            />
+          </InputGroup>
+
+          <InputGroup>
+            <Label>Apellido *</Label>
+            <Input
+              type="text"
+              name="apellido"
+              value={nuevoAlumnoRegular.apellido}
+              onChange={(e) => setNuevoAlumnoRegular(prev => ({
+                ...prev,
+                [e.target.name]: e.target.value
+              }))}
+              required
+              style={{ width: '100%' }}
+            />
+          </InputGroup>
+
+          <InputGroup>
+            <Label>DNI *</Label>
+            <Input
+              type="text"
+              name="dni"
+              value={nuevoAlumnoRegular.dni}
+              onChange={(e) => setNuevoAlumnoRegular(prev => ({
+                ...prev,
+                [e.target.name]: e.target.value
+              }))}
+              required
+              style={{ width: '100%' }}
+            />
+          </InputGroup>
+        </div>
+
+        {/* Datos de Contacto */}
+        <div style={{ 
+          display: 'flex', 
+          flexDirection: 'column',
+          gap: '15px' 
+        }}>
+          <InputGroup>
+            <Label>Fecha de Nacimiento *</Label>
+            <Input
+              type="date"
+              name="fechaNacimiento"
+              value={nuevoAlumnoRegular.fechaNacimiento}
+              onChange={(e) => setNuevoAlumnoRegular(prev => ({
+                ...prev,
+                [e.target.name]: e.target.value
+              }))}
+              required
+              style={{ width: '100%' }}
+            />
+          </InputGroup>
+
+          <InputGroup>
+            <Label>Email</Label>
+            <Input
+              type="email"
+              name="email"
+              value={nuevoAlumnoRegular.email}
+              onChange={(e) => setNuevoAlumnoRegular(prev => ({
+                ...prev,
+                [e.target.name]: e.target.value
+              }))}
+              style={{ width: '100%' }}
+            />
+          </InputGroup>
+
+          <InputGroup>
+            <Label>Teléfono</Label>
+            <Input
+              type="tel"
+              name="telefono"
+              value={nuevoAlumnoRegular.telefono}
+              onChange={(e) => setNuevoAlumnoRegular(prev => ({
+                ...prev,
+                [e.target.name]: e.target.value
+              }))}
+              style={{ width: '100%' }}
+            />
+          </InputGroup>
+        </div>
+
+        {/* Estilos y Descuentos */}
+        <div style={{ 
+          display: 'flex', 
+          flexDirection: 'column',
+          gap: '15px' 
+        }}>
+          <InputGroup>
+            <Label>Estilos *</Label>
+            <Select
+              name="estilosIds"
+              multiple
+              value={nuevoAlumnoRegular.estilosIds}
+              onChange={(e) => {
+                const selectedOptions = Array.from(
+                  e.target.selectedOptions,
+                  option => option.value
+                );
+                setNuevoAlumnoRegular(prev => ({
+                  ...prev,
+                  estilosIds: selectedOptions
+                }));
+              }}
+              style={{ 
+                width: '100%',
+                height: '120px',
+                padding: '8px'
+              }}
+            >
+              {estilos.map(estilo => (
+                <option key={estilo.id} value={estilo.id.toString()}>
+                  {estilo.nombre}
+                </option>
+              ))}
+            </Select>
+            <small style={{ 
+              display: 'block', 
+              marginTop: '5px', 
+              color: '#666',
+              fontSize: '0.85em' 
+            }}>
+              Mantén presionado Ctrl (Cmd en Mac) para seleccionar múltiples estilos
+            </small>
+          </InputGroup>
+
+          <InputGroup>
+            <Label>Descuento Manual (%)</Label>
+            <Input
+              type="number"
+              name="descuentoManual"
+              value={nuevoAlumnoRegular.descuentoManual}
+              onChange={(e) => setNuevoAlumnoRegular(prev => ({
+                ...prev,
+                [e.target.name]: e.target.value
+              }))}
+              min="0"
+              max="100"
+              style={{ width: '100%' }}
+            />
+          </InputGroup>
+        </div>
+      </div>
+
+      {/* Botones de Acción */}
+      <ButtonGroup style={{
+        marginTop: '20px',
+        padding: '20px',
+        borderTop: '1px solid #eee',
+        display: 'flex',
+        justifyContent: 'flex-end',
+        gap: '10px',
+        '@media (max-width: 768px)': {
+          flexDirection: 'column',
+          width: '100%'
+        }
+      }}>
+        <Button 
+          type="button" 
+          onClick={() => setMostrarFormularioRegular(false)}
+          style={{
+            backgroundColor: '#f0f0f0',
+            color: '#333'
+          }}
+        >
+          Cancelar
+        </Button>
+        <Button 
+          type="submit" 
+          disabled={loading}
+          style={{
+            width: 'auto',
+            '@media (max-width: 768px)': {
+              width: '100%'
+            }
+          }}
+        >
+          {loading ? 'Guardando...' : 'Crear Alumno Regular'}
+        </Button>
+      </ButtonGroup>
+    </Form>
+  </FormSection>
+)}
 
             {/* Tabla de Asistencias */}
             {(alumnosSeleccionados.length > 0 || alumnosSueltos.length > 0) && (
