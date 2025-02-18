@@ -191,12 +191,6 @@ const InputGroup = styled.div`
 
 const SelectGroup = styled(InputGroup)``;
 
-const ButtonGroup = styled.div`
-  display: flex;
-  gap: 10px;
-  margin-top: 20px;
-`;
-
 const ButtonContainer = styled.div`
   display: flex;
   justify-content: center;
@@ -267,6 +261,33 @@ const CheckboxWrapper = styled.div`
     &:checked {
       accent-color: #FFC001;
     }
+  }
+`;
+
+const ButtonGroup = styled.div`
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 20px;
+  padding: 20px;
+  border-top: 1px solid #eee;
+
+  @media (max-width: 768px) {
+    flex-direction: column;
+    width: 100%;
+  }
+`;
+
+const CancelButton = styled(Button)`
+  background-color: #f0f0f0;
+  color: #333;
+`;
+
+const SubmitButton = styled(Button)`
+  width: auto;
+
+  @media (max-width: 768px) {
+    width: 100%;
   }
 `;
 
@@ -1106,41 +1127,20 @@ const [nuevoAlumnoRegular, setNuevoAlumnoRegular] = useState({
       </div>
 
       {/* Botones de Acción */}
-      <ButtonGroup style={{
-        marginTop: '20px',
-        padding: '20px',
-        borderTop: '1px solid #eee',
-        display: 'flex',
-        justifyContent: 'flex-end',
-        gap: '10px',
-        '@media (max-width: 768px)': {
-          flexDirection: 'column',
-          width: '100%'
-        }
-      }}>
-        <Button 
-          type="button" 
-          onClick={() => setMostrarFormularioRegular(false)}
-          style={{
-            backgroundColor: '#f0f0f0',
-            color: '#333'
-          }}
-        >
-          Cancelar
-        </Button>
-        <Button 
-          type="submit" 
-          disabled={loading}
-          style={{
-            width: 'auto',
-            '@media (max-width: 768px)': {
-              width: '100%'
-            }
-          }}
-        >
-          {loading ? 'Guardando...' : 'Crear Alumno Regular'}
-        </Button>
-      </ButtonGroup>
+      <ButtonGroup>
+  <CancelButton 
+    type="button" 
+    onClick={() => setMostrarFormularioRegular(false)}
+  >
+    Cancelar
+  </CancelButton>
+  <SubmitButton 
+    type="submit" 
+    disabled={loading}
+  >
+    {loading ? 'Guardando...' : 'Crear Alumno Regular'}
+  </SubmitButton>
+</ButtonGroup>
     </Form>
   </FormSection>
 )}
