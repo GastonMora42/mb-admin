@@ -2,20 +2,12 @@ name: Generate Monthly Debts
 
 on:
   schedule:
-    # Ejecutar el primer día de cada mes a las 00:00 UTC
     - cron: '0 0 1 * *'
-  
-  # Permitir ejecución manual desde GitHub
   workflow_dispatch:
 
 jobs:
   generate-debts:
     runs-on: ubuntu-latest
-    
-    strategy:
-      matrix:
-        environment: [testing]  # Dos entornos: testing 
-      fail-fast: false  # Permite que ambos jobs se ejecuten independientemente
 
     steps:
       - name: Checkout code
@@ -36,8 +28,12 @@ jobs:
         env:
           APP_URL: ${{ secrets.APP_URL }}
           CRON_SECRET_KEY: ${{ secrets.CRON_SECRET_KEY }}
-          DATABASE_URL: ${{ matrix.environment == 'testing' && secrets.TESTING_DATABASE_URL || secrets.PRODUCTION_DATABASE_URL }}
         run: |
           curl -X POST $APP_URL/api/cron/generate-monthly-debts \
           -H "Authorization: Bearer $CRON_SECRET_KEY" \
           -H "Content-Type: application/json"
+
+      - name: Cleanup Testing Data (Opcional)
+        if: always()
+        run: |
+          npx prisma migrate reset --force

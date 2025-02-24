@@ -5,7 +5,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  url      = "postgresql://mb-admin_owner:gYph3QlDW5zI@ep-late-block-a5w4dyjy-pooler.us-east-2.aws.neon.tech/mb-admin?sslmode=require"
 }
 
 model Inscripcion {
