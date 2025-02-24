@@ -1,4 +1,3 @@
-# .github/workflows/generate-monthly-debts.yml
 name: Generate Monthly Debts
 
 on:
@@ -6,20 +5,39 @@ on:
     # Ejecutar el primer día de cada mes a las 00:00 UTC
     - cron: '0 0 1 * *'
   
-  # Opcional: permitir ejecución manual desde GitHub
+  # Permitir ejecución manual desde GitHub
   workflow_dispatch:
 
 jobs:
   generate-debts:
     runs-on: ubuntu-latest
     
-    steps:
-      - name: Generate Monthly Debts
-        run: |
-          curl -X POST ${{ secrets.APP_URL }}/api/cron/generate-monthly-debts \
-          -H "Authorization: Bearer ${{ secrets.CRON_SECRET_KEY }}" \
-          -H "Content-Type: application/json"
+    strategy:
+      matrix:
+        environment: [testing]  # Dos entornos: testing 
+      fail-fast: false  # Permite que ambos jobs se ejecuten independientemente
 
-    env:
-      APP_URL: ${{ secrets.APP_URL }}
-      CRON_SECRET_KEY: ${{ secrets.CRON_SECRET_KEY }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run Prisma Migrations
+        run: npx prisma migrate deploy
+
+      - name: Generate Monthly Debts
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+          CRON_SECRET_KEY: ${{ secrets.CRON_SECRET_KEY }}
+          DATABASE_URL: ${{ matrix.environment == 'testing' && secrets.TESTING_DATABASE_URL || secrets.PRODUCTION_DATABASE_URL }}
+        run: |
+          curl -X POST $APP_URL/api/cron/generate-monthly-debts \
+          -H "Authorization: Bearer $CRON_SECRET_KEY" \
+          -H "Content-Type: application/json"
