@@ -32,8 +32,3 @@ jobs:
           curl -X POST $APP_URL/api/cron/generate-monthly-debts \
           -H "Authorization: Bearer $CRON_SECRET_KEY" \
           -H "Content-Type: application/json"
-
-      - name: Cleanup Testing Data (Opcional)
-        if: always()
-        run: |
-          npx prisma migrate reset --force
