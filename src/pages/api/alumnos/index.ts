@@ -4,53 +4,58 @@ import prisma from '@/lib/prisma';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // GET
-  if (req.method === 'GET') {
-    try {
-      const alumnos = await prisma.alumno.findMany({
-        include: { 
-          alumnoEstilos: {
-            include: {
-              estilo: {
-                select: {
-                  id: true,
-                  nombre: true,
-                  monto: true,
-                  descripcion: true,
-                  importe: true
-                }
-              }
-            }
-          },
-          descuentosVigentes: {
-            where: {
-              activo: true
-            },
-            include: {
-              descuento: true
-            }
-          },
-          deudas: {
-            include: {
-              estilo: true,
-              concepto: {
-                select: {
-                  id: true,
-                  nombre: true,
-                  monto: true,
-                  esInscripcion: true
-                }
+// En src/pages/api/alumnos/index.ts, en el método GET
+if (req.method === 'GET') {
+  try {
+    const alumnos = await prisma.alumno.findMany({
+      include: { 
+        // El mismo include que tienes actualmente
+        alumnoEstilos: {
+          include: {
+            estilo: {
+              select: {
+                id: true,
+                nombre: true,
+                monto: true,
+                descripcion: true,
+                importe: true
               }
             }
           }
         },
-        orderBy: { apellido: 'asc' }
-      });
-      return res.status(200).json(alumnos);
-    } catch (error) {
-      console.error('Error al obtener alumnos:', error);
-      return res.status(500).json({ error: 'Error al obtener alumnos' });
-    }
+        descuentosVigentes: {
+          where: {
+            activo: true
+          },
+          include: {
+            descuento: true
+          }
+        },
+        deudas: {
+          include: {
+            estilo: true,
+            concepto: {
+              select: {
+                id: true,
+                nombre: true,
+                monto: true,
+                esInscripcion: true
+              }
+            }
+          }
+        }
+      },
+      // Cambiar este orderBy para que los últimos inscritos aparezcan primero
+      orderBy: [
+        { fechaIngreso: 'desc' }  // Cambiar de 'apellido: asc' a 'fechaIngreso: desc'
+      ]
+    });
+    return res.status(200).json(alumnos);
+  } catch (error) {
+    console.error('Error al obtener alumnos:', error);
+    return res.status(500).json({ error: 'Error al obtener alumnos' });
   }
+}
   
 // POST
 if (req.method === 'POST') {
