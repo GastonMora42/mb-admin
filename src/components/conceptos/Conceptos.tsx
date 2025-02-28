@@ -191,7 +191,7 @@ const ButtonGroup = styled.div`
   margin-top: 20px;
 `;
 
-// Interfaces
+// Interfaces actualizadas
 interface Estilo {
   id: number;
   nombre: string;
@@ -206,10 +206,11 @@ interface Concepto {
   id: number;
   nombre: string;
   descripcion: string | null;
-  monto: number;
+  montoRegular: number; // Reemplaza monto
+  montoSuelto: number;  // Nuevo campo
   estiloId: number | null;
   estilo: Estilo | null;
-  esClaseSuelta: boolean;
+  esClaseSuelta?: boolean;
   esInscripcion: boolean;
 }
 
@@ -217,7 +218,8 @@ interface ConceptoEdicion {
   id: number;
   nombre: string;
   descripcion: string;
-  monto: number;
+  montoRegular: number; // Reemplaza monto
+  montoSuelto: number;  // Nuevo campo
   estiloId: number | null;
   esClaseSuelta: boolean;
   esInscripcion: boolean;
@@ -226,7 +228,8 @@ interface ConceptoEdicion {
 interface NuevoConcepto {
   nombre: string;
   descripcion: string;
-  monto: string;
+  montoRegular: string; // Reemplaza monto
+  montoSuelto: string;  // Nuevo campo
   estiloId: string;
   esClaseSuelta: boolean;
   esInscripcion: boolean;
@@ -240,7 +243,8 @@ const Conceptos: React.FC = () => {
   const [nuevoConcepto, setNuevoConcepto] = useState<NuevoConcepto>({
     nombre: '',
     descripcion: '',
-    monto: '',
+    montoRegular: '',
+    montoSuelto: '',
     estiloId: '',
     esClaseSuelta: false,
     esInscripcion: false
@@ -287,7 +291,8 @@ const Conceptos: React.FC = () => {
       const conceptoData = {
         ...nuevoConcepto,
         nombre: nuevoConcepto.esClaseSuelta ? 'Clase Suelta' : nuevoConcepto.nombre,
-        monto: parseFloat(nuevoConcepto.monto),
+        montoRegular: parseFloat(nuevoConcepto.montoRegular),
+        montoSuelto: parseFloat(nuevoConcepto.montoSuelto || nuevoConcepto.montoRegular),
         estiloId: nuevoConcepto.estiloId ? parseInt(nuevoConcepto.estiloId) : null
       };
   
@@ -306,7 +311,8 @@ const Conceptos: React.FC = () => {
       setNuevoConcepto({
         nombre: '',
         descripcion: '',
-        monto: '',
+        montoRegular: '',
+        montoSuelto: '',
         estiloId: '',
         esClaseSuelta: false,
         esInscripcion: false
@@ -328,9 +334,10 @@ const Conceptos: React.FC = () => {
       id: concepto.id,
       nombre: concepto.nombre,
       descripcion: concepto.descripcion || '',
-      monto: concepto.monto,
+      montoRegular: concepto.montoRegular,
+      montoSuelto: concepto.montoSuelto,
       estiloId: concepto.estiloId,
-      esClaseSuelta: concepto.esClaseSuelta,
+      esClaseSuelta: concepto.esClaseSuelta || false,
       esInscripcion: concepto.esInscripcion
     });
   };
@@ -426,7 +433,9 @@ const Conceptos: React.FC = () => {
     
     setConceptoEnEdicion(prev => ({
       ...prev!,
-      [name]: value
+      [name]: name === 'montoRegular' || name === 'montoSuelto' 
+        ? parseFloat(value) || 0
+        : value
     }));
   };
 
@@ -474,14 +483,26 @@ const Conceptos: React.FC = () => {
           </FormGroup>
           
           <FormGroup>
-            <Label>Monto:</Label>
+            <Label>Monto Regular:</Label>
             <Input
               type="number"
-              name="monto"
-              value={nuevoConcepto.monto}
+              name="montoRegular"
+              value={nuevoConcepto.montoRegular}
               onChange={handleInputChange}
-              placeholder="Monto"
+              placeholder="Monto para clases regulares"
               required
+              min="0"
+            />
+          </FormGroup>
+
+          <FormGroup>
+            <Label>Monto Clases Sueltas:</Label>
+            <Input
+              type="number"
+              name="montoSuelto"
+              value={nuevoConcepto.montoSuelto}
+              onChange={handleInputChange}
+              placeholder="Monto para clases sueltas"
               min="0"
             />
           </FormGroup>
@@ -532,7 +553,7 @@ const Conceptos: React.FC = () => {
         </Button>
       </Form>
       
-<h2>Buscar Conceptos</h2>
+      <h2>Buscar Conceptos</h2>
       <SearchInput
         type="text"
         placeholder="Buscar por nombre de concepto o estilo..."
@@ -545,7 +566,7 @@ const Conceptos: React.FC = () => {
           <Tr>
             <Th>Nombre</Th>
             <Th>Descripción</Th>
-            <Th>Monto</Th>
+            <Th>Montos</Th>
             <Th>Estilo</Th>
             <Th>Profesor</Th>
             <Th>Tipo</Th>
@@ -557,7 +578,10 @@ const Conceptos: React.FC = () => {
             <Tr key={concepto.id}>
               <Td>{concepto.nombre}</Td>
               <Td>{concepto.descripcion}</Td>
-              <Td>${concepto.monto.toFixed(0)}</Td>
+              <Td>
+                <div>Regular: ${concepto.montoRegular?.toFixed(0) || "0"}</div>
+                <div>Suelto: ${concepto.montoSuelto?.toFixed(0) || "0"}</div>
+              </Td>
               <Td>{concepto.estilo?.nombre || '-'}</Td>
               <Td>
                 {concepto.estilo?.profesor 
@@ -618,15 +642,30 @@ const Conceptos: React.FC = () => {
                 onChange={handleEdicionChange}
                 placeholder="Descripción"
               />
-              <Input
-                type="number"
-                name="monto"
-                value={conceptoEnEdicion.monto}
-                onChange={handleEdicionChange}
-                placeholder="Monto"
-                required
-                min="0"
-              />
+              <FormGroup>
+                <Label>Monto Regular:</Label>
+                <Input
+                  type="number"
+                  name="montoRegular"
+                  value={conceptoEnEdicion.montoRegular}
+                  onChange={handleEdicionChange}
+                  placeholder="Monto para clases regulares"
+                  required
+                  min="0"
+                />
+              </FormGroup>
+              <FormGroup>
+                <Label>Monto Clases Sueltas:</Label>
+                <Input
+                  type="number"
+                  name="montoSuelto"
+                  value={conceptoEnEdicion.montoSuelto}
+                  onChange={handleEdicionChange}
+                  placeholder="Monto para clases sueltas"
+                  required
+                  min="0"
+                />
+              </FormGroup>
               <Select
                 name="estiloId"
                 value={conceptoEnEdicion.estiloId || ''}

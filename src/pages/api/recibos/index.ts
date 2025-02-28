@@ -14,7 +14,6 @@ export const config = {
   },
 }
 
-
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   res.setTimeout(30000); // 30 segundos
   if (req.method === 'GET') {
@@ -124,9 +123,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               dni: true,
               email: true,
               telefono: true,
-              activo: true,
-              inscripcionPagada: true,
-              fechaPagoInscripcion: true
+              activo: true
             }
           },
           alumnoSuelto: {
@@ -148,7 +145,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                     select: {
                       id: true,
                       nombre: true,
-                      monto: true,
+                      montoRegular: true,
+                      montoSuelto: true,
                       esInscripcion: true
                     }
                   }
@@ -165,14 +163,43 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         take: itemsPerPage
       });
 
+      // Procesar recibos y agregar propiedades calculadas necesarias para el frontend
       const procesedRecibos = recibos.map(recibo => {
-        if (recibo.alumnoSuelto && recibo.alumnoSuelto.alumnoRegular) {
+        // Verificar si hay deudas de inscripción pagadas
+        const tieneInscripcionPagada = recibo.pagosDeuda.some(
+          pago => pago.deuda.concepto?.esInscripcion === true
+        );
+
+        const fechaPagoInscripcion = tieneInscripcionPagada 
+          ? recibo.pagosDeuda.find(pago => pago.deuda.concepto?.esInscripcion === true)?.fecha 
+          : null;
+
+        // Si el alumno suelto tiene un alumno regular asociado, usar ese alumno
+        if (recibo.alumnoSueltoId && recibo.alumnoSuelto?.alumnoRegular) {
           return {
             ...recibo,
-            alumno: recibo.alumnoSuelto.alumnoRegular,
+            alumno: {
+              ...recibo.alumnoSuelto.alumnoRegular,
+              // Agregar propiedades calculadas
+              inscripcionPagada: tieneInscripcionPagada,
+              fechaPagoInscripcion: fechaPagoInscripcion
+            },
             alumnoSuelto: null
           };
         }
+
+        // Para alumnos regulares, agregar propiedades calculadas
+        if (recibo.alumnoId && recibo.alumno) {
+          return {
+            ...recibo,
+            alumno: {
+              ...recibo.alumno,
+              inscripcionPagada: tieneInscripcionPagada,
+              fechaPagoInscripcion: fechaPagoInscripcion
+            }
+          };
+        }
+
         return recibo;
       });
 
@@ -207,7 +234,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         claseId,
         esMesCompleto,
         deudasAPagar,
-        fecha,  // Nueva fecha proporcionada// Nueva fecha de efecto proporcionada
+        fecha,  // Nueva fecha proporcionada
       } = req.body;
    
       const fechaArgentina = getArgentinaDateTime();
@@ -256,7 +283,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             clase: {
               include: {
                 profesor: true,
-                estilo: true
+                estilo: true,
+                modalidad: true // Incluir modalidad
               }
             },
             pagosDeuda: {
@@ -273,40 +301,46 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         });
    
         if (alumnoId && deudasAPagar?.length > 0) {
-          await Promise.all(deudasAPagar.map(async (deuda: { deudaId: any; monto: any; }) => {
+          for (const deuda of deudasAPagar) {
             const deudaOriginal = await tx.deuda.findUnique({
               where: { id: deuda.deudaId },
               include: { concepto: true }
             });
    
-            
             await tx.pagoDeuda.create({
               data: {
                 deudaId: deuda.deudaId,
                 reciboId: recibo.id,
                 monto: deuda.monto,
-                fecha: start// Usar la fecha de creación del recibo
+                fecha: start
               }
             });
             
-            await tx.deuda.update({
-              where: { id: deuda.deudaId },
-              data: {
-                pagada: true,
-                fechaPago: start
-              }
+            // Actualizar deuda como pagada
+            const pagosExistentes = await tx.pagoDeuda.findMany({
+              where: { deudaId: deuda.deudaId }
             });
-   
-            if (deudaOriginal?.concepto?.esInscripcion) {
-              await tx.alumno.update({
-                where: { id: parseInt(alumnoId) },
-                data: {
-                  inscripcionPagada: true,
-                  fechaPagoInscripcion: start
-                }
+            
+            const totalPagado = pagosExistentes.reduce((sum, pago) => sum + pago.monto, 0);
+            const deudaCompleta = await tx.deuda.findUnique({
+              where: { id: deuda.deudaId },
+              select: { monto: true }
+            });
+            
+            if (deudaCompleta && totalPagado >= deudaCompleta.monto) {
+              await tx.deuda.update({
+                where: { id: deuda.deudaId },
+                data: { pagada: true }
               });
             }
-          }));
+   
+            // Si es una inscripción, marcar como "inscripcionPagada" usando un campo computado
+            if (deudaOriginal?.concepto?.esInscripcion) {
+              // Ahora, en lugar de actualizar el campo directamente, 
+              // marcar deudas de inscripción como pagadas es suficiente
+              // ya que calcularemos inscripcionPagada dinámicamente
+            }
+          }
         }
    
         // Intentar imprimir fuera de la transacción principal
@@ -332,7 +366,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             clase: {
               include: {
                 profesor: true,
-                estilo: true
+                estilo: true,
+                modalidad: true // Incluir modalidad
               }
             },
             pagosDeuda: {
@@ -378,21 +413,34 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         });
 
         // Revertir los pagos de deuda
-        await Promise.all(pagosDeuda.map(async (pago) => {
-          // Actualizar la deuda a no pagada
-          await prisma.deuda.update({
-            where: { id: pago.deudaId },
-            data: {
-              pagada: false,
-              fechaPago: null
-            }
+        for (const pago of pagosDeuda) {
+          // Obtener todos los pagos para esta deuda
+          const todosLosPagos = await prisma.pagoDeuda.findMany({
+            where: { deudaId: pago.deudaId }
           });
+          
+          // Calcular total pagado sin este pago
+          const otrosPagos = todosLosPagos.filter(p => p.id !== pago.id);
+          const montoPagado = otrosPagos.reduce((sum, p) => sum + p.monto, 0);
+          
+          // Marcar la deuda como no pagada si quedaría con saldo
+          const deuda = await prisma.deuda.findUnique({
+            where: { id: pago.deudaId },
+            select: { monto: true }
+          });
+          
+          if (deuda && montoPagado < deuda.monto) {
+            await prisma.deuda.update({
+              where: { id: pago.deudaId },
+              data: { pagada: false }
+            });
+          }
 
           // Eliminar el pago
           await prisma.pagoDeuda.delete({
             where: { id: pago.id }
           });
-        }));
+        }
 
         // Marcar el recibo como anulado
         await prisma.recibo.update({

@@ -8,17 +8,6 @@ datasource db {
   url      = "postgresql://mb-admin_owner:gYph3QlDW5zI@ep-late-block-a5w4dyjy-pooler.us-east-2.aws.neon.tech/mb-admin?sslmode=require"
 }
 
-model Inscripcion {
-  id        Int       @id @default(autoincrement())
-  alumnoId  Int       @unique
-  monto     Float
-  pagada    Boolean   @default(false)
-  fechaPago DateTime?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  alumno    Alumno    @relation(fields: [alumnoId], references: [id])
-}
-
 model Alumno {
   id                       Int                      @id @default(autoincrement())
   nombre                   String
@@ -43,14 +32,15 @@ model Alumno {
   alumnosSueltosAnteriores AlumnoSuelto[]           @relation("AlumnoSueltoRegular")
   asistencias              Asistencia[]
   configuracionPago        ConfiguracionPagoAlumno?
-  inscripcion Inscripcion?
+  inscripciones            Inscripcion[]            @relation("InscripcionesAlumno")
   ctaCte                   CtaCte?
   descuentosVigentes       DescuentoAplicado[]
   deudas                   Deuda[]
   recibos                  Recibo[]
   estilos                  Estilo[]                 @relation("AlumnoEstilos")
-  inscripcionPagada    Boolean   @default(false)
-  fechaPagoInscripcion DateTime?
+
+  // Campo derivado (no persistido en DB)
+  inscripcionPagada Boolean @default(false) @ignore
 }
 
 model ConfiguracionPagoAlumno {
@@ -91,26 +81,25 @@ model DescuentoAplicado {
 }
 
 model Deuda {
-  id               Int         @id @default(autoincrement())
+  id               Int           @id @default(autoincrement())
   alumnoId         Int
   monto            Float
   mes              String
-  estiloId         Int
-  pagada           Boolean     @default(false)
-  createdAt        DateTime    @default(now())
-  updatedAt        DateTime    @updatedAt
   anio             Int
-  fechaPago        DateTime?
-  montoOriginal    Float
+  estiloId         Int
+  pagada           Boolean       @default(false)
+  tipoDeuda        TipoModalidad // REGULAR o SUELTA
+  cantidadClases   Int? // Solo para modalidad SUELTA
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
   fechaVencimiento DateTime
-  alumno           Alumno      @relation(fields: [alumnoId], references: [id])
-  estilo           Estilo      @relation(fields: [estiloId], references: [id])
+  alumno           Alumno        @relation(fields: [alumnoId], references: [id])
+  estilo           Estilo        @relation(fields: [estiloId], references: [id])
+  concepto         Concepto?     @relation(fields: [conceptoId], references: [id])
+  conceptoId       Int?
   pagos            PagoDeuda[]
 
   @@index([alumnoId, mes, anio])
-  esInscripcion Boolean @default(false)
-  conceptoId    Int?
-  concepto      Concepto? @relation(fields: [conceptoId], references: [id])
 }
 
 model PagoDeuda {
@@ -127,19 +116,35 @@ model PagoDeuda {
   @@index([deudaId])
 }
 
+model Inscripcion {
+  id         Int       @id @default(autoincrement())
+  alumnoId   Int       @unique
+  monto      Float
+  pagada     Boolean   @default(false)
+  fechaPago  DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  alumno     Alumno    @relation("InscripcionesAlumno", fields: [alumnoId], references: [id])
+  conceptoId Int
+  concepto   Concepto  @relation(fields: [conceptoId], references: [id])
+}
+
 model Concepto {
-  id          Int      @id @default(autoincrement())
-  nombre      String
-  descripcion String?
-  monto       Float
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  estiloId    Int?
-  estilo      Estilo?  @relation(fields: [estiloId], references: [id])
-  recibos     Recibo[]
-  esInscripcion Boolean @default(false) 
-  activo        Boolean @default(true)
+  id            Int           @id @default(autoincrement())
+  nombre        String
+  descripcion   String?
+  montoRegular  Float // Precio para clases regulares (mensual)
+  montoSuelto   Float // Precio para clases sueltas
+  esInscripcion Boolean       @default(false) // Indica si es un concepto de inscripción
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  estiloId      Int?
+  estilo        Estilo?       @relation(fields: [estiloId], references: [id])
+  recibos       Recibo[]
   deudas        Deuda[]
+  inscripciones Inscripcion[]
+
+  @@unique([estiloId, esInscripcion])
 }
 
 model Recibo {
@@ -178,37 +183,52 @@ model Recibo {
 }
 
 model Estilo {
-  id            Int             @id @default(autoincrement())
-  nombre        String
-  descripcion   String?
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
-  profesorId    Int?
-  monto         Float           @default(0)
-  importe       Float           @default(0)
-  alumnoEstilos AlumnoEstilos[]
-  clases        Clase[]
-  conceptos     Concepto[]
-  deudas        Deuda[]
-  profesor      Profesor?       @relation(fields: [profesorId], references: [id])
-  alumnos       Alumno[]        @relation("AlumnoEstilos")
+  id             Int              @id @default(autoincrement())
+  nombre         String
+  descripcion    String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  profesorId     Int?
+  monto          Float            @default(0)
+  importe        Float            @default(0)
+  alumnoEstilos  AlumnoEstilos[]
+  clases         Clase[]
+  conceptos      Concepto[]
+  deudas         Deuda[]
+  profesor       Profesor?        @relation(fields: [profesorId], references: [id])
+  alumnos        Alumno[]         @relation("AlumnoEstilos")
+  ModalidadClase ModalidadClase[]
 }
 
 model AlumnoEstilos {
-  alumnoId               Int
-  estiloId               Int
-  activo                 Boolean   @default(true)
-  id                     Int       @id @default(autoincrement())
-  descuentoPersonalizado Float?
-  fechaFin               DateTime?
-  fechaInicio            DateTime  @default(now())
-  montoPersonalizado     Float?
-  observaciones          String?
-  alumno                 Alumno    @relation(fields: [alumnoId], references: [id])
-  estilo                 Estilo    @relation(fields: [estiloId], references: [id])
+  alumnoId    Int
+  estiloId    Int
+  modalidadId Int
+  activo      Boolean        @default(true)
+  fechaInicio DateTime       @default(now())
+  fechaFin    DateTime?
+  alumno      Alumno         @relation(fields: [alumnoId], references: [id])
+  estilo      Estilo         @relation(fields: [estiloId], references: [id])
+  modalidad   ModalidadClase @relation(fields: [modalidadId], references: [id])
 
   @@unique([alumnoId, estiloId])
-  @@index([activo])
+}
+
+model ModalidadClase {
+  id            Int             @id @default(autoincrement())
+  tipo          TipoModalidad
+  porcentaje    Float // Porcentaje de liquidación para el profesor
+  estiloId      Int
+  estilo        Estilo          @relation(fields: [estiloId], references: [id])
+  clases        Clase[]
+  alumnoEstilos AlumnoEstilos[]
+
+  @@unique([estiloId, tipo])
+}
+
+enum TipoModalidad {
+  REGULAR
+  SUELTA
 }
 
 model Profesor {
@@ -256,6 +276,8 @@ model Clase {
   fecha          DateTime       @default(now())
   profesorId     Int
   estiloId       Int
+  modalidadId    Int
+  modalidad      ModalidadClase @relation(fields: [modalidadId], references: [id])
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
   asistencias    Asistencia[]
@@ -292,24 +314,19 @@ model AlumnoSuelto {
 }
 
 model Liquidacion {
-  id                      Int                  @id @default(autoincrement())
-  fecha                   DateTime             @default(now())
-  profesorId              Int?
-  createdAt               DateTime             @default(now())
-  updatedAt               DateTime             @updatedAt
-  anio                    Int
-  estado                  EstadoLiquidacion    @default(PENDIENTE)
-  fechaPago               DateTime?
-  mes                     Int
-  metodoPago              TipoPago?
-  montoClasesSueltas      Float
-  montoCursos             Float
-  montoTotal              Float
-  observaciones           String?
-  porcentajeClasesSueltas Float                @default(0.80)
-  porcentajeCursos        Float                @default(0.60)
-  detalles                DetalleLiquidacion[]
-  profesor                Profesor?            @relation(fields: [profesorId], references: [id])
+  id                Int                  @id @default(autoincrement())
+  fecha             DateTime             @default(now())
+  profesorId        Int?
+  mes               Int
+  anio              Int
+  montoTotalRegular Float
+  montoTotalSueltas Float
+  porcentajeRegular Float                @default(0.60)
+  porcentajeSueltas Float                @default(0.80)
+  totalLiquidar     Float
+  estado            EstadoLiquidacion    @default(PENDIENTE)
+  detalles          DetalleLiquidacion[]
+  profesor          Profesor?            @relation(fields: [profesorId], references: [id])
 }
 
 model DetalleLiquidacion {

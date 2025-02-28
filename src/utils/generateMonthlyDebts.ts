@@ -1,6 +1,6 @@
 // pages/api/deudas/generateMonthly.ts
 import { Handler } from 'aws-lambda';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, TipoModalidad, Concepto } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -23,7 +23,8 @@ export const handler: Handler = async (event) => {
               activo: true
             },
             include: {
-              estilo: true
+              estilo: true,
+              modalidad: true // Incluir modalidad
             }
           }
         }
@@ -34,6 +35,9 @@ export const handler: Handler = async (event) => {
       const anio = fechaActual.getFullYear();
 
       const deudasACrear = [];
+      
+      // Definir el tipo correcto para el cache
+      const conceptosCache: Record<number, Concepto> = {}; 
 
       // 2. Para cada alumno, generar deudas por cada estilo activo
       for (const alumno of alumnosActivos) {
@@ -44,18 +48,45 @@ export const handler: Handler = async (event) => {
               alumnoId: alumno.id,
               estiloId: alumnoEstilo.estiloId,
               mes,
-              anio
+              anio,
+              tipoDeuda: alumnoEstilo.modalidad?.tipo || TipoModalidad.REGULAR
             }
           });
 
           if (!deudaExistente) {
+            // Obtener el concepto correspondiente al estilo
+            if (!conceptosCache[alumnoEstilo.estiloId]) {
+              const concepto = await tx.concepto.findFirst({
+                where: {
+                  estiloId: alumnoEstilo.estiloId,
+                  esInscripcion: false
+                }
+              });
+              
+              if (concepto) {
+                conceptosCache[alumnoEstilo.estiloId] = concepto;
+              } else {
+                console.warn(`No se encontró concepto para el estilo ID ${alumnoEstilo.estiloId}`);
+                continue; // Saltar este estilo si no hay concepto
+              }
+            }
+            
+            const concepto = conceptosCache[alumnoEstilo.estiloId];
+            const modalidadTipo = alumnoEstilo.modalidad?.tipo || TipoModalidad.REGULAR;
+            
+            // Determinar el monto según la modalidad
+            const monto = modalidadTipo === TipoModalidad.REGULAR 
+              ? concepto.montoRegular 
+              : concepto.montoSuelto;
+
             deudasACrear.push({
               alumnoId: alumno.id,
               estiloId: alumnoEstilo.estiloId,
-              monto: alumnoEstilo.estilo.importe || 0,
-              montoOriginal: alumnoEstilo.estilo.importe || 0,
+              conceptoId: concepto.id,
+              monto: monto,
               mes,
               anio,
+              tipoDeuda: modalidadTipo,
               fechaVencimiento: new Date(anio, fechaActual.getMonth(), 10),
               pagada: false
             });
@@ -74,20 +105,21 @@ export const handler: Handler = async (event) => {
     });
 
     return {
-        statusCode: 200,
-        body: JSON.stringify({
-          message: `Se generaron ${resultado} nuevas deudas`
-        })
-      };
-    } catch (error) {
-      console.error('Error al generar deudas mensuales:', error);
-      return {
-        statusCode: 500,
-        body: JSON.stringify({
-          error: 'Error al generar deudas mensuales'
-        })
-      };
-    } finally {
-      await prisma.$disconnect();
-    }
-  };
+      statusCode: 200,
+      body: JSON.stringify({
+        message: `Se generaron ${resultado} nuevas deudas`
+      })
+    };
+  } catch (error) {
+    console.error('Error al generar deudas mensuales:', error);
+    return {
+      statusCode: 500,
+      body: JSON.stringify({
+        error: 'Error al generar deudas mensuales',
+        details: error instanceof Error ? error.message : 'Error desconocido'
+      })
+    };
+  } finally {
+    await prisma.$disconnect();
+  }
+};

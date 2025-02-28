@@ -1,6 +1,7 @@
 // pages/api/registrar-clase.ts
 import { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
+import { TipoModalidad } from '@prisma/client';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -8,7 +9,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const { profesorId, estiloId, fecha, asistencias, alumnosSueltos } = req.body;
+    const { profesorId, estiloId, fecha, asistencias, alumnosSueltos, tipoModalidad } = req.body;
 
     // Validación de datos de entrada
     if (!profesorId || !estiloId || !fecha || !Array.isArray(asistencias)) {
@@ -52,16 +53,33 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     }
 
+    // Determinar el tipo de modalidad (REGULAR por defecto)
+    const modalidadTipo = tipoModalidad || TipoModalidad.REGULAR;
+
     const clase = await prisma.$transaction(async (prisma) => {
+      // Buscar la modalidad adecuada para este estilo
+      const modalidad = await prisma.modalidadClase.findFirst({
+        where: {
+          estiloId: parseInt(estiloId),
+          tipo: modalidadTipo
+        }
+      });
+
+      if (!modalidad) {
+        throw new Error(`No se encontró la modalidad ${modalidadTipo} para el estilo ID ${estiloId}`);
+      }
+
       const nuevaClase = await prisma.clase.create({
         data: {
           fecha: new Date(fecha),
           profesorId: parseInt(profesorId),
           estiloId: parseInt(estiloId),
+          modalidadId: modalidad.id  // Agregar el nuevo campo requerido
         },
         include: {
           profesor: true,
-          estilo: true
+          estilo: true,
+          modalidad: true  // Incluir información de la modalidad
         }
       });
 

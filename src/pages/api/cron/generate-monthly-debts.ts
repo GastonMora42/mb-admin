@@ -32,6 +32,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
       });
 
+      
+
       const fechaActual = new Date();
       const mes = (fechaActual.getMonth() + 2).toString();  // Mes siguiente (por ejemplo, octubre → 11, noviembre)
       const anio = fechaActual.getFullYear();

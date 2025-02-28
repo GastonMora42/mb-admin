@@ -1,7 +1,7 @@
 // pages/api/liquidaciones.ts
 import type { NextApiRequest, NextApiResponse } from 'next'
 import prisma from '@/lib/prisma'
-import { Prisma } from '@prisma/client'
+import { Prisma, TipoModalidad } from '@prisma/client'
 
 interface LiquidacionResponse {
   regularCount: number;
@@ -25,8 +25,8 @@ interface LiquidacionResponse {
 }
 
 interface PorcentajesPersonalizados {
-  porcentajeCursos: number;
-  porcentajeClasesSueltas: number;
+  porcentajeRegular: number;  // Renombrado de porcentajeCursos
+  porcentajeSueltas: number;  // Renombrado de porcentajeClasesSueltas
 }
 
 export default async function handler(
@@ -83,40 +83,40 @@ export default async function handler(
       const estilosIds = profesor.estilos.map(e => e.id);
 
       // Construimos la consulta para los recibos
-const where: Prisma.ReciboWhereInput = {
-  AND: [
-    { 
-      fechaEfecto: {
-        gte: startDate,
-        lte: endDate
-      }
-    },
-    { anulado: false },
-    {
-      OR: [
-        // Recibos regulares por los estilos del profesor
-        {
-          concepto: {
-            estilo: {
-              profesorId: Number(profesorId)
+      const where: Prisma.ReciboWhereInput = {
+        AND: [
+          { 
+            fechaEfecto: {
+              gte: startDate,
+              lte: endDate
             }
-          }
-        },
-        // Clases sueltas donde el profesor dio la clase
-        {
-          AND: [
-            { esClaseSuelta: true },
-            {
-              clase: {
-                profesorId: Number(profesorId)
+          },
+          { anulado: false },
+          {
+            OR: [
+              // Recibos regulares por los estilos del profesor
+              {
+                concepto: {
+                  estilo: {
+                    profesorId: Number(profesorId)
+                  }
+                }
+              },
+              // Clases sueltas donde el profesor dio la clase
+              {
+                AND: [
+                  { esClaseSuelta: true },
+                  {
+                    clase: {
+                      profesorId: Number(profesorId)
+                    }
+                  }
+                ]
               }
-            }
-          ]
-        }
-      ]
-    }
-  ]
-};
+            ]
+          }
+        ]
+      };
 
       console.log('Query where:', JSON.stringify(where, null, 2));
 
@@ -146,7 +146,8 @@ const where: Prisma.ReciboWhereInput = {
           clase: {
             include: {
               profesor: true,
-              estilo: true
+              estilo: true,
+              modalidad: true  // Incluimos la modalidad de la clase
             }
           }
         },
@@ -156,133 +157,140 @@ const where: Prisma.ReciboWhereInput = {
       });
 
       console.log(`Recibos encontrados: ${recibos.length}`);
+      
       // Separar y procesar los recibos
-     const regularRecibos = recibos.filter(recibo => {
-      // Es un recibo regular si está asociado a un estilo del profesor
-      // y no es una clase suelta
-      return (
-        recibo.concepto.estilo &&
-        estilosIds.includes(recibo.concepto.estilo.id) &&
-        recibo.concepto.nombre !== 'Clase Suelta'
-      );
-    });
+      const regularRecibos = recibos.filter(recibo => {
+        // Es un recibo regular si:
+        // 1. Está asociado a un estilo del profesor
+        // 2. No es una clase suelta (verificamos con esClaseSuelta o con la modalidad)
+        return (
+          recibo.concepto.estilo &&
+          estilosIds.includes(recibo.concepto.estilo.id) &&
+          !recibo.esClaseSuelta &&
+          (!recibo.clase?.modalidad || recibo.clase.modalidad.tipo === TipoModalidad.REGULAR)
+        );
+      });
 
-    const sueltasRecibos = recibos.filter(recibo => {
-      // Es una clase suelta si:
-      // 1. El concepto es 'Clase Suelta'
-      // 2. Está asociado a una clase del profesor
-      return (
-        recibo.concepto.nombre === 'Clase Suelta' &&
-        recibo.clase?.profesorId === Number(profesorId)
-      );
-    });
+      const sueltasRecibos = recibos.filter(recibo => {
+        // Es una clase suelta si:
+        // 1. La marca esClaseSuelta está activa o
+        // 2. La modalidad de la clase es SUELTA
+        return (
+          recibo.esClaseSuelta ||
+          (recibo.clase && recibo.clase.modalidad?.tipo === TipoModalidad.SUELTA && 
+           recibo.clase.profesorId === Number(profesorId))
+        );
+      });
 
-    // Calcular totales
-    const totalRegular = regularRecibos.reduce((sum, r) => sum + r.monto, 0);
-    const totalSueltas = sueltasRecibos.reduce((sum, r) => sum + r.monto, 0);
+      // Calcular totales
+      const totalRegular = regularRecibos.reduce((sum, r) => sum + r.monto, 0);
+      const totalSueltas = sueltasRecibos.reduce((sum, r) => sum + r.monto, 0);
 
-    // Usar porcentajes personalizados o los del profesor
-    const porcentajeCursos = porcentajes?.porcentajeCursos ?? profesor.porcentajePorDefecto;
-    const porcentajeClasesSueltas = porcentajes?.porcentajeClasesSueltas ?? profesor.porcentajeClasesSueltasPorDefecto;
+      // Usar porcentajes personalizados o los del profesor
+      const porcentajeRegular = porcentajes?.porcentajeRegular ?? profesor.porcentajePorDefecto;
+      const porcentajeSueltas = porcentajes?.porcentajeSueltas ?? profesor.porcentajeClasesSueltasPorDefecto;
 
-    const montoLiquidacionRegular = totalRegular * porcentajeCursos;
-    const montoLiquidacionSueltas = totalSueltas * porcentajeClasesSueltas;
+      const montoLiquidacionRegular = totalRegular * porcentajeRegular;
+      const montoLiquidacionSueltas = totalSueltas * porcentajeSueltas;
+      const montoTotalLiquidacion = montoLiquidacionRegular + montoLiquidacionSueltas;
 
-    // Preparar los recibos con sus montos de liquidación
-    const recibosConLiquidacion = [
-      ...regularRecibos.map(recibo => ({
-        ...recibo,
-        tipoLiquidacion: 'Regular',
-        porcentajeAplicado: porcentajeCursos,
-        montoLiquidacion: recibo.monto * porcentajeCursos
-      })),
-      ...sueltasRecibos.map(recibo => ({
-        ...recibo,
-        tipoLiquidacion: 'Clase Suelta',
-        porcentajeAplicado: porcentajeClasesSueltas,
-        montoLiquidacion: recibo.monto * porcentajeClasesSueltas
-      }))
-    ];
+      // Preparar los recibos con sus montos de liquidación
+      const recibosConLiquidacion = [
+        ...regularRecibos.map(recibo => ({
+          ...recibo,
+          tipoLiquidacion: 'Regular',
+          porcentajeAplicado: porcentajeRegular,
+          montoLiquidacion: recibo.monto * porcentajeRegular
+        })),
+        ...sueltasRecibos.map(recibo => ({
+          ...recibo,
+          tipoLiquidacion: 'Clase Suelta',
+          porcentajeAplicado: porcentajeSueltas,
+          montoLiquidacion: recibo.monto * porcentajeSueltas
+        }))
+      ];
 
-    // Crear la liquidación en la base de datos
-    if (recibosConLiquidacion.length > 0) {
-      try {
-        const liquidacion = await prisma.liquidacion.create({
-          data: {
-            fecha: new Date(),
-            mes: Number(month),
-            anio: Number(year),
-            profesor: {
-              connect: { id: Number(profesorId) }
-            },
-            montoTotal: montoLiquidacionRegular + montoLiquidacionSueltas,
-            montoCursos: montoLiquidacionRegular,
-            montoClasesSueltas: montoLiquidacionSueltas,
-            porcentajeCursos,
-            porcentajeClasesSueltas,
-            estado: 'PENDIENTE',
-            detalles: {
-              create: recibosConLiquidacion.map(recibo => ({
-                montoOriginal: recibo.monto,
-                porcentaje: recibo.porcentajeAplicado,
-                montoLiquidado: recibo.montoLiquidacion,
-                recibo: {
-                  connect: { id: recibo.id }
-                }
-              }))
+      // Crear la liquidación en la base de datos
+      if (recibosConLiquidacion.length > 0) {
+        try {
+          const liquidacion = await prisma.liquidacion.create({
+            data: {
+              fecha: new Date(),
+              mes: Number(month),
+              anio: Number(year),
+              profesor: {
+                connect: { id: Number(profesorId) }
+              },
+              // Nuevos campos para el modelo actualizado
+              montoTotalRegular: totalRegular,
+              montoTotalSueltas: totalSueltas,
+              porcentajeRegular,
+              porcentajeSueltas,
+              totalLiquidar: montoTotalLiquidacion,
+              estado: 'PENDIENTE',
+              detalles: {
+                create: recibosConLiquidacion.map(recibo => ({
+                  montoOriginal: recibo.monto,
+                  porcentaje: recibo.porcentajeAplicado,
+                  montoLiquidado: recibo.montoLiquidacion,
+                  recibo: {
+                    connect: { id: recibo.id }
+                  }
+                }))
+              }
             }
-          }
-        });
+          });
 
-        console.log('Liquidación creada:', liquidacion.id);
-      } catch (error) {
-        console.error('Error al crear liquidación en DB:', error);
-        throw new Error('Error al guardar la liquidación');
+          console.log('Liquidación creada:', liquidacion.id);
+        } catch (error) {
+          console.error('Error al crear liquidación en DB:', error);
+          throw new Error('Error al guardar la liquidación');
+        }
       }
+
+      // Preparar respuesta detallada
+      const liquidacionData: LiquidacionResponse = {
+        regularCount: regularRecibos.length,
+        sueltasCount: sueltasRecibos.length,
+        totalRegular,
+        totalSueltas,
+        montoLiquidacionRegular,
+        montoLiquidacionSueltas,
+        recibos: recibosConLiquidacion.map(recibo => ({
+          id: recibo.id,
+          numeroRecibo: recibo.numeroRecibo,
+          fecha: recibo.fecha,
+          fechaEfecto: recibo.fechaEfecto,
+          monto: recibo.monto,
+          montoLiquidacion: recibo.montoLiquidacion,
+          porcentajeAplicado: recibo.porcentajeAplicado,
+          tipoLiquidacion: recibo.tipoLiquidacion,
+          alumno: recibo.alumno || recibo.alumnoSuelto,
+          concepto: {
+            nombre: recibo.concepto.nombre,
+            estilo: recibo.concepto.estilo?.nombre
+          },
+          clase: recibo.clase ? {
+            fecha: recibo.clase.fecha,
+            estilo: recibo.clase.estilo.nombre,
+            modalidad: recibo.clase.modalidad?.tipo // Incluir la modalidad
+          } : null
+        })),
+        periodo,
+        detallesPorProfesor: undefined // Ya no necesitamos esto para liquidaciones individuales
+      };
+
+      return res.status(200).json(liquidacionData);
+
+    } catch (error) {
+      console.error('Error al generar liquidación:', error);
+      return res.status(500).json({ 
+        error: 'Error al generar liquidación',
+        details: error instanceof Error ? error.message : 'Error desconocido'
+      });
     }
-
-    // Preparar respuesta detallada
-    const liquidacionData: LiquidacionResponse = {
-      regularCount: regularRecibos.length,
-      sueltasCount: sueltasRecibos.length,
-      totalRegular,
-      totalSueltas,
-      montoLiquidacionRegular,
-      montoLiquidacionSueltas,
-      recibos: recibosConLiquidacion.map(recibo => ({
-        id: recibo.id,
-        numeroRecibo: recibo.numeroRecibo,
-        fecha: recibo.fecha,
-        fechaEfecto: recibo.fechaEfecto,
-        monto: recibo.monto,
-        montoLiquidacion: recibo.montoLiquidacion,
-        porcentajeAplicado: recibo.porcentajeAplicado,
-        tipoLiquidacion: recibo.tipoLiquidacion,
-        alumno: recibo.alumno || recibo.alumnoSuelto,
-        concepto: {
-          nombre: recibo.concepto.nombre,
-          estilo: recibo.concepto.estilo?.nombre
-        },
-        clase: recibo.clase ? {
-          fecha: recibo.clase.fecha,
-          estilo: recibo.clase.estilo.nombre
-        } : null
-      })),
-      periodo,
-      detallesPorProfesor: undefined // Ya no necesitamos esto para liquidaciones individuales
-    };
-
-    return res.status(200).json(liquidacionData);
-
-  } catch (error) {
-    console.error('Error al generar liquidación:', error);
-    return res.status(500).json({ 
-      error: 'Error al generar liquidación',
-      details: error instanceof Error ? error.message : 'Error desconocido'
-    });
   }
-}
 
-res.setHeader('Allow', ['GET', 'POST']);
-return res.status(405).end(`Method ${req.method} Not Allowed`);
+  res.setHeader('Allow', ['GET', 'POST']);
+  return res.status(405).end(`Method ${req.method} Not Allowed`);
 }
