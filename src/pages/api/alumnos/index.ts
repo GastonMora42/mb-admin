@@ -9,7 +9,7 @@ if (req.method === 'GET') {
   try {
     const alumnos = await prisma.alumno.findMany({
       include: { 
-        // El mismo include que tienes actualmente
+        // El mismo include que tienes actualmentes
         alumnoEstilos: {
           include: {
             estilo: {
