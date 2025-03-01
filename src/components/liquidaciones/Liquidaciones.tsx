@@ -1,8 +1,7 @@
-
 // components/Liquidaciones/index.tsx
 import React, { useState, useEffect } from 'react';
-import PreviewModal from './PreviewModal';
 import { styled } from 'styled-components';
+import { PreviewModal } from './PreviewModal';
 
 
 interface Profesor {
@@ -30,6 +29,8 @@ interface Recibo {
     nombre: string;
   };
   montoLiquidacion?: number;
+  tipoLiquidacion?: string;
+  porcentajeAplicado?: number;
 }
 
 interface LiquidacionData {
@@ -41,6 +42,10 @@ interface LiquidacionData {
   montoLiquidacionSueltas: number;
   recibos: Recibo[];
   periodo: string;
+  claseSueltaDetalle?: {
+    porConcepto: number;
+    porFlag: number;
+  };
 }
 
 interface FiltrosLiquidacion {
@@ -54,8 +59,7 @@ interface PorcentajesPersonalizados {
   porcentajeClasesSueltas: number;
 }
 
-// Styled Components (mantener los que ya tenías)
-
+// Styled Components
 const Container = styled.div`
   background-color: #FFFFFF;
   padding: 30px;
@@ -258,7 +262,6 @@ const LoadingSpinner = styled.div`
   }
 `;
 
-
 // Nuevo styled component para la sección de porcentajes
 const PorcentajesSection = styled.div`
   margin: 20px 0;
@@ -308,8 +311,55 @@ const PreviewButton = styled(Button)`
   }
 `;
 
+const DetalleContainer = styled.div`
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed #ccc;
+`;
+
+const DetailsContainer = styled.div`
+  margin-top: 20px;
+`;
+
+const DetailsTitle = styled.h4`
+  margin-bottom: 10px;
+  color: #495057;
+`;
+
+const DetailsTable = styled.table`
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+`;
+
+const DetailsTableHeader = styled.th`
+  padding: 8px;
+  text-align: left;
+  background-color: #f8f9fa;
+  border-bottom: 2px solid #dee2e6;
+`;
+
+const DetailsTableCell = styled.td`
+  padding: 8px;
+  border-bottom: 1px solid #dee2e6;
+`;
+
+const DetailsTableRow = styled.tr`
+  &:hover {
+    background-color: #f8f9fa;
+  }
+
+  input {
+    width: 80px;
+    padding: 4px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    text-align: right;
+  }
+`;
+
 const Liquidaciones: React.FC = () => {
-  // Estados existentes
+  // Estados para datos
   const [profesores, setProfesores] = useState<Profesor[]>([]);
   const [alumnos, setAlumnos] = useState<Alumno[]>([]);
   const [loading, setLoading] = useState(false);
@@ -320,13 +370,18 @@ const Liquidaciones: React.FC = () => {
     periodo: new Date().toISOString().slice(0, 7)
   });
 
+  // Estado para los valores editables del resumen
   const [valoresEditables, setValoresEditables] = useState({
     regularCount: 0,
     totalRegular: 0,
     sueltasCount: 0,
-    totalSueltas: 0
+    totalSueltas: 0,
+    claseSueltaConcepto: 0,
+    claseSueltaFlag: 0
   });
 
+  // Estado para los recibos editables individualmente
+  const [recibosEditables, setRecibosEditables] = useState<any[]>([]);
 
   // Nuevos estados
   const [liquidacionData, setLiquidacionData] = useState<LiquidacionData | null>(null);
@@ -337,6 +392,7 @@ const Liquidaciones: React.FC = () => {
   });
   const [profesorSeleccionado, setProfesorSeleccionado] = useState<Profesor | null>(null);
   const [mostrarPorcentajes, setMostrarPorcentajes] = useState(false);
+  const [mostrarDetalles, setMostrarDetalles] = useState(false);
 
   // Effects existentes
   useEffect(() => {
@@ -369,256 +425,480 @@ const Liquidaciones: React.FC = () => {
         regularCount: liquidacionData.regularCount,
         totalRegular: liquidacionData.totalRegular,
         sueltasCount: liquidacionData.sueltasCount,
-        totalSueltas: liquidacionData.totalSueltas
+        totalSueltas: liquidacionData.totalSueltas,
+        claseSueltaConcepto: liquidacionData.claseSueltaDetalle?.porConcepto || 0,
+        claseSueltaFlag: liquidacionData.claseSueltaDetalle?.porFlag || 0
       });
+
+      // Inicializar los recibos editables
+      setRecibosEditables(liquidacionData.recibos.map(recibo => ({
+        ...recibo,
+        montoEditable: recibo.monto,
+        porcentajeEditable: recibo.porcentajeAplicado || 
+                           (recibo.tipoLiquidacion?.includes('Clase Suelta') 
+                            ? porcentajesPersonalizados.porcentajeClasesSueltas / 100 
+                            : porcentajesPersonalizados.porcentajeCursos / 100),
+        montoLiquidacionEditable: recibo.montoLiquidacion || 0
+      })));
     }
-  }, [liquidacionData]);
+  }, [liquidacionData, porcentajesPersonalizados]);
 
   // Funciones existentes actualizadas
- const fetchProfesores = async () => {
-  try {
-    const res = await fetch('/api/profesores');
-    if (!res.ok) throw new Error('Error al cargar profesores');
-    const data = await res.json();
-    setProfesores(data);
-  } catch (error) {
-    setError('Error al cargar los profesores');
-    console.error('Error fetching profesores:', error);
-  }
-};
-
-const fetchAlumnos = async () => {
-  try {
-    const res = await fetch('/api/alumnos');
-    if (!res.ok) throw new Error('Error al cargar alumnos');
-    const data = await res.json();
-    setAlumnos(data);
-  } catch (error) {
-    setError('Error al cargar los alumnos');
-    console.error('Error fetching alumnos:', error);
-  }
-};
-
-// Nuevas funciones de manejo
-const handlePorcentajeChange = (tipo: 'cursos' | 'sueltas', valor: string) => {
-  const numeroValor = parseFloat(valor);
-  if (isNaN(numeroValor) || numeroValor < 0 || numeroValor > 100) return;
-
-  setPorcentajesPersonalizados(prev => ({
-    ...prev,
-    [tipo === 'cursos' ? 'porcentajeCursos' : 'porcentajeClasesSueltas']: numeroValor
-  }));
-};
-
-const calcularLiquidacion = async () => {
-  setError(null);
-  setLoading(true);
-
-  try {
-    const res = await fetch('/api/liquidaciones', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        ...filtros,
-        porcentajes: {
-          porcentajeCursos: porcentajesPersonalizados.porcentajeCursos / 100,
-          porcentajeClasesSueltas: porcentajesPersonalizados.porcentajeClasesSueltas / 100
-        }
-      }),
-    });
-
-    if (!res.ok) {
-      throw new Error('Error al generar la liquidación');
+  const fetchProfesores = async () => {
+    try {
+      const res = await fetch('/api/profesores');
+      if (!res.ok) throw new Error('Error al cargar profesores');
+      const data = await res.json();
+      setProfesores(data);
+    } catch (error) {
+      setError('Error al cargar los profesores');
+      console.error('Error fetching profesores:', error);
     }
+  };
 
-    const data = await res.json();
-    setLiquidacionData(data);
-    setMostrarPorcentajes(true);
-  } catch (error) {
-    setError('Error al generar la liquidación');
-    console.error('Error generando liquidación:', error);
-  } finally {
-    setLoading(false);
-  }
-};
+  const fetchAlumnos = async () => {
+    try {
+      const res = await fetch('/api/alumnos');
+      if (!res.ok) throw new Error('Error al cargar alumnos');
+      const data = await res.json();
+      setAlumnos(data);
+    } catch (error) {
+      setError('Error al cargar los alumnos');
+      console.error('Error fetching alumnos:', error);
+    }
+  };
 
-// JSX
-return (
-  <Container>
-    <Title>Generación de Liquidaciones</Title>
-    
-    {error && <ErrorMessage>{error}</ErrorMessage>}
+  // Nuevas funciones de manejo
+  const handlePorcentajeChange = (tipo: 'cursos' | 'sueltas', valor: string) => {
+    const numeroValor = parseFloat(valor);
+    if (isNaN(numeroValor) || numeroValor < 0 || numeroValor > 100) return;
 
-    <Form onSubmit={(e) => { e.preventDefault(); calcularLiquidacion(); }}>
-      <FormGroup>
-        <Label htmlFor="periodo">Período</Label>
-        <Input
-          type="month"
-          id="periodo"
-          required
-          value={filtros.periodo}
-          onChange={(e) => setFiltros(prev => ({
-            ...prev,
-            periodo: e.target.value
-          }))}
-        />
-      </FormGroup>
+    setPorcentajesPersonalizados(prev => ({
+      ...prev,
+      [tipo === 'cursos' ? 'porcentajeCursos' : 'porcentajeClasesSueltas']: numeroValor
+    }));
 
-      <FormGroup>
-        <Label htmlFor="profesor">Profesor</Label>
-        <Select 
-          id="profesor" 
-          value={filtros.profesorId || ''}
-          onChange={(e) => setFiltros(prev => ({
-            ...prev,
-            profesorId: e.target.value ? Number(e.target.value) : undefined
-          }))}
-        >
-          <option value="">Seleccionar profesor</option>
-          {profesores.map(profesor => (
-            <option key={profesor.id} value={profesor.id}>
-              {`${profesor.apellido}, ${profesor.nombre}`}
-            </option>
-          ))}
-        </Select>
-      </FormGroup>
+    // Actualizar los montos de liquidación con el nuevo porcentaje
+    if (recibosEditables.length > 0) {
+      setRecibosEditables(prev => 
+        prev.map(recibo => {
+          if (
+            (tipo === 'cursos' && !recibo.tipoLiquidacion?.includes('Clase Suelta')) ||
+            (tipo === 'sueltas' && recibo.tipoLiquidacion?.includes('Clase Suelta'))
+          ) {
+            const nuevoPorcentaje = numeroValor / 100;
+            return {
+              ...recibo,
+              porcentajeEditable: nuevoPorcentaje,
+              montoLiquidacionEditable: recibo.montoEditable * nuevoPorcentaje
+            };
+          }
+          return recibo;
+        })
+      );
+    }
+  };
 
-      {profesorSeleccionado && (
-        <PorcentajesSection>
-          <h3>Porcentajes de Liquidación</h3>
-          <p>Puede modificar los porcentajes por defecto para esta liquidación</p>
+  // Manejar cambios en los recibos individuales
+  const handleReciboChange = (id: number, field: string, value: string) => {
+    const numValue = parseFloat(value);
+    if (isNaN(numValue)) return;
+
+    setRecibosEditables(prev => 
+      prev.map(recibo => {
+        if (recibo.id === id) {
+          const updatedRecibo = { ...recibo, [field]: numValue };
           
-          <PorcentajesGrid>
-            <PorcentajeInput>
-              <label>Cursos Regulares (%)</label>
-              <input
-                type="number"
-                value={porcentajesPersonalizados.porcentajeCursos}
-                onChange={(e) => handlePorcentajeChange('cursos', e.target.value)}
-                min="0"
-                max="100"
-                step="1"
-              />
-              <small>Por defecto: {profesorSeleccionado.porcentajePorDefecto * 100}%</small>
-            </PorcentajeInput>
+          // Si cambia el monto o el porcentaje, recalcular el monto de liquidación
+          if (field === 'montoEditable' || field === 'porcentajeEditable') {
+            updatedRecibo.montoLiquidacionEditable = 
+              updatedRecibo.montoEditable * updatedRecibo.porcentajeEditable;
+          }
+          
+          return updatedRecibo;
+        }
+        return recibo;
+      })
+    );
 
-            <PorcentajeInput>
-              <label>Clases Sueltas (%)</label>
-              <input
-                type="number"
-                value={porcentajesPersonalizados.porcentajeClasesSueltas}
-                onChange={(e) => handlePorcentajeChange('sueltas', e.target.value)}
-                min="0"
-                max="100"
-                step="1"
-              />
-              <small>Por defecto: {profesorSeleccionado.porcentajeClasesSueltasPorDefecto * 100}%</small>
-            </PorcentajeInput>
-          </PorcentajesGrid>
-        </PorcentajesSection>
-      )}
+    // Recalcular los totales basados en los recibos editados
+    recalcularTotales();
+  };
 
-      <Button type="submit" disabled={loading}>
-        {loading ? (
-          <>
-            <LoadingSpinner />
-            Calculando...
-          </>
-        ) : 'Calcular Liquidación'}
-      </Button>
-    </Form>
+  // Recalcular totales basados en recibos individuales
+  const recalcularTotales = () => {
+    const regularRecibos = recibosEditables.filter(r => 
+      !r.tipoLiquidacion?.includes('Clase Suelta')
+    );
+    
+    const claseSueltaPorConcepto = recibosEditables.filter(r => 
+      r.tipoLiquidacion?.includes('Clase Suelta (por concepto)')
+    );
+    
+    const claseSueltaPorFlag = recibosEditables.filter(r => 
+      r.tipoLiquidacion?.includes('Clase Suelta (por flag)')
+    );
 
-    {liquidacionData && mostrarPorcentajes && (
-      <>
-        <ResumenContainer>
-          <h3>Resumen de Liquidación</h3>
-<ResumenGrid>
-  <ResumenItem>
-    <h4>Cursos Regulares</h4>
-    <div>
-      <label>Cantidad de alumnos: </label>
-      <EditableInput
-        type="number"
-        value={valoresEditables.regularCount}
-        onChange={(e) => setValoresEditables(prev => ({
-          ...prev,
-          regularCount: parseInt(e.target.value) || 0
-        }))}
-      />
-    </div>
-    <div>
-      <label>Total recaudado: $</label>
-      <EditableInput
-        type="number"
-        step="0.01"
-        value={valoresEditables.totalRegular}
-        onChange={(e) => setValoresEditables(prev => ({
-          ...prev,
-          totalRegular: parseFloat(e.target.value) || 0
-        }))}
-      />
-    </div>
-    <div>Porcentaje profesor: {porcentajesPersonalizados.porcentajeCursos}%</div>
-    <div>Monto liquidación: ${(valoresEditables.totalRegular * porcentajesPersonalizados.porcentajeCursos / 100).toFixed(2)}</div>
-  </ResumenItem>
+    const totalRegular = regularRecibos.reduce((sum, r) => sum + r.montoEditable, 0);
+    const totalSueltasConcepto = claseSueltaPorConcepto.reduce((sum, r) => sum + r.montoEditable, 0);
+    const totalSueltasFlag = claseSueltaPorFlag.reduce((sum, r) => sum + r.montoEditable, 0);
 
-  <ResumenItem>
-    <h4>Clases Sueltas</h4>
-    <div>
-      <label>Cantidad de alumnos: </label>
-      <EditableInput
-        type="number"
-        value={valoresEditables.sueltasCount}
-        onChange={(e) => setValoresEditables(prev => ({
-          ...prev,
-          sueltasCount: parseInt(e.target.value) || 0
-        }))}
-      />
-    </div>
-    <div>
-      <label>Total recaudado: $</label>
-      <EditableInput
-        type="number"
-        step="0.01"
-        value={valoresEditables.totalSueltas}
-        onChange={(e) => setValoresEditables(prev => ({
-          ...prev,
-          totalSueltas: parseFloat(e.target.value) || 0
-        }))}
-      />
-    </div>
-    <div>Porcentaje profesor: {porcentajesPersonalizados.porcentajeClasesSueltas}%</div>
-    <div>Monto liquidación: ${(valoresEditables.totalSueltas * porcentajesPersonalizados.porcentajeClasesSueltas / 100).toFixed(2)}</div>
-  </ResumenItem>
-</ResumenGrid>
+    setValoresEditables(prev => ({
+      ...prev,
+      regularCount: regularRecibos.length,
+      totalRegular: totalRegular,
+      sueltasCount: claseSueltaPorConcepto.length + claseSueltaPorFlag.length,
+      totalSueltas: totalSueltasConcepto + totalSueltasFlag,
+      claseSueltaConcepto: totalSueltasConcepto,
+      claseSueltaFlag: totalSueltasFlag
+    }));
+  };
 
-          <ButtonContainer>
-            <PreviewButton onClick={() => setShowPreview(true)}>
-              Vista Previa
-            </PreviewButton>
-          </ButtonContainer>
-        </ResumenContainer>
-      </>
-    )}
+  const calcularLiquidacion = async () => {
+    setError(null);
+    setLoading(true);
 
-{showPreview && liquidacionData && (
-  <PreviewModal
-    liquidacionData={{
+    try {
+      const res = await fetch('/api/liquidaciones', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...filtros,
+          porcentajes: {
+            porcentajeCursos: porcentajesPersonalizados.porcentajeCursos / 100,
+            porcentajeClasesSueltas: porcentajesPersonalizados.porcentajeClasesSueltas / 100
+          },
+          buscarConceptosClaseSuelta: true
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error('Error al generar la liquidación');
+      }
+
+      const data = await res.json();
+      setLiquidacionData(data);
+      setMostrarPorcentajes(true);
+      setMostrarDetalles(false); // Resetear el estado de detalles
+    } catch (error) {
+      setError('Error al generar la liquidación');
+      console.error('Error generando liquidación:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Preparar data para previsualización con valores editados
+  const prepararDataParaPreview = () => {
+    if (!liquidacionData) return null;
+
+    // Calcular montos de liquidación actualizados
+    const montoLiquidacionRegular = valoresEditables.totalRegular * (porcentajesPersonalizados.porcentajeCursos / 100);
+    const montoLiquidacionSueltas = valoresEditables.totalSueltas * (porcentajesPersonalizados.porcentajeClasesSueltas / 100);
+
+    // Usar los recibos editables
+    return {
       ...liquidacionData,
       regularCount: valoresEditables.regularCount,
       totalRegular: valoresEditables.totalRegular,
       sueltasCount: valoresEditables.sueltasCount,
       totalSueltas: valoresEditables.totalSueltas,
-      montoLiquidacionRegular: valoresEditables.totalRegular * porcentajesPersonalizados.porcentajeCursos / 100,
-      montoLiquidacionSueltas: valoresEditables.totalSueltas * porcentajesPersonalizados.porcentajeClasesSueltas / 100
-    }}
-    profesor={profesorSeleccionado}
-    porcentajesPersonalizados={porcentajesPersonalizados}
-    onClose={() => setShowPreview(false)}
-  />
-)}
-  </Container>
-);
-};
+      montoLiquidacionRegular: montoLiquidacionRegular,
+      montoLiquidacionSueltas: montoLiquidacionSueltas,
+      claseSueltaDetalle: {
+        porConcepto: valoresEditables.claseSueltaConcepto,
+        porFlag: valoresEditables.claseSueltaFlag
+      },
+      recibos: recibosEditables.map(recibo => ({
+        ...recibo,
+        monto: recibo.montoEditable,
+        porcentajeAplicado: recibo.porcentajeEditable,
+        montoLiquidacion: recibo.montoLiquidacionEditable
+      }))
+    };
+  };
 
-export default Liquidaciones;
+  // JSX
+  return (
+    <Container>
+      <Title>Generación de Liquidaciones</Title>
+      
+      {error && <ErrorMessage>{error}</ErrorMessage>}
+
+      <Form onSubmit={(e) => { e.preventDefault(); calcularLiquidacion(); }}>
+        <FormGroup>
+          <Label htmlFor="periodo">Período</Label>
+          <Input
+            type="month"
+            id="periodo"
+            required
+            value={filtros.periodo}
+            onChange={(e) => setFiltros(prev => ({
+              ...prev,
+              periodo: e.target.value
+            }))}
+          />
+        </FormGroup>
+
+        <FormGroup>
+          <Label htmlFor="profesor">Profesor</Label>
+          <Select 
+            id="profesor" 
+            value={filtros.profesorId || ''}
+            onChange={(e) => setFiltros(prev => ({
+              ...prev,
+              profesorId: e.target.value ? Number(e.target.value) : undefined
+            }))}
+          >
+            <option value="">Seleccionar profesor</option>
+            {profesores.map(profesor => (
+              <option key={profesor.id} value={profesor.id}>
+                {`${profesor.apellido}, ${profesor.nombre}`}
+              </option>
+            ))}
+          </Select>
+        </FormGroup>
+
+        {profesorSeleccionado && (
+          <PorcentajesSection>
+            <h3>Porcentajes de Liquidación</h3>
+            <p>Puede modificar los porcentajes por defecto para esta liquidación</p>
+            
+            <PorcentajesGrid>
+              <PorcentajeInput>
+                <label>Cursos Regulares (%)</label>
+                <input
+                  type="number"
+                  value={porcentajesPersonalizados.porcentajeCursos}
+                  onChange={(e) => handlePorcentajeChange('cursos', e.target.value)}
+                  min="0"
+                  max="100"
+                  step="1"
+                />
+                <small>Por defecto: {profesorSeleccionado.porcentajePorDefecto * 100}%</small>
+              </PorcentajeInput>
+
+              <PorcentajeInput>
+                <label>Clases Sueltas (%)</label>
+                <input
+                  type="number"
+                  value={porcentajesPersonalizados.porcentajeClasesSueltas}
+                  onChange={(e) => handlePorcentajeChange('sueltas', e.target.value)}
+                  min="0"
+                  max="100"
+                  step="1"
+                />
+                <small>Por defecto: {profesorSeleccionado.porcentajeClasesSueltasPorDefecto * 100}%</small>
+              </PorcentajeInput>
+            </PorcentajesGrid>
+          </PorcentajesSection>
+        )}
+
+        <Button type="submit" disabled={loading}>
+          {loading ? (
+            <>
+              <LoadingSpinner />
+              Calculando...
+            </>
+          ) : 'Calcular Liquidación'}
+        </Button>
+      </Form>
+
+      {liquidacionData && mostrarPorcentajes && (
+        <>
+          <ResumenContainer>
+            <h3>Resumen de Liquidación</h3>
+            <ResumenGrid>
+              <ResumenItem>
+                <h4>Cursos Regulares</h4>
+                <div>
+                  <label>Cantidad de alumnos: </label>
+                  <EditableInput
+                    type="number"
+                    value={valoresEditables.regularCount}
+                    onChange={(e) => setValoresEditables(prev => ({
+                      ...prev,
+                      regularCount: parseInt(e.target.value) || 0
+                    }))}
+                  />
+                </div>
+                <div>
+                  <label>Total recaudado: $</label>
+                  <EditableInput
+                    type="number"
+                    step="0.01"
+                    value={valoresEditables.totalRegular}
+                    onChange={(e) => setValoresEditables(prev => ({
+                      ...prev,
+                      totalRegular: parseFloat(e.target.value) || 0
+                    }))}
+                  />
+                </div>
+                <div>Porcentaje profesor: {porcentajesPersonalizados.porcentajeCursos}%</div>
+                <div>Monto liquidación: ${(valoresEditables.totalRegular * porcentajesPersonalizados.porcentajeCursos / 100).toFixed(2)}</div>
+              </ResumenItem>
+
+              <ResumenItem>
+                <h4>Clases Sueltas</h4>
+                <div>
+                  <label>Cantidad de alumnos: </label>
+                  <EditableInput
+                    type="number"
+                    value={valoresEditables.sueltasCount}
+                    onChange={(e) => setValoresEditables(prev => ({
+                      ...prev,
+                      sueltasCount: parseInt(e.target.value) || 0
+                    }))}
+                  />
+                </div>
+                <div>
+                  <label>Total recaudado: $</label>
+                  <EditableInput
+                    type="number"
+                    step="0.01"
+                    value={valoresEditables.totalSueltas}
+                    onChange={(e) => setValoresEditables(prev => ({
+                      ...prev,
+                      totalSueltas: parseFloat(e.target.value) || 0
+                    }))}
+                  />
+                </div>
+                <div>Porcentaje profesor: {porcentajesPersonalizados.porcentajeClasesSueltas}%</div>
+                <div>Monto liquidación: ${(valoresEditables.totalSueltas * porcentajesPersonalizados.porcentajeClasesSueltas / 100).toFixed(2)}</div>
+                
+                {/* Detalle de clases sueltas */}
+                <DetalleContainer>
+                  <div><strong>Desglose de Clases Sueltas:</strong></div>
+                  <div>
+                    <label>Por concepto: $</label>
+                    <EditableInput
+                      type="number"
+                      step="0.01"
+                      value={valoresEditables.claseSueltaConcepto}
+                      onChange={(e) => {
+                        const newValue = parseFloat(e.target.value) || 0;
+                        setValoresEditables(prev => ({
+                          ...prev,
+                          claseSueltaConcepto: newValue,
+                          totalSueltas: newValue + prev.claseSueltaFlag
+                        }));
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label>Por flag: $</label>
+                    <EditableInput
+                      type="number"
+                      step="0.01"
+                      value={valoresEditables.claseSueltaFlag}
+                      onChange={(e) => {
+                        const newValue = parseFloat(e.target.value) || 0;
+                        setValoresEditables(prev => ({
+                          ...prev,
+                          claseSueltaFlag: newValue,
+                          totalSueltas: prev.claseSueltaConcepto + newValue
+                        }));
+                      }}
+                    />
+                  </div>
+                </DetalleContainer>
+              </ResumenItem>
+            </ResumenGrid>
+
+            <TotalGeneral>
+              Total a Liquidar: ${(
+                (valoresEditables.totalRegular * porcentajesPersonalizados.porcentajeCursos / 100) + 
+                (valoresEditables.totalSueltas * porcentajesPersonalizados.porcentajeClasesSueltas / 100)
+              ).toFixed(2)}
+            </TotalGeneral>
+
+            <ButtonContainer>
+              <Button onClick={() => setMostrarDetalles(!mostrarDetalles)}>
+                {mostrarDetalles ? "Ocultar Detalles" : "Mostrar Detalles"}
+              </Button>
+              <PreviewButton onClick={() => setShowPreview(true)}>
+                Vista Previa
+              </PreviewButton>
+            </ButtonContainer>
+          </ResumenContainer>
+
+          {/* Sección de Detalles */}
+          {mostrarDetalles && (
+            <DetailsContainer>
+              <DetailsTitle>Detalle de Recibos</DetailsTitle>
+              <DetailsTable>
+                <thead>
+                  <tr>
+                    <DetailsTableHeader>N° Recibo</DetailsTableHeader>
+                    <DetailsTableHeader>Fecha</DetailsTableHeader>
+                    <DetailsTableHeader>Alumno</DetailsTableHeader>
+                    <DetailsTableHeader>Concepto</DetailsTableHeader>
+                    <DetailsTableHeader>Tipo</DetailsTableHeader>
+                    <DetailsTableHeader>Monto</DetailsTableHeader>
+                    <DetailsTableHeader>%</DetailsTableHeader>
+                    <DetailsTableHeader>A Liquidar</DetailsTableHeader>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recibosEditables.map((recibo) => (
+                    <DetailsTableRow key={recibo.id}>
+                      <DetailsTableCell>{recibo.numeroRecibo}</DetailsTableCell>
+                      <DetailsTableCell>{new Date(recibo.fecha).toLocaleDateString()}</DetailsTableCell>
+                      <DetailsTableCell>
+                        {recibo.alumno ? 
+                          `${recibo.alumno.apellido}, ${recibo.alumno.nombre}` : 
+                          recibo.alumnoSuelto ? 
+                            `${recibo.alumnoSuelto.apellido}, ${recibo.alumnoSuelto.nombre}` : 
+                            'Sin alumno'}
+                      </DetailsTableCell>
+                      <DetailsTableCell>{
+                        recibo.concepto.nombre}</DetailsTableCell>
+                        <DetailsTableCell>{recibo.tipoLiquidacion || 'Regular'}</DetailsTableCell>
+                        <DetailsTableCell>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={recibo.montoEditable}
+                            onChange={(e) => handleReciboChange(recibo.id, 'montoEditable', e.target.value)}
+                          />
+                        </DetailsTableCell>
+                        <DetailsTableCell>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            max="1"
+                            value={recibo.porcentajeEditable}
+                            onChange={(e) => handleReciboChange(recibo.id, 'porcentajeEditable', e.target.value)}
+                          />
+                        </DetailsTableCell>
+                        <DetailsTableCell>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={recibo.montoLiquidacionEditable}
+                            onChange={(e) => handleReciboChange(recibo.id, 'montoLiquidacionEditable', e.target.value)}
+                          />
+                        </DetailsTableCell>
+                      </DetailsTableRow>
+                    ))}
+                  </tbody>
+                </DetailsTable>
+              </DetailsContainer>
+            )}
+          </>
+        )}
+  
+        {showPreview && liquidacionData && (
+          <PreviewModal
+            liquidacionData={prepararDataParaPreview() || liquidacionData}
+            profesor={profesorSeleccionado}
+            porcentajesPersonalizados={porcentajesPersonalizados}
+            onClose={() => setShowPreview(false)}
+          />
+        )}
+      </Container>
+    );
+  };
+  
+  export default Liquidaciones;

@@ -56,130 +56,138 @@ export default async function handler(
     }
   }
 
-  if (req.method === 'POST') {
-    const { periodo, profesorId, porcentajes } = req.body;
+ // En el manejador de la solicitud POST
+if (req.method === 'POST') {
+  const { periodo, profesorId, porcentajes, buscarConceptosClaseSuelta } = req.body;
 
-    try {
-      if (!periodo) {
-        return res.status(400).json({ error: 'El período es requerido' });
+  try {
+    if (!periodo) {
+      return res.status(400).json({ error: 'El período es requerido' });
+    }
+
+    const [year, month] = periodo.split('-');
+    const startDate = new Date(Number(year), Number(month) - 1, 1);
+    const endDate = new Date(Number(year), Number(month), 0);
+
+    // Primero obtenemos los estilos del profesor
+    const profesor = await prisma.profesor.findUnique({
+      where: { id: Number(profesorId) },
+      include: {
+        estilos: true
       }
+    });
 
-      const [year, month] = periodo.split('-');
-      const startDate = new Date(Number(year), Number(month) - 1, 1);
-      const endDate = new Date(Number(year), Number(month), 0);
+    if (!profesor) {
+      return res.status(404).json({ error: 'Profesor no encontrado' });
+    }
 
-      // Primero obtenemos los estilos del profesor
-      const profesor = await prisma.profesor.findUnique({
-        where: { id: Number(profesorId) },
-        include: {
-          estilos: true
-        }
-      });
+    const estilosIds = profesor.estilos.map(e => e.id);
 
-      if (!profesor) {
-        return res.status(404).json({ error: 'Profesor no encontrado' });
-      }
-
-      const estilosIds = profesor.estilos.map(e => e.id);
-
-      // Construimos la consulta para los recibos
-const where: Prisma.ReciboWhereInput = {
-  AND: [
-    { 
-      fechaEfecto: {
-        gte: startDate,
-        lte: endDate
-      }
-    },
-    { anulado: false },
-    {
-      OR: [
-        // Recibos regulares por los estilos del profesor
-        {
-          concepto: {
-            estilo: {
-              profesorId: Number(profesorId)
-            }
+    // Construimos la consulta para los recibos
+    const where: Prisma.ReciboWhereInput = {
+      AND: [
+        { 
+          fechaEfecto: {
+            gte: startDate,
+            lte: endDate
           }
         },
-        // Clases sueltas donde el profesor dio la clase
+        { anulado: false },
         {
-          AND: [
-            { esClaseSuelta: true },
+          OR: [
+            // Recibos regulares por los estilos del profesor
             {
-              clase: {
-                profesorId: Number(profesorId)
+              concepto: {
+                estilo: {
+                  profesorId: Number(profesorId)
+                }
               }
+            },
+            // Clases sueltas donde el profesor dio la clase
+            {
+              AND: [
+                { 
+                  OR: [
+                    // Por flag explícito
+                    { esClaseSuelta: true },
+                    // Por nombre de concepto
+                    {
+                      concepto: {
+                        nombre: {
+                          contains: 'Clase Suelta',
+                          mode: 'insensitive'
+                        }
+                      }
+                    }
+                  ]
+                },
+                {
+                  clase: {
+                    profesorId: Number(profesorId)
+                  }
+                }
+              ]
             }
           ]
         }
       ]
-    }
-  ]
-};
+    };
 
-      console.log('Query where:', JSON.stringify(where, null, 2));
-
-      // Obtener recibos
-      const recibos = await prisma.recibo.findMany({
-        where,
-        include: {
-          alumno: {
-            select: {
-              id: true,
-              nombre: true,
-              apellido: true
-            }
-          },
-          alumnoSuelto: {
-            select: {
-              id: true,
-              nombre: true,
-              apellido: true
-            }
-          },
-          concepto: {
-            include: {
-              estilo: true
-            }
-          },
-          clase: {
-            include: {
-              profesor: true,
-              estilo: true
-            }
+    // Obtener recibos
+    const recibos = await prisma.recibo.findMany({
+      where,
+      include: {
+        alumno: {
+          select: {
+            id: true,
+            nombre: true,
+            apellido: true
           }
         },
-        orderBy: [
-          { fechaEfecto: 'asc' }
-        ]
-      });
-
-      console.log(`Recibos encontrados: ${recibos.length}`);
-      // Separar y procesar los recibos
-     const regularRecibos = recibos.filter(recibo => {
-      // Es un recibo regular si está asociado a un estilo del profesor
-      // y no es una clase suelta
-      return (
-        recibo.concepto.estilo &&
-        estilosIds.includes(recibo.concepto.estilo.id) &&
-        recibo.concepto.nombre !== 'Clase Suelta'
-      );
+        alumnoSuelto: {
+          select: {
+            id: true,
+            nombre: true,
+            apellido: true
+          }
+        },
+        concepto: {
+          include: {
+            estilo: true
+          }
+        },
+        clase: {
+          include: {
+            profesor: true,
+            estilo: true
+          }
+        }
+      },
+      orderBy: [
+        { fechaEfecto: 'asc' }
+      ]
     });
 
-    const sueltasRecibos = recibos.filter(recibo => {
-      // Es una clase suelta si:
-      // 1. El concepto es 'Clase Suelta'
-      // 2. Está asociado a una clase del profesor
-      return (
-        recibo.concepto.nombre === 'Clase Suelta' &&
-        recibo.clase?.profesorId === Number(profesorId)
-      );
-    });
+    // Clasificar los recibos por tipo:
+    const claseSueltaPorConcepto = recibos.filter(recibo => 
+      recibo.concepto.nombre.toLowerCase().includes('clase suelta')
+    );
+
+    const claseSueltaPorFlag = recibos.filter(recibo => 
+      recibo.esClaseSuelta && 
+      !recibo.concepto.nombre.toLowerCase().includes('clase suelta')
+    );
+
+    const regularRecibos = recibos.filter(recibo => 
+      !recibo.concepto.nombre.toLowerCase().includes('clase suelta') && 
+      !recibo.esClaseSuelta
+    );
 
     // Calcular totales
     const totalRegular = regularRecibos.reduce((sum, r) => sum + r.monto, 0);
-    const totalSueltas = sueltasRecibos.reduce((sum, r) => sum + r.monto, 0);
+    const totalClaseSueltaConcepto = claseSueltaPorConcepto.reduce((sum, r) => sum + r.monto, 0);
+    const totalClaseSueltaFlag = claseSueltaPorFlag.reduce((sum, r) => sum + r.monto, 0);
+    const totalSueltas = totalClaseSueltaConcepto + totalClaseSueltaFlag;
 
     // Usar porcentajes personalizados o los del profesor
     const porcentajeCursos = porcentajes?.porcentajeCursos ?? profesor.porcentajePorDefecto;
@@ -196,9 +204,15 @@ const where: Prisma.ReciboWhereInput = {
         porcentajeAplicado: porcentajeCursos,
         montoLiquidacion: recibo.monto * porcentajeCursos
       })),
-      ...sueltasRecibos.map(recibo => ({
+      ...claseSueltaPorConcepto.map(recibo => ({
         ...recibo,
-        tipoLiquidacion: 'Clase Suelta',
+        tipoLiquidacion: 'Clase Suelta (concepto)',
+        porcentajeAplicado: porcentajeClasesSueltas,
+        montoLiquidacion: recibo.monto * porcentajeClasesSueltas
+      })),
+      ...claseSueltaPorFlag.map(recibo => ({
+        ...recibo,
+        tipoLiquidacion: 'Clase Suelta (flag)',
         porcentajeAplicado: porcentajeClasesSueltas,
         montoLiquidacion: recibo.monto * porcentajeClasesSueltas
       }))
@@ -242,9 +256,9 @@ const where: Prisma.ReciboWhereInput = {
     }
 
     // Preparar respuesta detallada
-    const liquidacionData: LiquidacionResponse = {
+    const liquidacionData = {
       regularCount: regularRecibos.length,
-      sueltasCount: sueltasRecibos.length,
+      sueltasCount: claseSueltaPorConcepto.length + claseSueltaPorFlag.length,
       totalRegular,
       totalSueltas,
       montoLiquidacionRegular,
@@ -258,22 +272,21 @@ const where: Prisma.ReciboWhereInput = {
         montoLiquidacion: recibo.montoLiquidacion,
         porcentajeAplicado: recibo.porcentajeAplicado,
         tipoLiquidacion: recibo.tipoLiquidacion,
-        alumno: recibo.alumno || recibo.alumnoSuelto,
+        alumno: recibo.alumno || null,
+        alumnoSuelto: recibo.alumnoSuelto || null,
         concepto: {
           nombre: recibo.concepto.nombre,
           estilo: recibo.concepto.estilo?.nombre
-        },
-        clase: recibo.clase ? {
-          fecha: recibo.clase.fecha,
-          estilo: recibo.clase.estilo.nombre
-        } : null
+        }
       })),
       periodo,
-      detallesPorProfesor: undefined // Ya no necesitamos esto para liquidaciones individuales
+      claseSueltaDetalle: {
+        porConcepto: totalClaseSueltaConcepto,
+        porFlag: totalClaseSueltaFlag
+      }
     };
 
     return res.status(200).json(liquidacionData);
-
   } catch (error) {
     console.error('Error al generar liquidación:', error);
     return res.status(500).json({ 

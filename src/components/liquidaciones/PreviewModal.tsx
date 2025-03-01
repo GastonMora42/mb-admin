@@ -1,7 +1,7 @@
 // components/Liquidaciones/PreviewModal.tsx
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import styled from 'styled-components';
-import { PDFViewer } from '@react-pdf/renderer';
+import { PDFViewer, PDFDownloadLink, BlobProvider } from '@react-pdf/renderer';
 import LiquidacionPDF from './LiquidacionPDF';
 
 // Interfaces
@@ -27,6 +27,10 @@ interface LiquidacionData {
   montoLiquidacionRegular: number;
   montoLiquidacionSueltas: number;
   recibos: any[];
+  claseSueltaDetalle?: {
+    porConcepto: number;
+    porFlag: number;
+  };
 }
 
 // En PreviewModal.tsx, actualiza la interfaz:
@@ -35,6 +39,14 @@ interface PreviewModalProps {
   profesor: Profesor | null | undefined;  // Actualizado para aceptar null
   porcentajesPersonalizados: PorcentajesPersonalizados;
   onClose: () => void;
+}
+
+// Interfaz para el estado del PDFDownloadLink
+interface PDFDownloadLinkState {
+  blob: Blob | null;
+  url: string | null;
+  loading: boolean;
+  error: Error | null;
 }
 
 // Styled Components
@@ -108,27 +120,28 @@ const ModalActions = styled.div`
   gap: 10px;
 `;
 
-const ActionButton = styled.button<{ variant?: 'primary' | 'secondary' }>`
+const ActionButton = styled.button<{ variant?: 'primary' | 'secondary'; disabled?: boolean }>`
   padding: 10px 20px;
   border-radius: 4px;
   border: none;
-  cursor: pointer;
+  cursor: ${props => props.disabled ? 'not-allowed' : 'pointer'};
   font-weight: 500;
   transition: all 0.2s ease;
+  opacity: ${props => props.disabled ? 0.7 : 1};
   
   ${props => props.variant === 'primary' ? `
     background-color: #FFC001;
     color: #000;
     
     &:hover {
-      background-color: #e6ac00;
+      background-color: ${props.disabled ? '#FFC001' : '#e6ac00'};
     }
   ` : `
     background-color: #f0f0f0;
     color: #333;
     
     &:hover {
-      background-color: #e0e0e0;
+      background-color: ${props.disabled ? '#f0f0f0' : '#e0e0e0'};
     }
   `}
 `;
@@ -141,16 +154,21 @@ const LoadingContainer = styled.div`
   color: #666;
 `;
 
-const PreviewModal: React.FC<PreviewModalProps> = ({
+// Añadir un nuevo styled component para ocultar el PDFDownloadLink default
+const HiddenDownloadLink = styled.div`
+  display: none;
+`;
+
+// Versión con BlobProvider
+export const PreviewModal: React.FC<PreviewModalProps> = ({
   liquidacionData,
   profesor,
   porcentajesPersonalizados,
   onClose
 }) => {
   const [isLoading, setIsLoading] = useState(true);
-
+  
   useEffect(() => {
-    // Simular tiempo de carga del PDF
     const timer = setTimeout(() => {
       setIsLoading(false);
     }, 1000);
@@ -158,9 +176,24 @@ const PreviewModal: React.FC<PreviewModalProps> = ({
     return () => clearTimeout(timer);
   }, []);
 
-  const handleDownload = () => {
-    // La descarga se maneja automáticamente por el componente PDF
-    onClose();
+  const handleDownload = async (blob: Blob) => {
+    // Crear un objeto URL para el blob
+    const url = URL.createObjectURL(blob);
+    
+    // Crear un elemento a temporal
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `liquidacion_${
+      profesor ? `${profesor.apellido}_${profesor.nombre}_` : ''
+    }${liquidacionData.periodo.replace('-', '_')}.pdf`;
+    
+    // Añadir al DOM, hacer clic y luego eliminar
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    // Liberar el objeto URL
+    setTimeout(() => URL.revokeObjectURL(url), 100);
   };
 
   const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -200,16 +233,28 @@ const PreviewModal: React.FC<PreviewModalProps> = ({
           >
             Cancelar
           </ActionButton>
-          <ActionButton 
-            variant="primary" 
-            onClick={handleDownload}
+          
+          <BlobProvider
+            document={
+              <LiquidacionPDF
+                liquidacionData={liquidacionData}
+                profesor={profesor}
+                porcentajesPersonalizados={porcentajesPersonalizados}
+              />
+            }
           >
-            Descargar PDF
-          </ActionButton>
+            {({ blob, loading, error }) => (
+              <ActionButton 
+                variant="primary" 
+                onClick={() => blob && handleDownload(blob)}
+                disabled={loading || !blob || !!error}
+              >
+                {loading ? 'Preparando PDF...' : 'Descargar PDF'}
+              </ActionButton>
+            )}
+          </BlobProvider>
         </ModalActions>
       </ModalContent>
     </ModalOverlay>
   );
 };
-
-export default PreviewModal;
