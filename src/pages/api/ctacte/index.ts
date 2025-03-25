@@ -187,36 +187,46 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const todosLosRecibos = [...recibosRegulares, ...recibosSueltos]
           .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
 
-        // Procesar las deudas para manejar estiloId null
-        const deudasProcesadas = alumnoInfo.deudas.map((deuda: Deuda) => {
-          // Procesar los pagos válidos
-          const pagosValidos = deuda.pagos.filter(pago => !pago.recibo.anulado);
-          const montoPagado = pagosValidos.reduce((sum: number, pago: PagoDeuda) => sum + pago.monto, 0);
-          const estaPagada = montoPagado >= deuda.monto;
+// Procesar las deudas para manejar estiloId null
+const deudasProcesadas = alumnoInfo.deudas.map((deuda) => {
+  // Procesar los pagos válidos
+  const pagosValidos = deuda.pagos.filter(pago => !pago.recibo.anulado);
+  const montoPagado = pagosValidos.reduce((sum: number, pago: PagoDeuda) => sum + pago.monto, 0);
+  const estaPagada = montoPagado >= deuda.monto;
 
-          // Formatear los detalles de pago
-          const pagosDetalle = pagosValidos.map(pago => ({
-            id: pago.id,
-            monto: pago.monto,
-            fecha: pago.recibo.fecha,
-            numeroRecibo: pago.recibo.numeroRecibo
-          }));
+  // Formatear los detalles de pago
+  const pagosDetalle = pagosValidos.map(pago => ({
+    id: pago.id,
+    monto: pago.monto,
+    fecha: pago.recibo.fecha,
+    numeroRecibo: pago.recibo.numeroRecibo
+  }));
 
-          // Construir objeto con información adicional para la UI
-          return {
-            ...deuda,
-            montoPagado,
-            saldoPendiente: deuda.monto - montoPagado,
-            pagada: estaPagada,
-            pagosDetalle,
-            // Agregar información de visualización para deudas sin estilo
-            estiloNombre: deuda.estilo ? deuda.estilo.nombre : 
-                         (deuda.concepto?.esInscripcion ? 'Inscripción' : 'Sin estilo'),
-            conceptoNombre: deuda.concepto ? deuda.concepto.nombre : 
-                           (deuda.tipoDeuda === 'SUELTA' ? 'Clase suelta' : 'Mensualidad')
-          };
-        });
-  
+  // Normalizar los valores de concepto para evitar errores de tipos
+  const concepto = deuda.concepto
+    ? {
+        ...deuda.concepto,
+        montoRegular: deuda.concepto.montoRegular ?? 0, // Convertir null a 0
+        montoSuelto: deuda.concepto.montoSuelto ?? 0,   // Convertir null a 0
+      }
+    : null;
+
+  // Construir objeto con información adicional para la UI
+  return {
+    ...deuda,
+    montoPagado,
+    saldoPendiente: deuda.monto - montoPagado,
+    pagada: estaPagada,
+    pagosDetalle,
+    concepto, // Usar el objeto concepto corregido
+    // Agregar información de visualización para deudas sin estilo
+    estiloNombre: deuda.estilo ? deuda.estilo.nombre : 
+                  (concepto?.esInscripcion ? 'Inscripción' : 'Sin estilo'),
+    conceptoNombre: concepto ? concepto.nombre : 
+                    (deuda.tipoDeuda === 'SUELTA' ? 'Clase suelta' : 'Mensualidad')
+  };
+});
+
         // Definir la fecha de inscripción e inscripción pagada basándonos en deudas
         const deudaInscripcion = deudasProcesadas.find((d: any) => 
           d.concepto?.esInscripcion === true
