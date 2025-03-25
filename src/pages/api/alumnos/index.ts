@@ -520,7 +520,7 @@ if (req.method === 'POST') {
                   alumnoId: parseInt(id),
                   estiloId: estiloId,
                   conceptoId: concepto.id,
-                  monto: concepto.montoRegular,
+                  monto: concepto.montoRegular ?? 0,
                   mes: (fechaActual.getMonth() + 1).toString(),
                   anio: fechaActual.getFullYear(),
                   fechaVencimiento: new Date(
