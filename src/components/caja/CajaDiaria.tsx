@@ -1,199 +1,557 @@
-import React, { useEffect, useState, useMemo, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import styled from 'styled-components';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useUserRole } from '@/hooks/useUserRole';
-import recibos from '@/pages/api/recibos';
 import { getArgentinaDateTime } from '@/utils/dateUtils';
 
+// Styled Components con mejoras de diseño y responsividad
 const Container = styled.div`
- background-color: #FFFFFF;
- padding: 30px;
- border-radius: 8px;
- box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  background-color: #FFFFFF;
+  padding: 30px;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  
+  @media (max-width: 768px) {
+    padding: 20px 15px;
+    border-radius: 8px;
+  }
 `;
 
 const Title = styled.h2`
- color: #000000;
- margin-bottom: 20px;
+  color: #1A202C;
+  margin-bottom: 25px;
+  font-size: 1.8rem;
+  font-weight: 700;
+  padding-bottom: 12px;
+  border-bottom: 2px solid #FFC001;
+  
+  @media (max-width: 768px) {
+    font-size: 1.5rem;
+    margin-bottom: 20px;
+  }
 `;
 
 const Form = styled.form`
- display: flex;
- flex-direction: column;
- gap: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 25px;
+  margin-bottom: 30px;
+  
+  @media (max-width: 768px) {
+    gap: 20px;
+  }
 `;
 
 const FormRow = styled.div`
- display: flex;
- gap: 15px;
- align-items: center;
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+  
+  @media (max-width: 1024px) {
+    flex-wrap: wrap;
+  }
+  
+  @media (max-width: 768px) {
+    flex-direction: column;
+    gap: 15px;
+  }
 `;
 
 const InputGroup = styled.div`
- display: flex;
- align-items: center;
- gap: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  min-width: 200px;
+  
+  @media (max-width: 768px) {
+    width: 100%;
+    min-width: unset;
+  }
 `;
 
 const Label = styled.label`
- min-width: 100px;
+  font-weight: 600;
+  color: #4A5568;
+  font-size: 0.9rem;
 `;
 
 const Input = styled.input`
- padding: 10px;
- border: 1px solid #ccc;
- border-radius: 4px;
- flex: 1;
+  padding: 12px 15px;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  font-size: 1rem;
+  width: 100%;
+  transition: all 0.2s ease;
+  background-color: #FFFFFF;
+  
+  &:focus {
+    outline: none;
+    border-color: #FFC001;
+    box-shadow: 0 0 0 3px rgba(255, 192, 1, 0.2);
+  }
+  
+  &:disabled {
+    background-color: #F7FAFC;
+    cursor: not-allowed;
+  }
+  
+  @media (max-width: 768px) {
+    padding: 10px 12px;
+  }
 `;
 
 const Select = styled.select`
- padding: 10px;
- border: 1px solid #ccc;
- border-radius: 4px;
- flex: 1;
+  padding: 12px 15px;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  font-size: 1rem;
+  width: 100%;
+  transition: all 0.2s ease;
+  background-color: #FFFFFF;
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 15px center;
+  background-size: 15px;
+  
+  &:focus {
+    outline: none;
+    border-color: #FFC001;
+    box-shadow: 0 0 0 3px rgba(255, 192, 1, 0.2);
+  }
+  
+  @media (max-width: 768px) {
+    padding: 10px 12px;
+  }
 `;
 
-const Button = styled.button`
- background-color: #FFC001;
- color: #000000;
- border: none;
- padding: 10px 20px;
- border-radius: 4px;
- cursor: pointer;
- transition: background-color 0.3s;
+const Button = styled(motion.button)`
+  background-color: #FFC001;
+  color: #1A202C;
+  border: none;
+  padding: 14px 24px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 1rem;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  align-self: flex-end;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  
+  &:hover {
+    background-color: #F0B000;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+  }
+  
+  &:active {
+    transform: translateY(0);
+  }
+  
+  &:disabled {
+    background-color: #CBD5E0;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+  }
+  
+  @media (max-width: 768px) {
+    width: 100%;
+    padding: 12px;
+  }
+`;
 
- &:hover {
-   background-color: #e6ac00;
- }
+const TableContainer = styled.div`
+  overflow-x: auto;
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+  margin-bottom: 30px;
+  
+  /* Custom scrollbar */
+  &::-webkit-scrollbar {
+    height: 6px;
+  }
+  
+  &::-webkit-scrollbar-track {
+    background: #F7FAFC;
+  }
+  
+  &::-webkit-scrollbar-thumb {
+    background: #CBD5E0;
+    border-radius: 3px;
+  }
+  
+  &::-webkit-scrollbar-thumb:hover {
+    background: #A0AEC0;
+  }
 `;
 
 const Table = styled.table`
- width: 100%;
- border-collapse: collapse;
- margin-top: 20px;
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  overflow: hidden;
 `;
 
 const Th = styled.th`
- background-color: #000000;
- color: #FFFFFF;
- text-align: left;
- padding: 12px;
+  background-color: #1A202C;
+  color: #FFFFFF;
+  text-align: left;
+  padding: 16px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  position: sticky;
+  top: 0;
+  white-space: nowrap;
+  
+  &:first-child {
+    border-top-left-radius: 8px;
+  }
+  
+  &:last-child {
+    border-top-right-radius: 8px;
+  }
+  
+  @media (max-width: 768px) {
+    padding: 12px 10px;
+    font-size: 0.8rem;
+  }
 `;
 
 const Td = styled.td`
- border-bottom: 1px solid #F9F8F8;
- padding: 12px;
+  border-bottom: 1px solid #E2E8F0;
+  padding: 14px 16px;
+  font-size: 0.95rem;
+  color: #4A5568;
+  vertical-align: middle;
+  
+  @media (max-width: 768px) {
+    padding: 12px 10px;
+    font-size: 0.85rem;
+  }
 `;
 
-const Tr = styled.tr`
- &:nth-child(even) {
-   background-color: #F9F8F8;
- }
+const Tr = styled(motion.tr)`
+  transition: background-color 0.2s ease;
+  
+  &:nth-child(even) {
+    background-color: #F7FAFC;
+  }
+  
+  &:hover {
+    background-color: #EDF2F7;
+  }
+  
+  &:last-child td:first-child {
+    border-bottom-left-radius: 8px;
+  }
+  
+  &:last-child td:last-child {
+    border-bottom-right-radius: 8px;
+  }
 `;
 
-const Message = styled.div<{ isError?: boolean }>`
- margin-top: 20px;
- padding: 10px;
- border-radius: 4px;
- background-color: ${props => props.isError ? '#ffcccc' : '#ccffcc'};
- color: ${props => props.isError ? '#cc0000' : '#006600'};
+const Message = styled(motion.div)<{ isError?: boolean }>`
+  margin: 20px 0;
+  padding: 16px;
+  border-radius: 8px;
+  background-color: ${props => props.isError ? '#FFF5F5' : '#F0FFF4'};
+  color: ${props => props.isError ? '#C53030' : '#276749'};
+  border-left: 4px solid ${props => props.isError ? '#FC8181' : '#68D391'};
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  
+  svg {
+    width: 24px;
+    height: 24px;
+    color: ${props => props.isError ? '#E53E3E' : '#38A169'};
+    flex-shrink: 0;
+  }
+  
+  @media (max-width: 768px) {
+    padding: 12px;
+    font-size: 0.9rem;
+  }
 `;
 
-const TotalesContainer = styled.div`
- margin-top: 30px;
- background-color: #f0f0f0;
- border-radius: 8px;
- padding: 20px;
- box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+const TotalesContainer = styled(motion.div)`
+  background-color: #FAFAFA;
+  border-radius: 12px;
+  padding: 25px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+  
+  @media (max-width: 768px) {
+    padding: 20px 15px;
+  }
 `;
 
-const TotalGeneral = styled.h3`
- font-size: 24px;
- color: #000000;
- margin-bottom: 20px;
- text-align: right;
+const TotalGeneral = styled.div`
+  font-size: 1.5rem;
+  color: #1A202C;
+  margin-bottom: 25px;
+  text-align: right;
+  font-weight: 700;
+  
+  span {
+    font-size: 0.85rem;
+    color: #718096;
+    font-weight: 400;
+    display: block;
+    margin-top: 5px;
+  }
+  
+  @media (max-width: 768px) {
+    font-size: 1.3rem;
+  }
 `;
 
 const TotalesPorTipo = styled.div`
- display: grid;
- grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
- gap: 15px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 15px;
+  
+  @media (max-width: 768px) {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 10px;
+  }
 `;
 
-const TotalTipo = styled.div`
- background-color: #ffffff;
- padding: 15px;
- border-radius: 6px;
- box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+const TotalTipo = styled(motion.div)`
+  background-color: #FFFFFF;
+  padding: 16px;
+  border-radius: 8px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+  transition: all 0.3s ease;
+  
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  }
+  
+  @media (max-width: 768px) {
+    padding: 12px;
+  }
 `;
 
 const TipoLabel = styled.p`
- font-weight: bold;
- margin-bottom: 5px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #4A5568;
+  font-size: 0.9rem;
 `;
 
 const TipoMonto = styled.p`
- font-size: 18px;
- color: #0066cc;
+  font-size: 1.3rem;
+  color: #3182CE;
+  font-weight: 700;
+  
+  @media (max-width: 768px) {
+    font-size: 1.1rem;
+  }
 `;
 
 const AutocompleteContainer = styled.div`
- position: relative;
- flex: 1;
+  position: relative;
+  width: 100%;
 `;
 
 const SearchInput = styled(Input)`
- width: 100%;
+  padding-left: 40px;
 `;
 
-const SuggestionsList = styled.ul`
- position: absolute;
- top: 100%;
- left: 0;
- right: 0;
- max-height: 200px;
- overflow-y: auto;
- margin: 0;
- padding: 0;
- list-style: none;
- border: 1px solid #ddd;
- border-radius: 4px;
- background-color: white;
- box-shadow: 0 4px 6px rgba(0,0,0,0.1);
- z-index: 1000;
+const SearchIcon = styled.div`
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #A0AEC0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  
+  svg {
+    width: 18px;
+    height: 18px;
+  }
 `;
 
-const SuggestionItem = styled.li`
- padding: 10px 12px;
- cursor: pointer;
- border-bottom: 1px solid #eee;
- 
- &:last-child {
-   border-bottom: none;
- }
- 
- &:hover {
-   background-color: #f5f5f5;
- }
+const SuggestionsList = styled(motion.ul)`
+  position: absolute;
+  top: calc(100% + 5px);
+  left: 0;
+  right: 0;
+  max-height: 200px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  background-color: white;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+  
+  /* Custom scrollbar */
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  &::-webkit-scrollbar-track {
+    background: #F7FAFC;
+  }
+  
+  &::-webkit-scrollbar-thumb {
+    background: #CBD5E0;
+    border-radius: 3px;
+  }
+  
+  &::-webkit-scrollbar-thumb:hover {
+    background: #A0AEC0;
+  }
+`;
+
+const SuggestionItem = styled(motion.li)`
+  padding: 12px 16px;
+  cursor: pointer;
+  border-bottom: 1px solid #EDF2F7;
+  transition: background-color 0.2s ease;
+  
+  &:last-child {
+    border-bottom: none;
+  }
+  
+  &:hover {
+    background-color: #F7FAFC;
+  }
+`;
+
+const FilterBadge = styled.div`
+  display: inline-flex;
+  align-items: center;
+  background-color: #F0FFF4;
+  color: #276749;
+  font-size: 0.85rem;
+  padding: 4px 12px;
+  border-radius: 20px;
+  gap: 6px;
+  margin-right: 10px;
+  margin-bottom: 10px;
+  
+  button {
+    background: none;
+    border: none;
+    color: #276749;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    padding: 0;
+    
+    &:hover {
+      color: #C53030;
+    }
+    
+    svg {
+      width: 16px;
+      height: 16px;
+    }
+  }
+`;
+
+const ActiveFilters = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+`;
+
+const NoData = styled.div`
+  text-align: center;
+  padding: 50px 20px;
+  color: #718096;
+  
+  svg {
+    width: 60px;
+    height: 60px;
+    color: #CBD5E0;
+    margin-bottom: 15px;
+  }
+  
+  h3 {
+    font-size: 1.2rem;
+    margin-bottom: 10px;
+    color: #4A5568;
+  }
+  
+  p {
+    font-size: 0.95rem;
+  }
+`;
+
+const ReciboMonto = styled.span<{ anulado: boolean }>`
+  font-weight: ${props => props.anulado ? 'normal' : '600'};
+  color: ${props => props.anulado ? '#A0AEC0' : '#4A5568'};
+  text-decoration: ${props => props.anulado ? 'line-through' : 'none'};
+`;
+
+const ReciboEstado = styled.span<{ anulado: boolean }>`
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background-color: ${props => props.anulado ? '#FFF5F5' : '#F0FFF4'};
+  color: ${props => props.anulado ? '#C53030' : '#276749'};
+  margin-left: 10px;
+`;
+
+const LoadingSpinner = styled(motion.div)`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin: 50px 0;
+  
+  .spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid #E2E8F0;
+    border-top: 3px solid #FFC001;
+    border-radius: 50%;
+    margin-bottom: 15px;
+  }
+  
+  p {
+    color: #718096;
+    font-size: 0.95rem;
+  }
 `;
 
 interface Recibo {
- anulado: any;
- id: number;
- numeroRecibo: number;
- fecha: string;
- alumno?: { id: number; nombre: string; apellido: string };
- alumnoSuelto?: { id: number; nombre: string; apellido: string };
- concepto: { id: number; nombre: string };
- periodoPago: string;
- fueraDeTermino: boolean;
- monto: number;
- tipoPago: string;
+  anulado: boolean;
+  id: number;
+  numeroRecibo: number;
+  fecha: string;
+  alumno?: { id: number; nombre: string; apellido: string };
+  alumnoSuelto?: { id: number; nombre: string; apellido: string };
+  concepto: { id: number; nombre: string };
+  periodoPago: string;
+  fueraDeTermino: boolean;
+  monto: number;
+  tipoPago: string;
 }
 
 interface CajaDiariaData {
- recibos: Recibo[];
- totalMonto: number;
- totalPorTipoPago: Record<string, number>;
+  recibos: Recibo[];
+  totalMonto: number;
+  totalPorTipoPago: Record<string, number>;
 }
 
 const CajaDiaria = () => {
@@ -220,6 +578,8 @@ const CajaDiaria = () => {
     fueraDeTermino: '',
     tipoPago: ''
   });
+  
+  const [filtrosActivos, setFiltrosActivos] = useState<Record<string, string>>({});
 
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ text: string; isError: boolean } | null>(null);
@@ -230,10 +590,12 @@ const CajaDiaria = () => {
   const [alumnosFiltrados, setAlumnosFiltrados] = useState<any[]>([]);
   const [conceptosFiltrados, setConceptosFiltrados] = useState<any[]>([]);
   const lastUpdate = useRef(new Date());
+  
+  const [initialLoad, setInitialLoad] = useState(true);
 
   const userRole = useUserRole();
 
-  const fetchCajaDiaria = async () => {
+  const fetchCajaDiaria = useCallback(async () => {
     if (userRole !== 'Dueño' && userRole !== 'Secretaria') return;
     
     setLoading(true);
@@ -253,7 +615,47 @@ const CajaDiaria = () => {
       // Agregar filtros solo si es Dueño
       if (userRole === 'Dueño') {
         Object.entries(filtros).forEach(([key, value]) => {
-          if (value) queryParams.append(key, value);
+          if (value) {
+            queryParams.append(key, value);
+            
+            if (key === 'alumnoId' && alumnos.length > 0) {
+              const alumno = alumnos.find(a => a.id.toString() === value);
+              if (alumno) {
+                setFiltrosActivos(prev => ({
+                  ...prev,
+                  alumno: `${alumno.apellido} ${alumno.nombre}`
+                }));
+              }
+            } else if (key === 'conceptoId' && conceptos.length > 0) {
+              const concepto = conceptos.find(c => c.id.toString() === value);
+              if (concepto) {
+                setFiltrosActivos(prev => ({
+                  ...prev,
+                  concepto: concepto.nombre
+                }));
+              }
+            } else if (key === 'periodoPago') {
+              setFiltrosActivos(prev => ({
+                ...prev,
+                periodo: value
+              }));
+            } else if (key === 'tipoPago') {
+              setFiltrosActivos(prev => ({
+                ...prev,
+                tipoPago: value.replace('_', ' ')
+              }));
+            } else if (key === 'fueraDeTermino') {
+              setFiltrosActivos(prev => ({
+                ...prev,
+                termino: value === 'true' ? 'Fuera de término' : 'En término'
+              }));
+            } else if (key === 'numeroRecibo') {
+              setFiltrosActivos(prev => ({
+                ...prev,
+                numeroRecibo: value
+              }));
+            }
+          }
         });
       }
 
@@ -269,13 +671,16 @@ const CajaDiaria = () => {
           "Esta es la caja del día corriente", 
         isError: false 
       });
+      
+      setInitialLoad(false);
     } catch (error) {
       console.error('Error fetching recibos:', error);
       setMessage({ text: 'Error al cargar recibos', isError: true });
+      setInitialLoad(false);
     } finally {
       setLoading(false);
     }
-  };
+  }, [fechaInicio, fechaFin, filtros, userRole, alumnos, conceptos]);
 
   // Cargar datos iniciales
   useEffect(() => {
@@ -339,7 +744,6 @@ const CajaDiaria = () => {
    }
  };
 
-
  const renderAlumnoNombre = (recibo: Recibo) => {
    if (recibo.alumno) {
      return `${recibo.alumno.nombre} ${recibo.alumno.apellido}`;
@@ -355,6 +759,24 @@ const CajaDiaria = () => {
    }
  };
 
+ const handleRemoveFiltro = (key: string) => {
+   setFiltros(prev => ({ ...prev, [key]: '' }));
+   setFiltrosActivos(prev => {
+     const newFiltros = { ...prev };
+     if (key === 'alumnoId') delete newFiltros.alumno;
+     if (key === 'conceptoId') delete newFiltros.concepto;
+     if (key === 'periodoPago') delete newFiltros.periodo;
+     if (key === 'tipoPago') delete newFiltros.tipoPago;
+     if (key === 'fueraDeTermino') delete newFiltros.termino;
+     if (key === 'numeroRecibo') delete newFiltros.numeroRecibo;
+     return newFiltros;
+   });
+   
+   // Reset search inputs
+   if (key === 'alumnoId') setSearchAlumno('');
+   if (key === 'conceptoId') setSearchConcepto('');
+ };
+
  const handleSubmit = (e: React.FormEvent) => {
    e.preventDefault();
    if (userRole === 'Dueño' || userRole === 'Secretaria') {
@@ -362,265 +784,457 @@ const CajaDiaria = () => {
    }
  };
 
+ // Cargar datos iniciales
  useEffect(() => {
-  if (userRole === 'Dueño' || userRole === 'Secretaria') {
-    fetchCajaDiaria();
-    fetchAlumnos();
-    fetchConceptos();
-  }
-}, [userRole]);
+   if (userRole === 'Dueño' || userRole === 'Secretaria') {
+     fetchCajaDiaria();
+   }
+ }, [userRole, fetchCajaDiaria]);
 
  useEffect(() => {
-  if (searchAlumno) {
-    const filtered = alumnos.filter(alumno => 
-      `${alumno.apellido} ${alumno.nombre}`.toLowerCase().includes(searchAlumno.toLowerCase())
-    );
-    setAlumnosFiltrados(filtered);
-  } else {
-    setAlumnosFiltrados([]);
-  }
-}, [searchAlumno, alumnos]);
+   if (searchAlumno) {
+     const filtered = alumnos.filter(alumno => 
+       `${alumno.apellido} ${alumno.nombre}`.toLowerCase().includes(searchAlumno.toLowerCase())
+     );
+     setAlumnosFiltrados(filtered);
+   } else {
+     setAlumnosFiltrados([]);
+   }
+ }, [searchAlumno, alumnos]);
 
-useEffect(() => {
-  if (searchConcepto) {
-    const filtered = conceptos.filter(concepto => 
-      concepto.nombre.toLowerCase().includes(searchConcepto.toLowerCase())
-    );
-    setConceptosFiltrados(filtered);
-  } else {
-    setConceptosFiltrados([]);
-  }
-}, [searchConcepto, conceptos]);
+ useEffect(() => {
+   if (searchConcepto) {
+     const filtered = conceptos.filter(concepto => 
+       concepto.nombre.toLowerCase().includes(searchConcepto.toLowerCase())
+     );
+     setConceptosFiltrados(filtered);
+   } else {
+     setConceptosFiltrados([]);
+   }
+ }, [searchConcepto, conceptos]);
+
+ const formatDate = (dateString: string) => {
+   try {
+     const date = new Date(dateString);
+     return date.toLocaleDateString('es-AR', {
+       day: '2-digit',
+       month: '2-digit',
+       year: 'numeric'
+     });
+   } catch (e) {
+     return dateString;
+   }
+ };
+
+ // Cuando se hace clic fuera de autocomplete
+ useEffect(() => {
+   const handleClickOutside = (event: MouseEvent) => {
+     if (
+       alumnosFiltrados.length > 0 || 
+       conceptosFiltrados.length > 0
+     ) {
+       if (!(event.target as HTMLElement).closest('.autocomplete-container')) {
+         setAlumnosFiltrados([]);
+         setConceptosFiltrados([]);
+       }
+     }
+   };
+
+   document.addEventListener('mousedown', handleClickOutside);
+   return () => {
+     document.removeEventListener('mousedown', handleClickOutside);
+   };
+ }, [alumnosFiltrados.length, conceptosFiltrados.length]);
 
  if (userRole === 'Profesor') {
-   return <Message isError={true}>No tienes acceso a la información de caja diaria.</Message>;
+   return (
+     <Container>
+       <Message 
+         isError={true}
+         initial={{ opacity: 0, y: -20 }}
+         animate={{ opacity: 1, y: 0 }}
+         transition={{ duration: 0.3 }}
+       >
+         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+         </svg>
+         No tienes acceso a la información de caja diaria.
+       </Message>
+     </Container>
+   );
  }
 
  return (
-  <Container>
-    <Title>Caja Diaria</Title>
-    
-    <Form onSubmit={handleSubmit}>
-      <FormRow>
-        <InputGroup>
-          <Label>Desde:</Label>
-          <Input
-            type="date"
-            value={fechaInicio}
-            onChange={(e) => setFechaInicio(e.target.value)}
-            readOnly={userRole === 'Secretaria'}
-            style={userRole === 'Secretaria' ? { backgroundColor: '#f5f5f5' } : {}}
-          />
-        </InputGroup>
-        {userRole === 'Dueño' && (
-          <>
-            <InputGroup>
-              <Label>Hasta:</Label>
-              <Input
-                type="date"
-                value={fechaFin}
-                onChange={(e) => setFechaFin(e.target.value)}
-              />
-            </InputGroup>
+   <Container>
+     <Title>Caja Diaria</Title>
+     
+     <Form onSubmit={handleSubmit}>
+       <FormRow>
+         <InputGroup>
+           <Label>Desde:</Label>
+           <Input
+             type="date"
+             value={fechaInicio}
+             onChange={(e) => setFechaInicio(e.target.value)}
+             readOnly={userRole === 'Secretaria'}
+             style={userRole === 'Secretaria' ? { backgroundColor: '#F7FAFC' } : {}}
+           />
+         </InputGroup>
+         {userRole === 'Dueño' && (
+           <>
+             <InputGroup>
+               <Label>Hasta:</Label>
+               <Input
+                 type="date"
+                 value={fechaFin}
+                 onChange={(e) => setFechaFin(e.target.value)}
+               />
+             </InputGroup>
 
-            {/* Filtros adicionales solo para Dueño */}
-            <InputGroup>
-              <Label>N° Recibo:</Label>
-              <Input
-                type="text"
-                name="numeroRecibo"
-                value={filtros.numeroRecibo}
-                onChange={(e) => handleFiltroChange(e.target.name, e.target.value)}
-                placeholder="Número de Recibo"
-              />
-            </InputGroup>
-          </>
-        )}
-      </FormRow>
+             {/* Filtros adicionales solo para Dueño */}
+             <InputGroup>
+               <Label>N° Recibo:</Label>
+               <Input
+type="text"
+name="numeroRecibo"
+value={filtros.numeroRecibo}
+onChange={(e) => handleFiltroChange(e.target.name, e.target.value)}
+placeholder="Número de Recibo"
+/>
+</InputGroup>
+</>
+)}
+</FormRow>
 
-      {userRole === 'Dueño' && (
-        <>
-          <FormRow>
-            <InputGroup>
-              <Label>Alumno:</Label>
-              <AutocompleteContainer className="autocomplete-container">
-                <SearchInput
-                  type="text"
-                  value={searchAlumno}
-                  onChange={(e) => {
-                    setSearchAlumno(e.target.value);
-                    if (!e.target.value) {
-                      handleFiltroChange('alumnoId', '');
-                    }
-                  }}
-                  placeholder="Buscar alumno..."
-                />
-                {searchAlumno && alumnosFiltrados.length > 0 && (
-                  <SuggestionsList>
-                    {alumnosFiltrados.map(alumno => (
-                      <SuggestionItem
-                        key={alumno.id}
-                        onClick={() => {
-                          handleFiltroChange('alumnoId', alumno.id.toString());
-                          setSearchAlumno(`${alumno.apellido} ${alumno.nombre}`);
-                          fetchCajaDiaria();
-                        }}
-                      >
-                        {alumno.apellido} {alumno.nombre}
-                      </SuggestionItem>
-                    ))}
-                  </SuggestionsList>
-                )}
-              </AutocompleteContainer>
-            </InputGroup>
+{userRole === 'Dueño' && (
+<>
+<FormRow>
 <InputGroup>
-  <Label>Concepto:</Label>
-  <AutocompleteContainer className="autocomplete-container">
-    <SearchInput
-      type="text"
-      value={searchConcepto}
-      onChange={(e) => {
-        setSearchConcepto(e.target.value);
-        if (!e.target.value) {
-          handleFiltroChange('conceptoId', '');
-        }
-      }}
-      placeholder="Buscar concepto..."
-    />
-    {searchConcepto && conceptosFiltrados.length > 0 && (
-      <SuggestionsList>
-        {conceptosFiltrados.map(concepto => (
-          <SuggestionItem
-            key={concepto.id}
-            onClick={() => {
-              handleFiltroChange('conceptoId', concepto.id.toString());
-              setSearchConcepto(concepto.nombre);
-              fetchCajaDiaria();
-            }}
-          >
-            {concepto.nombre}
-          </SuggestionItem>
-        ))}
-      </SuggestionsList>
-    )}
-  </AutocompleteContainer>
+<Label>Alumno:</Label>
+<AutocompleteContainer className="autocomplete-container">
+<SearchIcon>
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+  </svg>
+</SearchIcon>
+<SearchInput
+  type="text"
+  value={searchAlumno}
+  onChange={(e) => {
+    setSearchAlumno(e.target.value);
+    if (!e.target.value) {
+      handleFiltroChange('alumnoId', '');
+    }
+  }}
+  placeholder="Buscar alumno..."
+/>
+<AnimatePresence>
+  {searchAlumno && alumnosFiltrados.length > 0 && (
+    <SuggestionsList
+      initial={{ opacity: 0, y: -10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -10 }}
+      transition={{ duration: 0.2 }}
+    >
+      {alumnosFiltrados.map(alumno => (
+        <SuggestionItem
+          key={alumno.id}
+          onClick={() => {
+            handleFiltroChange('alumnoId', alumno.id.toString());
+            setSearchAlumno(`${alumno.apellido} ${alumno.nombre}`);
+            setAlumnosFiltrados([]);
+          }}
+          whileHover={{ backgroundColor: '#F7FAFC' }}
+          transition={{ duration: 0.1 }}
+        >
+          {alumno.apellido} {alumno.nombre}
+        </SuggestionItem>
+      ))}
+    </SuggestionsList>
+  )}
+</AnimatePresence>
+</AutocompleteContainer>
+</InputGroup>
+<InputGroup>
+<Label>Concepto:</Label>
+<AutocompleteContainer className="autocomplete-container">
+<SearchIcon>
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+  </svg>
+</SearchIcon>
+<SearchInput
+  type="text"
+  value={searchConcepto}
+  onChange={(e) => {
+    setSearchConcepto(e.target.value);
+    if (!e.target.value) {
+      handleFiltroChange('conceptoId', '');
+    }
+  }}
+  placeholder="Buscar concepto..."
+/>
+<AnimatePresence>
+  {searchConcepto && conceptosFiltrados.length > 0 && (
+    <SuggestionsList
+      initial={{ opacity: 0, y: -10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -10 }}
+      transition={{ duration: 0.2 }}
+    >
+      {conceptosFiltrados.map(concepto => (
+        <SuggestionItem
+          key={concepto.id}
+          onClick={() => {
+            handleFiltroChange('conceptoId', concepto.id.toString());
+            setSearchConcepto(concepto.nombre);
+            setConceptosFiltrados([]);
+          }}
+          whileHover={{ backgroundColor: '#F7FAFC' }}
+          transition={{ duration: 0.1 }}
+        >
+          {concepto.nombre}
+        </SuggestionItem>
+      ))}
+    </SuggestionsList>
+  )}
+</AnimatePresence>
+</AutocompleteContainer>
 </InputGroup>
 </FormRow>
 
 <FormRow>
-  <InputGroup>
-    <Label>Periodo:</Label>
-    <Input
-      type="month"
-      name="periodoPago"
-      value={filtros.periodoPago}
-      onChange={(e) => handleFiltroChange(e.target.name, e.target.value)}
-    />
-  </InputGroup>
+<InputGroup>
+<Label>Periodo:</Label>
+<Input
+type="month"
+name="periodoPago"
+value={filtros.periodoPago}
+onChange={(e) => handleFiltroChange(e.target.name, e.target.value)}
+/>
+</InputGroup>
 
-  <InputGroup>
-    <Label>Término:</Label>
-    <Select
-      name="fueraDeTermino"
-      value={filtros.fueraDeTermino}
-      onChange={(e) => handleFiltroChange(e.target.name, e.target.value)}
-    >
-      <option value="">Todos</option>
-      <option value="true">Fuera de término</option>
-      <option value="false">En término</option>
-    </Select>
-  </InputGroup>
+<InputGroup>
+<Label>Término:</Label>
+<Select
+name="fueraDeTermino"
+value={filtros.fueraDeTermino}
+onChange={(e) => handleFiltroChange(e.target.name, e.target.value)}
+>
+<option value="">Todos</option>
+<option value="true">Fuera de término</option>
+<option value="false">En término</option>
+</Select>
+</InputGroup>
 
-  <InputGroup>
-    <Label>Tipo de Pago:</Label>
-    <Select
-      name="tipoPago"
-      value={filtros.tipoPago}
-      onChange={(e) => handleFiltroChange(e.target.name, e.target.value)}
-    >
-      <option value="">Todos</option>
-      <option value="EFECTIVO">Efectivo</option>
-      <option value="MERCADO_PAGO">Mercado Pago</option>
-      <option value="TRANSFERENCIA">Transferencia</option>
-      <option value="DEBITO_AUTOMATICO">Débito Automático</option>
-      <option value="OTRO">Otro</option>
-    </Select>
-  </InputGroup>
+<InputGroup>
+<Label>Tipo de Pago:</Label>
+<Select
+name="tipoPago"
+value={filtros.tipoPago}
+onChange={(e) => handleFiltroChange(e.target.name, e.target.value)}
+>
+<option value="">Todos</option>
+<option value="EFECTIVO">Efectivo</option>
+<option value="MERCADO_PAGO">Mercado Pago</option>
+<option value="TRANSFERENCIA">Transferencia</option>
+<option value="DEBITO_AUTOMATICO">Débito Automático</option>
+<option value="OTRO">Otro</option>
+</Select>
+</InputGroup>
 </FormRow>
 </>
 )}
 
-<Button type="submit" disabled={loading}>
-{loading ? 'Cargando...' : 'Mostrar caja'}
+<Button 
+type="submit" 
+disabled={loading}
+whileTap={{ scale: 0.97 }}
+>
+{loading ? (
+<>
+<motion.div
+animate={{ rotate: 360 }}
+transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+style={{ width: 20, height: 20, borderRadius: '50%', borderTop: '2px solid #FFF', borderRight: '2px solid transparent', borderBottom: '2px solid #FFF', borderLeft: '2px solid #FFF' }}
+/>
+Cargando...
+</>
+) : (
+<>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="20" height="20">
+<rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+<line x1="3" y1="9" x2="21" y2="9"></line>
+<line x1="9" y1="21" x2="9" y2="9"></line>
+</svg>
+Mostrar caja
+</>
+)}
 </Button>
 </Form>
-     {message && (
-       <Message isError={message.isError}>{message.text}</Message>
-     )}
 
-     {cajaData.recibos.length > 0 && (
-       <>
-         <Table>
-           <thead>
-             <Tr>
-               <Th>N° Recibo</Th>
-               <Th>Fecha</Th>
-               <Th>Alumno</Th>
-               <Th>Concepto</Th>
-               <Th>Periodo</Th>
-               <Th>Fuera de Término</Th>
-               <Th>Importe</Th>
-               <Th>Tipo de Pago</Th>
-             </Tr>
-           </thead>
-           <tbody>
-             {cajaData.recibos.map((recibo) => (
-<Tr key={recibo.id} style={{
-  color: recibo.anulado ? '#ff0000' : 'inherit',
-  backgroundColor: recibo.anulado ? '#ffebee' : undefined
+{Object.keys(filtrosActivos).length > 0 && (
+<ActiveFilters>
+{Object.entries(filtrosActivos).map(([key, value]) => (
+<FilterBadge key={key}>
+{key === 'alumno' ? 'Alumno: ' : 
+key === 'concepto' ? 'Concepto: ' : 
+key === 'periodo' ? 'Periodo: ' : 
+key === 'tipoPago' ? 'Tipo Pago: ' : 
+key === 'termino' ? 'Término: ' : 
+key === 'numeroRecibo' ? 'Recibo #' : ''}
+{value}
+<button onClick={() => {
+if (key === 'alumno') handleRemoveFiltro('alumnoId');
+else if (key === 'concepto') handleRemoveFiltro('conceptoId');
+else if (key === 'periodo') handleRemoveFiltro('periodoPago');
+else if (key === 'tipoPago') handleRemoveFiltro('tipoPago');
+else if (key === 'termino') handleRemoveFiltro('fueraDeTermino');
+else if (key === 'numeroRecibo') handleRemoveFiltro('numeroRecibo');
 }}>
-  <Td>{recibo.numeroRecibo}</Td>
-  <Td>{new Date(recibo.fecha).toLocaleDateString()}</Td>
-  <Td>{renderAlumnoNombre(recibo)}</Td>
-  <Td>{recibo.concepto.nombre}</Td>
-  <Td>{recibo.periodoPago}</Td>
-  <Td>{recibo.fueraDeTermino ? 'Sí' : 'No'}</Td>
-  <Td style={{
-    textDecoration: recibo.anulado ? 'line-through' : 'none'
-  }}>${recibo.monto.toFixed(0)}</Td>
-  <Td>{recibo.tipoPago}</Td>
-</Tr>
-             ))}
-           </tbody>
-         </Table>
-         
-         <TotalesContainer>
-            <TotalGeneral>
-              Total General: ${cajaData.totalMonto.toFixed(0)}
-              {cajaData.recibos.some(r => r.anulado) && (
-                <span style={{ 
-                  fontSize: '0.8em', 
-                  color: '#666',
-                  display: 'block',
-                  marginTop: '5px'
-                }}>
-                  (No incluye recibos anulados)
-                </span>
-              )}
-            </TotalGeneral>
-            <TotalesPorTipo>
-              {Object.entries(cajaData.totalPorTipoPago).map(([tipo, total]) => (
-                <TotalTipo key={tipo}>
-                  <TipoLabel>{tipo}</TipoLabel>
-                  <TipoMonto>${total.toFixed(0)}</TipoMonto>
-                </TotalTipo>
-              ))}
-            </TotalesPorTipo>
-          </TotalesContainer>
-        </>
-      )}
-    </Container>
-  );
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+<path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+</svg>
+</button>
+</FilterBadge>
+))}
+</ActiveFilters>
+)}
+
+<AnimatePresence mode="wait">
+{message && (
+<Message 
+isError={message.isError}
+initial={{ opacity: 0, y: -20 }}
+animate={{ opacity: 1, y: 0 }}
+exit={{ opacity: 0 }}
+transition={{ duration: 0.3 }}
+>
+<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+{message.isError ? (
+<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+) : (
+<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+)}
+</svg>
+{message.text}
+</Message>
+)}
+
+{loading && (
+<LoadingSpinner
+initial={{ opacity: 0 }}
+animate={{ opacity: 1 }}
+exit={{ opacity: 0 }}
+transition={{ duration: 0.3 }}
+>
+<motion.div
+className="spinner"
+animate={{ rotate: 360 }}
+transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+/>
+<p>Cargando datos de la caja...</p>
+</LoadingSpinner>
+)}
+
+{!loading && cajaData.recibos.length === 0 && !initialLoad && (
+<NoData>
+<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+</svg>
+<h3>No hay recibos para mostrar</h3>
+<p>No se encontraron transacciones para los criterios seleccionados.</p>
+</NoData>
+)}
+
+{!loading && cajaData.recibos.length > 0 && (
+<motion.div
+initial={{ opacity: 0, y: 20 }}
+animate={{ opacity: 1, y: 0 }}
+transition={{ duration: 0.3 }}
+>
+<TableContainer>
+<Table>
+<thead>
+<tr>
+  <Th>N° Recibo</Th>
+  <Th>Fecha</Th>
+  <Th>Alumno</Th>
+  <Th>Concepto</Th>
+  <Th>Periodo</Th>
+  <Th>Término</Th>
+  <Th>Importe</Th>
+  <Th>Tipo de Pago</Th>
+  <Th>Estado</Th>
+</tr>
+</thead>
+<tbody>
+{cajaData.recibos.map((recibo, index) => (
+  <Tr 
+    key={recibo.id} 
+    style={{
+      backgroundColor: recibo.anulado ? '#FFF5F5' : undefined
+    }}
+    initial={{ opacity: 0, y: 10 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ duration: 0.2, delay: index * 0.03 }}
+  >
+    <Td>{recibo.numeroRecibo}</Td>
+    <Td>{formatDate(recibo.fecha)}</Td>
+    <Td>{renderAlumnoNombre(recibo)}</Td>
+    <Td>{recibo.concepto.nombre}</Td>
+    <Td>{recibo.periodoPago}</Td>
+    <Td>{recibo.fueraDeTermino ? 'Fuera de término' : 'En término'}</Td>
+    <Td>
+      <ReciboMonto anulado={recibo.anulado}>
+        ${recibo.monto.toFixed(0)}
+      </ReciboMonto>
+    </Td>
+    <Td>{recibo.tipoPago.replace('_', ' ')}</Td>
+    <Td>
+      <ReciboEstado anulado={recibo.anulado}>
+        {recibo.anulado ? 'Anulado' : 'Activo'}
+      </ReciboEstado>
+    </Td>
+  </Tr>
+))}
+</tbody>
+</Table>
+</TableContainer>
+
+<TotalesContainer
+initial={{ opacity: 0, y: 20 }}
+animate={{ opacity: 1, y: 0 }}
+transition={{ duration: 0.3, delay: 0.2 }}
+>
+<TotalGeneral>
+Total General: ${cajaData.totalMonto.toFixed(0)}
+{cajaData.recibos.some(r => r.anulado) && (
+<span>
+  (No incluye recibos anulados)
+</span>
+)}
+</TotalGeneral>
+<TotalesPorTipo>
+{Object.entries(cajaData.totalPorTipoPago).map(([tipo, total], index) => (
+<TotalTipo 
+  key={tipo}
+  initial={{ opacity: 0, y: 10 }}
+  animate={{ opacity: 1, y: 0 }}
+  transition={{ duration: 0.2, delay: 0.3 + index * 0.05 }}
+  whileHover={{ y: -2, boxShadow: '0 6px 12px rgba(0, 0, 0, 0.1)' }}
+>
+  <TipoLabel>{tipo.replace('_', ' ')}</TipoLabel>
+  <TipoMonto>${total.toFixed(0)}</TipoMonto>
+</TotalTipo>
+))}
+</TotalesPorTipo>
+</TotalesContainer>
+</motion.div>
+)}
+</AnimatePresence>
+</Container>
+);
 };
 
 export default CajaDiaria;

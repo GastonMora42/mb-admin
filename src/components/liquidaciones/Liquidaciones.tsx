@@ -1,10 +1,9 @@
-
 // components/Liquidaciones/index.tsx
 import React, { useState, useEffect } from 'react';
 import PreviewModal from './PreviewModal';
 import { styled } from 'styled-components';
 
-
+// Interfaces
 interface Profesor {
   id: number;
   nombre: string;
@@ -19,7 +18,8 @@ interface Alumno {
   apellido: string;
 }
 
-interface Recibo {
+// Interfaz común para recibos en liquidación
+interface ReciboLiquidacion {
   id: number;
   numeroRecibo: number;
   fecha: string;
@@ -28,18 +28,23 @@ interface Recibo {
   alumno: Alumno | null;
   concepto: {
     nombre: string;
+    estilo?: string;
   };
   montoLiquidacion?: number;
+  porcentajeAplicado?: number;
+  tipoLiquidacion?: string;
+  // Más propiedades que puedan ser necesarias
 }
 
 interface LiquidacionData {
   regularCount: number;
   sueltasCount: number;
+  clasesCount: number;
   totalRegular: number;
   totalSueltas: number;
   montoLiquidacionRegular: number;
   montoLiquidacionSueltas: number;
-  recibos: Recibo[];
+  recibos: ReciboLiquidacion[];
   periodo: string;
 }
 
@@ -54,8 +59,7 @@ interface PorcentajesPersonalizados {
   porcentajeClasesSueltas: number;
 }
 
-// Styled Components (mantener los que ya tenías)
-
+// Styled Components
 const Container = styled.div`
   background-color: #FFFFFF;
   padding: 30px;
@@ -160,42 +164,6 @@ const Button = styled.button`
   }
 `;
 
-const Table = styled.table`
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 20px;
-`;
-
-
-const Th = styled.th`
-  background-color: #000000;
-  color: #FFFFFF;
-  text-align: left;
-  padding: 12px;
-`;
-
-const Td = styled.td`
-  border-bottom: 1px solid #F9F8F8;
-  padding: 12px;
-`;
-
-const Tr = styled.tr`
-  &:nth-child(even) {
-    background-color: #F9F8F8;
-  }
-`;
-
-const TotalContainer = styled.div`
-  margin-top: 20px;
-  text-align: right;
-  font-size: 18px;
-  font-weight: bold;
-`;
-
-const ExportButton = styled(Button)`
-  margin-top: 20px;
-`;
-
 const ResumenContainer = styled.div`
   margin: 20px 0;
   padding: 20px;
@@ -258,7 +226,6 @@ const LoadingSpinner = styled.div`
   }
 `;
 
-
 // Nuevo styled component para la sección de porcentajes
 const PorcentajesSection = styled.div`
   margin: 20px 0;
@@ -309,7 +276,7 @@ const PreviewButton = styled(Button)`
 `;
 
 const Liquidaciones: React.FC = () => {
-  // Estados existentes
+  // Estados
   const [profesores, setProfesores] = useState<Profesor[]>([]);
   const [alumnos, setAlumnos] = useState<Alumno[]>([]);
   const [loading, setLoading] = useState(false);
@@ -324,11 +291,10 @@ const Liquidaciones: React.FC = () => {
     regularCount: 0,
     totalRegular: 0,
     sueltasCount: 0,
+    clasesCount: 0,
     totalSueltas: 0
   });
 
-
-  // Nuevos estados
   const [liquidacionData, setLiquidacionData] = useState<LiquidacionData | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [porcentajesPersonalizados, setPorcentajesPersonalizados] = useState<PorcentajesPersonalizados>({
@@ -338,7 +304,7 @@ const Liquidaciones: React.FC = () => {
   const [profesorSeleccionado, setProfesorSeleccionado] = useState<Profesor | null>(null);
   const [mostrarPorcentajes, setMostrarPorcentajes] = useState(false);
 
-  // Effects existentes
+  // Effects
   useEffect(() => {
     fetchProfesores();
     fetchAlumnos();
@@ -369,256 +335,268 @@ const Liquidaciones: React.FC = () => {
         regularCount: liquidacionData.regularCount,
         totalRegular: liquidacionData.totalRegular,
         sueltasCount: liquidacionData.sueltasCount,
+        clasesCount: liquidacionData.clasesCount || 0,
         totalSueltas: liquidacionData.totalSueltas
       });
     }
   }, [liquidacionData]);
 
-  // Funciones existentes actualizadas
- const fetchProfesores = async () => {
-  try {
-    const res = await fetch('/api/profesores');
-    if (!res.ok) throw new Error('Error al cargar profesores');
-    const data = await res.json();
-    setProfesores(data);
-  } catch (error) {
-    setError('Error al cargar los profesores');
-    console.error('Error fetching profesores:', error);
-  }
-};
-
-const fetchAlumnos = async () => {
-  try {
-    const res = await fetch('/api/alumnos');
-    if (!res.ok) throw new Error('Error al cargar alumnos');
-    const data = await res.json();
-    setAlumnos(data);
-  } catch (error) {
-    setError('Error al cargar los alumnos');
-    console.error('Error fetching alumnos:', error);
-  }
-};
-
-// Nuevas funciones de manejo
-const handlePorcentajeChange = (tipo: 'cursos' | 'sueltas', valor: string) => {
-  const numeroValor = parseFloat(valor);
-  if (isNaN(numeroValor) || numeroValor < 0 || numeroValor > 100) return;
-
-  setPorcentajesPersonalizados(prev => ({
-    ...prev,
-    [tipo === 'cursos' ? 'porcentajeCursos' : 'porcentajeClasesSueltas']: numeroValor
-  }));
-};
-
-const calcularLiquidacion = async () => {
-  setError(null);
-  setLoading(true);
-
-  try {
-    const res = await fetch('/api/liquidaciones', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        ...filtros,
-        porcentajes: {
-          porcentajeCursos: porcentajesPersonalizados.porcentajeCursos / 100,
-          porcentajeClasesSueltas: porcentajesPersonalizados.porcentajeClasesSueltas / 100
-        }
-      }),
-    });
-
-    if (!res.ok) {
-      throw new Error('Error al generar la liquidación');
+  // Funciones
+  const fetchProfesores = async () => {
+    try {
+      const res = await fetch('/api/profesores');
+      if (!res.ok) throw new Error('Error al cargar profesores');
+      const data = await res.json();
+      setProfesores(data);
+    } catch (error) {
+      setError('Error al cargar los profesores');
+      console.error('Error fetching profesores:', error);
     }
+  };
 
-    const data = await res.json();
-    setLiquidacionData(data);
-    setMostrarPorcentajes(true);
-  } catch (error) {
-    setError('Error al generar la liquidación');
-    console.error('Error generando liquidación:', error);
-  } finally {
-    setLoading(false);
-  }
-};
+  const fetchAlumnos = async () => {
+    try {
+      const res = await fetch('/api/alumnos');
+      if (!res.ok) throw new Error('Error al cargar alumnos');
+      const data = await res.json();
+      setAlumnos(data);
+    } catch (error) {
+      setError('Error al cargar los alumnos');
+      console.error('Error fetching alumnos:', error);
+    }
+  };
 
-// JSX
-return (
-  <Container>
-    <Title>Generación de Liquidaciones</Title>
-    
-    {error && <ErrorMessage>{error}</ErrorMessage>}
+  const handlePorcentajeChange = (tipo: 'cursos' | 'sueltas', valor: string) => {
+    const numeroValor = parseFloat(valor);
+    if (isNaN(numeroValor) || numeroValor < 0 || numeroValor > 100) return;
 
-    <Form onSubmit={(e) => { e.preventDefault(); calcularLiquidacion(); }}>
-      <FormGroup>
-        <Label htmlFor="periodo">Período</Label>
-        <Input
-          type="month"
-          id="periodo"
-          required
-          value={filtros.periodo}
-          onChange={(e) => setFiltros(prev => ({
-            ...prev,
-            periodo: e.target.value
-          }))}
-        />
-      </FormGroup>
+    setPorcentajesPersonalizados(prev => ({
+      ...prev,
+      [tipo === 'cursos' ? 'porcentajeCursos' : 'porcentajeClasesSueltas']: numeroValor
+    }));
+  };
 
-      <FormGroup>
-        <Label htmlFor="profesor">Profesor</Label>
-        <Select 
-          id="profesor" 
-          value={filtros.profesorId || ''}
-          onChange={(e) => setFiltros(prev => ({
-            ...prev,
-            profesorId: e.target.value ? Number(e.target.value) : undefined
-          }))}
-        >
-          <option value="">Seleccionar profesor</option>
-          {profesores.map(profesor => (
-            <option key={profesor.id} value={profesor.id}>
-              {`${profesor.apellido}, ${profesor.nombre}`}
-            </option>
-          ))}
-        </Select>
-      </FormGroup>
+  const calcularLiquidacion = async () => {
+    setError(null);
+    setLoading(true);
 
-      {profesorSeleccionado && (
-        <PorcentajesSection>
-          <h3>Porcentajes de Liquidación</h3>
-          <p>Puede modificar los porcentajes por defecto para esta liquidación</p>
-          
-          <PorcentajesGrid>
-            <PorcentajeInput>
-              <label>Cursos Regulares (%)</label>
-              <input
-                type="number"
-                value={porcentajesPersonalizados.porcentajeCursos}
-                onChange={(e) => handlePorcentajeChange('cursos', e.target.value)}
-                min="0"
-                max="100"
-                step="1"
-              />
-              <small>Por defecto: {profesorSeleccionado.porcentajePorDefecto * 100}%</small>
-            </PorcentajeInput>
+    try {
+      const res = await fetch('/api/liquidaciones', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...filtros,
+          porcentajes: {
+            porcentajeRegular: porcentajesPersonalizados.porcentajeCursos / 100,
+            porcentajeSueltas: porcentajesPersonalizados.porcentajeClasesSueltas / 100
+          }
+        }),
+      });
 
-            <PorcentajeInput>
-              <label>Clases Sueltas (%)</label>
-              <input
-                type="number"
-                value={porcentajesPersonalizados.porcentajeClasesSueltas}
-                onChange={(e) => handlePorcentajeChange('sueltas', e.target.value)}
-                min="0"
-                max="100"
-                step="1"
-              />
-              <small>Por defecto: {profesorSeleccionado.porcentajeClasesSueltasPorDefecto * 100}%</small>
-            </PorcentajeInput>
-          </PorcentajesGrid>
-        </PorcentajesSection>
+      if (!res.ok) {
+        throw new Error('Error al generar la liquidación');
+      }
+
+      const data = await res.json();
+      setLiquidacionData(data);
+      setMostrarPorcentajes(true);
+    } catch (error) {
+      setError('Error al generar la liquidación');
+      console.error('Error generando liquidación:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Renderizado
+  return (
+    <Container>
+      <Title>Generación de Liquidaciones</Title>
+      
+      {error && <ErrorMessage>{error}</ErrorMessage>}
+
+      <Form onSubmit={(e) => { e.preventDefault(); calcularLiquidacion(); }}>
+        <FormGroup>
+          <Label htmlFor="periodo">Período</Label>
+          <Input
+            type="month"
+            id="periodo"
+            required
+            value={filtros.periodo}
+            onChange={(e) => setFiltros(prev => ({
+              ...prev,
+              periodo: e.target.value
+            }))}
+          />
+        </FormGroup>
+
+        <FormGroup>
+          <Label htmlFor="profesor">Profesor</Label>
+          <Select 
+            id="profesor" 
+            value={filtros.profesorId || ''}
+            onChange={(e) => setFiltros(prev => ({
+              ...prev,
+              profesorId: e.target.value ? Number(e.target.value) : undefined
+            }))}
+          >
+            <option value="">Seleccionar profesor</option>
+            {profesores.map(profesor => (
+              <option key={profesor.id} value={profesor.id}>
+                {`${profesor.apellido}, ${profesor.nombre}`}
+              </option>
+            ))}
+          </Select>
+        </FormGroup>
+
+        {profesorSeleccionado && (
+          <PorcentajesSection>
+            <h3>Porcentajes de Liquidación</h3>
+            <p>Puede modificar los porcentajes por defecto para esta liquidación</p>
+            
+            <PorcentajesGrid>
+              <PorcentajeInput>
+                <label>Cursos Regulares (%)</label>
+                <input
+                  type="number"
+                  value={porcentajesPersonalizados.porcentajeCursos}
+                  onChange={(e) => handlePorcentajeChange('cursos', e.target.value)}
+                  min="0"
+                  max="100"
+                  step="1"
+                />
+                <small>Por defecto: {profesorSeleccionado.porcentajePorDefecto * 100}%</small>
+              </PorcentajeInput>
+
+              <PorcentajeInput>
+                <label>Clases Sueltas (%)</label>
+                <input
+                  type="number"
+                  value={porcentajesPersonalizados.porcentajeClasesSueltas}
+                  onChange={(e) => handlePorcentajeChange('sueltas', e.target.value)}
+                  min="0"
+                  max="100"
+                  step="1"
+                />
+                <small>Por defecto: {profesorSeleccionado.porcentajeClasesSueltasPorDefecto * 100}%</small>
+              </PorcentajeInput>
+            </PorcentajesGrid>
+          </PorcentajesSection>
+        )}
+
+        <Button type="submit" disabled={loading}>
+          {loading ? (
+            <>
+              <LoadingSpinner />
+              Calculando...
+            </>
+          ) : 'Calcular Liquidación'}
+        </Button>
+      </Form>
+
+      {liquidacionData && mostrarPorcentajes && (
+        <>
+          <ResumenContainer>
+            <h3>Resumen de Liquidación</h3>
+            <ResumenGrid>
+              <ResumenItem>
+                <h4>Cursos Regulares</h4>
+                <div>
+                  <label>Cantidad de alumnos: </label>
+                  <EditableInput
+                    type="number"
+                    value={valoresEditables.regularCount}
+                    onChange={(e) => setValoresEditables(prev => ({
+                      ...prev,
+                      regularCount: parseInt(e.target.value) || 0
+                    }))}
+                  />
+                </div>
+                <div>
+                  <label>Total recaudado: $</label>
+                  <EditableInput
+                    type="number"
+                    step="0.01"
+                    value={valoresEditables.totalRegular}
+                    onChange={(e) => setValoresEditables(prev => ({
+                      ...prev,
+                      totalRegular: parseFloat(e.target.value) || 0
+                    }))}
+                  />
+                </div>
+                <div>Porcentaje profesor: {porcentajesPersonalizados.porcentajeCursos}%</div>
+                <div>Monto liquidación: ${(valoresEditables.totalRegular * porcentajesPersonalizados.porcentajeCursos / 100).toFixed(2)}</div>
+              </ResumenItem>
+              <ResumenItem>
+                <h4>Clases Sueltas</h4>
+                <div>
+                  <label>Cantidad de alumnos: </label>
+                  <EditableInput
+                    type="number"
+                    value={valoresEditables.sueltasCount}
+                    onChange={(e) => setValoresEditables(prev => ({
+                      ...prev,
+                      sueltasCount: parseInt(e.target.value) || 0
+                    }))}
+                  />
+                </div>
+                <div>
+                  <label>Cantidad de clases: </label>
+                  <EditableInput
+                    type="number"
+                    value={valoresEditables.clasesCount}
+                    onChange={(e) => setValoresEditables(prev => ({
+                      ...prev,
+                      clasesCount: parseInt(e.target.value) || 0
+                    }))}
+                  />
+                </div>
+                <div>
+                  <label>Total recaudado: $</label>
+                  <EditableInput
+                    type="number"
+                    step="0.01"
+                    value={valoresEditables.totalSueltas}
+                    onChange={(e) => setValoresEditables(prev => ({
+                      ...prev,
+                      totalSueltas: parseFloat(e.target.value) || 0
+                    }))}
+                  />
+                </div>
+                <div>Porcentaje profesor: {porcentajesPersonalizados.porcentajeClasesSueltas}%</div>
+                <div>Monto liquidación: ${(valoresEditables.totalSueltas * porcentajesPersonalizados.porcentajeClasesSueltas / 100).toFixed(2)}</div>
+              </ResumenItem>
+            </ResumenGrid>
+
+            <ButtonContainer>
+              <PreviewButton onClick={() => setShowPreview(true)}>
+                Vista Previa
+              </PreviewButton>
+            </ButtonContainer>
+          </ResumenContainer>
+        </>
       )}
 
-      <Button type="submit" disabled={loading}>
-        {loading ? (
-          <>
-            <LoadingSpinner />
-            Calculando...
-          </>
-        ) : 'Calcular Liquidación'}
-      </Button>
-    </Form>
-
-    {liquidacionData && mostrarPorcentajes && (
-      <>
-        <ResumenContainer>
-          <h3>Resumen de Liquidación</h3>
-<ResumenGrid>
-  <ResumenItem>
-    <h4>Cursos Regulares</h4>
-    <div>
-      <label>Cantidad de alumnos: </label>
-      <EditableInput
-        type="number"
-        value={valoresEditables.regularCount}
-        onChange={(e) => setValoresEditables(prev => ({
-          ...prev,
-          regularCount: parseInt(e.target.value) || 0
-        }))}
-      />
-    </div>
-    <div>
-      <label>Total recaudado: $</label>
-      <EditableInput
-        type="number"
-        step="0.01"
-        value={valoresEditables.totalRegular}
-        onChange={(e) => setValoresEditables(prev => ({
-          ...prev,
-          totalRegular: parseFloat(e.target.value) || 0
-        }))}
-      />
-    </div>
-    <div>Porcentaje profesor: {porcentajesPersonalizados.porcentajeCursos}%</div>
-    <div>Monto liquidación: ${(valoresEditables.totalRegular * porcentajesPersonalizados.porcentajeCursos / 100).toFixed(2)}</div>
-  </ResumenItem>
-
-  <ResumenItem>
-    <h4>Clases Sueltas</h4>
-    <div>
-      <label>Cantidad de alumnos: </label>
-      <EditableInput
-        type="number"
-        value={valoresEditables.sueltasCount}
-        onChange={(e) => setValoresEditables(prev => ({
-          ...prev,
-          sueltasCount: parseInt(e.target.value) || 0
-        }))}
-      />
-    </div>
-    <div>
-      <label>Total recaudado: $</label>
-      <EditableInput
-        type="number"
-        step="0.01"
-        value={valoresEditables.totalSueltas}
-        onChange={(e) => setValoresEditables(prev => ({
-          ...prev,
-          totalSueltas: parseFloat(e.target.value) || 0
-        }))}
-      />
-    </div>
-    <div>Porcentaje profesor: {porcentajesPersonalizados.porcentajeClasesSueltas}%</div>
-    <div>Monto liquidación: ${(valoresEditables.totalSueltas * porcentajesPersonalizados.porcentajeClasesSueltas / 100).toFixed(2)}</div>
-  </ResumenItem>
-</ResumenGrid>
-
-          <ButtonContainer>
-            <PreviewButton onClick={() => setShowPreview(true)}>
-              Vista Previa
-            </PreviewButton>
-          </ButtonContainer>
-        </ResumenContainer>
-      </>
-    )}
-
-{showPreview && liquidacionData && (
-  <PreviewModal
-    liquidacionData={{
-      ...liquidacionData,
-      regularCount: valoresEditables.regularCount,
-      totalRegular: valoresEditables.totalRegular,
-      sueltasCount: valoresEditables.sueltasCount,
-      totalSueltas: valoresEditables.totalSueltas,
-      montoLiquidacionRegular: valoresEditables.totalRegular * porcentajesPersonalizados.porcentajeCursos / 100,
-      montoLiquidacionSueltas: valoresEditables.totalSueltas * porcentajesPersonalizados.porcentajeClasesSueltas / 100
-    }}
-    profesor={profesorSeleccionado}
-    porcentajesPersonalizados={porcentajesPersonalizados}
-    onClose={() => setShowPreview(false)}
-  />
-)}
-  </Container>
-);
+      {showPreview && liquidacionData && (
+        <PreviewModal
+          liquidacionData={{
+            regularCount: valoresEditables.regularCount,
+            totalRegular: valoresEditables.totalRegular,
+            sueltasCount: valoresEditables.sueltasCount,
+            clasesCount: valoresEditables.clasesCount,
+            totalSueltas: valoresEditables.totalSueltas,
+            montoLiquidacionRegular: valoresEditables.totalRegular * porcentajesPersonalizados.porcentajeCursos / 100,
+            montoLiquidacionSueltas: valoresEditables.totalSueltas * porcentajesPersonalizados.porcentajeClasesSueltas / 100,
+            recibos: liquidacionData.recibos,
+            periodo: liquidacionData.periodo
+          }}
+          profesor={profesorSeleccionado}
+          porcentajesPersonalizados={porcentajesPersonalizados}
+          onClose={() => setShowPreview(false)}
+        />
+      )}
+    </Container>
+  );
 };
 
 export default Liquidaciones;

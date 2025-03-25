@@ -72,6 +72,8 @@ export type AlumnoEstilo = {
 };
 
 export type Deuda = {
+    montoOriginal: number;
+    estiloNombre: any;
     id: number;
     alumno: Alumno;
     alumnoId: number;

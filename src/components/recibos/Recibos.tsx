@@ -451,12 +451,12 @@ interface Filtros {
 }
 
 interface DeudaSeleccionada {
-  estiloId: any;
-  periodo: any;
-  deudaId: number;
+  id: number;
   monto: number;
   montoOriginal: number;
-  esInscripcion?: boolean;
+  estiloId: number | null; // Permitir que estiloId sea null
+  periodo: string;
+  esInscripcion: boolean;
 }
 
 interface ReciboPendiente {
@@ -472,6 +472,8 @@ interface ReciboPendiente {
   descuento?: number; // Cambiamos number | null a number | undefined
   deudasSeleccionadas?: {[key: number]: DeudaSeleccionada};
 }
+
+
 
 const initialFiltros: Filtros = {
   numero: '',
@@ -514,6 +516,7 @@ const Recibos: React.FC = () => {
   const deudaComun = deudasAlumno.filter(d => !d.concepto?.esInscripcion);
   const [searchAlumno, setSearchAlumno] = useState('');
   const [showAlumnoSuggestions, setShowAlumnoSuggestions] = useState(false);
+
  
   const [nuevoRecibo, setNuevoRecibo] = useState({
     monto: '',
@@ -548,6 +551,8 @@ const [filtros, setFiltros] = useState<Filtros>({
   const [message, setMessage] = useState<{ text: string; isError: boolean } | null>(null);
   const [mostrarSoloInscripcion, setMostrarSoloInscripcion] = useState(false);
   const [showPrinterAlert, setShowPrinterAlert] = useState(true);
+
+  
 
   const handlePageChange = (newPage: number) => {
     setCurrentPage(newPage);
@@ -679,6 +684,7 @@ const [filtros, setFiltros] = useState<Filtros>({
     }
   };
 
+  
   const agregarReciboPendiente = () => {
     setLoading(true);
     try {
@@ -709,6 +715,7 @@ const [filtros, setFiltros] = useState<Filtros>({
     }
   };
 
+  
 // Función para crear todos los recibos pendientes
 const crearRecibosPendientes = async () => {
   setLoading(true);
@@ -717,7 +724,15 @@ const crearRecibosPendientes = async () => {
       // Calculamos el monto final con el descuento aplicado
       const descuentoDecimal = recibo.descuento ? (recibo.descuento / 100) : 0;
       const montoFinal = recibo.monto * (1 - descuentoDecimal);
-
+      
+      // Determinar si es una clase suelta basado en múltiples criterios
+      const esClaseSueltaPorConcepto = recibo.concepto.nombre.toLowerCase().includes('suelta');
+      const esClaseSueltaPorMonto = recibo.monto === 15000; // Ajusta según tus montos
+      const esClaseSueltaPorAlumno = !!recibo.alumnoSuelto; // Si tiene alumnoSuelto, es clase suelta
+      
+      // Si cualquiera de los criterios se cumple, consideramos que es clase suelta
+      const esClaseSuelta = esClaseSueltaPorConcepto || esClaseSueltaPorMonto || esClaseSueltaPorAlumno;
+      
       const reciboData = {
         monto: montoFinal, // Monto con descuento aplicado
         montoOriginal: recibo.monto, // Monto original sin descuento
@@ -727,7 +742,7 @@ const crearRecibosPendientes = async () => {
         fecha: recibo.fecha,
         fechaEfecto: recibo.fechaEfecto,
         fueraDeTermino: false,
-        esClaseSuelta: false,
+        esClaseSuelta: esClaseSuelta, // Asignamos el valor calculado
         esMesCompleto: true,
         alumnoId: recibo.alumno?.id,
         alumnoSueltoId: recibo.alumnoSuelto?.id,
@@ -736,9 +751,16 @@ const crearRecibosPendientes = async () => {
           deudaId: parseInt(deudaId),
           monto: deuda.monto,
           estiloId: deuda.estiloId,
-          periodo: deuda.periodo
+          periodo: deuda.periodo,
+          esInscripcion: deuda.esInscripcion
         }))
       };
+
+      console.log('Creando recibo con esClaseSuelta:', esClaseSuelta, 'por:', {
+        porConcepto: esClaseSueltaPorConcepto,
+        porMonto: esClaseSueltaPorMonto, 
+        porAlumno: esClaseSueltaPorAlumno
+      });
 
       const res = await fetch('/api/recibos', {
         method: 'POST',
@@ -752,47 +774,46 @@ const crearRecibosPendientes = async () => {
 
       const reciboCreado = await res.json();
       
-            // Intentar imprimir si la impresora está disponible
-            if (isPrinterAvailable) {
-              try {
-                const printResult = await printReceipt(reciboCreado);
-                console.log('Resultado de impresión:', printResult);
-                
-                if (!printResult.success) {
-                  console.warn('Detalles del error de impresión:', printResult.message);
-                  setMessage({ 
-                    text: `No se pudo imprimir: ${printResult.message}`, 
-                    isError: true 
-                  });
-                }
-              } catch (printError) {
-                console.error('Error completo al imprimir:', printError);
-                setMessage({ 
-                  text: 'Error crítico al imprimir', 
-                  isError: true 
-                });
-              }
-            }
-          }
+      // Intentar imprimir si la impresora está disponible
+      if (isPrinterAvailable) {
+        try {
+          const printResult = await printReceipt(reciboCreado);
+          console.log('Resultado de impresión:', printResult);
           
-          setRecibosPendientes([]);
-          fetchRecibos();
-          if (nuevoRecibo.alumnoId) {
-            fetchDeudasAlumno(nuevoRecibo.alumnoId);
+          if (!printResult.success) {
+            console.warn('Detalles del error de impresión:', printResult.message);
+            setMessage({ 
+              text: `No se pudo imprimir: ${printResult.message}`, 
+              isError: true 
+            });
           }
+        } catch (printError) {
+          console.error('Error completo al imprimir:', printError);
           setMessage({ 
-            text: 'Recibos creados exitosamente' + 
-              (!isPrinterAvailable ? ' (Impresora no disponible)' : ''), 
-            isError: false 
+            text: 'Error crítico al imprimir', 
+            isError: true 
           });
-        } catch (error) {
-          console.error('Error:', error);
-          setMessage({ text: 'Error al crear los recibos', isError: true });
-        } finally {
-          setLoading(false);
         }
-      };
-
+      }
+    }
+    
+    setRecibosPendientes([]);
+    fetchRecibos();
+    if (nuevoRecibo.alumnoId) {
+      fetchDeudasAlumno(nuevoRecibo.alumnoId);
+    }
+    setMessage({ 
+      text: 'Recibos creados exitosamente' + 
+        (!isPrinterAvailable ? ' (Impresora no disponible)' : ''), 
+      isError: false 
+    });
+  } catch (error) {
+    console.error('Error:', error);
+    setMessage({ text: 'Error al crear los recibos', isError: true });
+  } finally {
+    setLoading(false);
+  }
+};
 
       useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -900,31 +921,56 @@ const filteredAlumnos = useMemo(() => {
       setDeudasAlumno([]);
     }
   };
+
+
+const getNombreEstilo = (deuda: Deuda) => {
+  if (deuda.estilo) return deuda.estilo.nombre;
+  if (deuda.estiloNombre) return deuda.estiloNombre;
+  if (deuda.concepto?.esInscripcion) return "Inscripción";
+  return deuda.tipoDeuda === "SUELTA" ? "Clase suelta" : "Sin estilo";
+};
+
+const calcularVistaPrevia = () => {
+  const montoBase = parseFloat(nuevoRecibo.monto) || 0;
+  const deudasTotal = Object.values(deudasSeleccionadas).reduce(
+    (sum, deuda) => sum + deuda.monto, 
+    0
+  );
   
-  const calcularVistaPrevia = () => {
-    const montoBase = parseFloat(nuevoRecibo.monto) || 0;
-    const deudasTotal = Object.values(deudasSeleccionadas).reduce(
-      (sum, deuda) => sum + deuda.monto, 
-      0
-    );
+  const subtotal = montoBase + deudasTotal;
+  const descuentoTotal = subtotal * (parseFloat(nuevoRecibo.descuentoManual.toString()) / 100);
+  const total = subtotal - descuentoTotal;
+
+  const deudasAPagar = Object.entries(deudasSeleccionadas).map(([id, deuda]) => {
+    const deudaOriginal = deudasAlumno.find(d => d.id === parseInt(id));
+    let nombreConcepto = 'Desconocido';
     
-    const subtotal = montoBase + deudasTotal;
-    const descuentoTotal = subtotal * (parseFloat(nuevoRecibo.descuentoManual.toString()) / 100);
-    const total = subtotal - descuentoTotal;
-
-    const deudasAPagar = Object.entries(deudasSeleccionadas).map(([id, deuda]) => ({
+    if (deudaOriginal) {
+      if (deudaOriginal.concepto?.esInscripcion) {
+        nombreConcepto = "Inscripción";
+      } else if (deudaOriginal.estilo) {
+        nombreConcepto = deudaOriginal.estilo.nombre;
+      } else if (deudaOriginal.tipoDeuda === "SUELTA") {
+        nombreConcepto = "Clase Suelta";
+      } else {
+        nombreConcepto = "Sin estilo";
+      }
+    }
+    
+    return {
       id: parseInt(id),
-      concepto: deudasAlumno.find(d => d.id === parseInt(id))?.estilo.nombre || 'Desconocido',
+      concepto: nombreConcepto,
       monto: deuda.monto
-    }));
+    };
+  });
 
-    setVistaPrevia({
-      subtotal,
-      descuentos: descuentoTotal,
-      total,
-      deudasAPagar
-    });
-  };
+  setVistaPrevia({
+    subtotal,
+    descuentos: descuentoTotal,
+    total,
+    deudasAPagar
+  });
+};
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -940,7 +986,6 @@ const filteredAlumnos = useMemo(() => {
     };
   }, []);
 
-
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
     const checked = type === 'checkbox' ? (e.target as HTMLInputElement).checked : undefined;
@@ -949,7 +994,7 @@ const filteredAlumnos = useMemo(() => {
       fetchDeudasAlumno(value);
       setDeudasSeleccionadas({}); // Limpiar las deudas seleccionadas
     }
-
+  
     setNuevoRecibo(prev => {
       const newState = {
         ...prev,
@@ -960,27 +1005,26 @@ const filteredAlumnos = useMemo(() => {
         newState.fechaEfecto = value;
       }
   
-      if (name === 'esClaseSuelta') {
-        newState.alumnoId = '';
-        newState.alumnoSueltoId = '';
-        setDeudasSeleccionadas({});
-      }
-
+      // No modificamos esClaseSuelta cuando cambiamos de tipo de alumno
+      // y no modificamos el tipo de alumno cuando cambiamos esClaseSuelta
+      
       if (name === 'alumnoId' && value) {
         newState.alumnoSueltoId = '';
-        newState.esClaseSuelta = false;
+        // No cambiamos esClaseSuelta aquí
       }
-
+  
       if (name === 'alumnoSueltoId' && value) {
         newState.alumnoId = '';
-        newState.esClaseSuelta = true;
-        setDeudasSeleccionadas({});
+        // No cambiamos esClaseSuelta aquí
       }
-
+  
+      // Eliminamos la condición que reestablecía los alumnos al marcar esClaseSuelta
+      // Al quitar esto, ya no se resetea el alumno al marcar/desmarcar el checkbox
+  
       return newState;
     });
   };
-  
+
   const handleDeudaSelect = (deudaId: number, checked: boolean) => {
     if (checked) {
       const deuda = deudasAlumno.find(d => d.id === deudaId);
@@ -998,16 +1042,15 @@ const filteredAlumnos = useMemo(() => {
         setDeudasSeleccionadas(prev => ({
           ...prev,
           [deudaId]: {
-            deudaId,
+            id: deudaId,
             monto: deuda.monto,
-            montoOriginal: deuda.montoOriginal,
-            estiloId: deuda.estilo.id,
+            montoOriginal: deuda.montoOriginal || deuda.monto,
+            estiloId: deuda.estilo?.id || null, // Permitir null
             periodo: `${deuda.mes}-${deuda.anio}`,
             esInscripcion: deuda.concepto?.esInscripcion || false
           }
         }));
       }
-    
     } else {
       setDeudasSeleccionadas(prev => {
         const newState = { ...prev };
@@ -1026,8 +1069,7 @@ const filteredAlumnos = useMemo(() => {
         return newState;
       });
     }
-   };
-
+  };
   const handleDeudaMontoChange = (deudaId: number, valor: string) => {
     const monto = parseFloat(valor);
     if (isNaN(monto)) return;
@@ -1064,28 +1106,6 @@ const filteredAlumnos = useMemo(() => {
       setDeudasSeleccionadas({});
     }
   };
-
-  // En el componente Recibos
-const handlePagoInscripcion = async (alumnoId: number) => {
-  const conceptoInscripcion = conceptos.find(c => c.esInscripcion);
-  if (!conceptoInscripcion) return;
-
-  setNuevoRecibo({
-    ...nuevoRecibo,
-    alumnoId: alumnoId.toString(),
-    conceptoId: conceptoInscripcion.id.toString(),
-    monto: conceptoInscripcion.monto.toString(),
-    periodoPago: format(new Date(), 'yyyy-MM')
-  });
-
-  // Buscar deuda de inscripción
-  const deudaInscripcion = deudasAlumno.find(
-    d => d.concepto?.esInscripcion && !d.pagada
-  );
-  if (deudaInscripcion) {
-    handleDeudaSelect(deudaInscripcion.id, true);
-  }
-};
 
 useEffect(() => {
   fetchRecibos();
@@ -1129,22 +1149,9 @@ return (
         </div>
         {/* Formulario Principal */}
         <Form className="white-bg" onSubmit={(e) => { e.preventDefault(); agregarReciboPendiente(); }}>
-          <InputGroup>
-            <InputLabel>Tipo de Alumno</InputLabel>
-            <CheckboxLabel>
-              <input
-                type="checkbox"
-                name="esClaseSuelta"
-                checked={nuevoRecibo.esClaseSuelta}
-                onChange={handleInputChange}
-              />
-              Clase Suelta
-            </CheckboxLabel>
-          </InputGroup>
-  
           {!nuevoRecibo.esClaseSuelta ? (
   <InputGroup>
-    <InputLabel>Alumno Regular</InputLabel>
+    <InputLabel>Alumno</InputLabel>
     <AutocompleteContainer className="autocomplete-container">
       <AutocompleteInput
         type="text"
@@ -1344,21 +1351,30 @@ return (
   />
   Mes Completo
 </CheckboxLabel>
+<CheckboxLabel>
+  <input
+    type="checkbox"
+    name="esClaseSuelta"
+    checked={nuevoRecibo.esClaseSuelta}
+    onChange={handleInputChange}
+  />
+  Clase Suelta {nuevoRecibo.alumnoSueltoId && "(recomendado para alumnos sueltos)"}
+</CheckboxLabel>
           </InputGroup>
 
-          {nuevoRecibo.alumnoId && !nuevoRecibo.esClaseSuelta && (
- <DeudaSection className="white-bg">
-   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-     <InputLabel>Deudas Pendientes</InputLabel>
-     <CheckboxLabel>
-       <input
-         type="checkbox"
-         checked={mostrarSoloInscripcion}
-         onChange={(e) => setMostrarSoloInscripcion(e.target.checked)}
-       />
-       Ver solo inscripción
-     </CheckboxLabel>
-   </div>
+          {nuevoRecibo.alumnoId && (
+  <DeudaSection className="white-bg">
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+      <InputLabel>Deudas Pendientes</InputLabel>
+      <CheckboxLabel>
+        <input
+          type="checkbox"
+          checked={mostrarSoloInscripcion}
+          onChange={(e) => setMostrarSoloInscripcion(e.target.checked)}
+        />
+        Ver solo inscripción
+      </CheckboxLabel>
+    </div>
 
    {/* Sección de Inscripción */}
    <div style={{ marginBottom: '20px' }}>
@@ -1392,27 +1408,27 @@ return (
    {/* Listado de deudas */}
    {Array.isArray(deudasAlumno) && deudasAlumno.length > 0 ? (
      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-       {deudasAlumno
-         .filter(deuda => !mostrarSoloInscripcion || deuda.concepto?.esInscripcion)
-         .map(deuda => (
-           <DeudaItem 
-             key={deuda.id}
-             style={{
-               backgroundColor: deuda.concepto?.esInscripcion ? '#fff3cd' : 'white',
-               border: deuda.concepto?.esInscripcion ? '2px solid #ffc107' : '1px solid #eee'
-             }}
-           >
-             <div style={{ flex: 1 }}>
-               <CheckboxLabel>
-                 <input
-                   type="checkbox"
-                   checked={!!deudasSeleccionadas[deuda.id]}
-                   onChange={(e) => handleDeudaSelect(deuda.id, e.target.checked)}
-                 />
-                 <span style={{
-                   fontWeight: deuda.concepto?.esInscripcion ? 'bold' : 'normal',
-                   color: deuda.concepto?.esInscripcion ? '#856404' : 'inherit'
-                 }}>
+{deudasAlumno
+  .filter(deuda => !mostrarSoloInscripcion || deuda.concepto?.esInscripcion)
+  .map(deuda => (
+    <DeudaItem 
+      key={deuda.id}
+      style={{
+        backgroundColor: deuda.concepto?.esInscripcion ? '#fff3cd' : 'white',
+        border: deuda.concepto?.esInscripcion ? '2px solid #ffc107' : '1px solid #eee'
+      }}
+    >
+      <div style={{ flex: 1 }}>
+        <CheckboxLabel>
+          <input
+            type="checkbox"
+            checked={!!deudasSeleccionadas[deuda.id]}
+            onChange={(e) => handleDeudaSelect(deuda.id, e.target.checked)}
+          />
+          <span style={{
+            fontWeight: deuda.concepto?.esInscripcion ? 'bold' : 'normal',
+            color: deuda.concepto?.esInscripcion ? '#856404' : 'inherit'
+          }}>
                    {deuda.concepto?.esInscripcion 
                      ? `INSCRIPCIÓN - $${deuda.monto}`
                      : `${deuda.estilo.nombre} - ${deuda.mes}/${deuda.anio} - $${deuda.monto}`}
@@ -1464,19 +1480,24 @@ return (
          flexDirection: 'column',
          gap: '5px'
        }}>
-         {Object.entries(deudasSeleccionadas).map(([deudaId, deuda]) => (
-           <div key={deudaId} style={{ 
-             display: 'flex', 
-             justifyContent: 'space-between'
-           }}>
-             <span>{deuda.esInscripcion ? 'INSCRIPCIÓN' : 
-               `${deudasAlumno.find(d => d.id === parseInt(deudaId))?.estilo.nombre} - 
-               ${deudasAlumno.find(d => d.id === parseInt(deudaId))?.mes}/
-               ${deudasAlumno.find(d => d.id === parseInt(deudaId))?.anio}`}
-             </span>
-             <span>${deuda.monto}</span>
-           </div>
-         ))}
+{Object.entries(deudasSeleccionadas).map(([deudaId, deuda]) => {
+  const deudaOriginal = deudasAlumno.find(d => d.id === parseInt(deudaId));
+  return (
+    <div key={deudaId} style={{ 
+      display: 'flex', 
+      justifyContent: 'space-between'
+    }}>
+      <span>
+        {deuda.esInscripcion ? 'INSCRIPCIÓN' : 
+          `${deudaOriginal ? getNombreEstilo(deudaOriginal) : 'Concepto'} - 
+          ${deudaOriginal?.mes || '?'}/
+          ${deudaOriginal?.anio || '?'}`
+        }
+      </span>
+      <span>${deuda.monto}</span>
+    </div>
+  );
+})}
          <div style={{ 
            borderTop: '1px solid #dee2e6',
            marginTop: '10px',
@@ -1934,6 +1955,7 @@ return (
       zIndex: 1000,
       boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
     }}
+
   >
     {message.isError ? '❌' : '✅'} {message.text}
   </Message>

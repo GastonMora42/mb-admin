@@ -53,53 +53,62 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
   }
   
-  // POST
-  if (req.method === 'POST') {
-    try {
-      const { 
-        nombre, apellido, dni, fechaNacimiento, email, telefono, 
-        numeroEmergencia, direccion, obraSocial, nombreTutor, dniTutor, 
-        notas, estilosIds, descuentoManual, tipoAlumno 
-      } = req.body;
+// POST
+if (req.method === 'POST') {
+  try {
+    const { 
+      nombre, apellido, dni, fechaNacimiento, email, telefono, 
+      numeroEmergencia, direccion, obraSocial, nombreTutor, dniTutor, 
+      notas, estilosIds, descuentoManual, tipoAlumno 
+    } = req.body;
 
-      // Verificaciones iniciales
-      const alumnoExistente = await prisma.alumno.findUnique({
-        where: { dni }
-      });
+    // Asegurarse de que tipoAlumno siempre tenga un valor predeterminado 'regular'
+    const tipoAlumnoFinal = tipoAlumno || 'regular';
 
-      const alumnoSueltoExistente = await prisma.alumnoSuelto.findUnique({
-        where: { dni }
-      });
+    // Verificaciones iniciales
+    const alumnoExistente = await prisma.alumno.findUnique({
+      where: { dni }
+    });
 
-      if (tipoAlumno === 'regular' && alumnoExistente) {
-        throw new Error('Ya existe un alumno regular con ese DNI');
-      }
+    const alumnoSueltoExistente = await prisma.alumnoSuelto.findUnique({
+      where: { dni }
+    });
 
-      if (tipoAlumno === 'suelto' && alumnoSueltoExistente) {
-        throw new Error('Ya existe un alumno suelto con ese DNI');
-      }
+    if (tipoAlumnoFinal === 'regular' && alumnoExistente) {
+      throw new Error('Ya existe un alumno regular con ese DNI');
+    }
 
-      // Si es alumno regular
-      if (tipoAlumno === 'regular') {
+    if (tipoAlumnoFinal === 'suelto' && alumnoSueltoExistente) {
+      throw new Error('Ya existe un alumno suelto con ese DNI');
+    }
+
+    // Si es alumno regular
+    if (tipoAlumnoFinal === 'regular') {
+      // El resto del código sigue igual...
         const resultado = await prisma.$transaction(async (tx) => {
-          // Obtener las modalidades REGULAR para cada estilo
-          const modalidades = await tx.modalidadClase.findMany({
-            where: {
-              estiloId: { in: estilosIds },
-              tipo: TipoModalidad.REGULAR
-            }
-          });
+          // Mapeo de estilos a modalidades
+          const estiloModalidadMap: Record<number, number> = {};
+          
+          // Solo buscar modalidades si hay estilos seleccionados
+          if (estilosIds && estilosIds.length > 0) {
+            // Obtener las modalidades REGULAR para cada estilo
+            const modalidades = await tx.modalidadClase.findMany({
+              where: {
+                estiloId: { in: estilosIds },
+                tipo: TipoModalidad.REGULAR
+              }
+            });
 
-          // Mapear estilosIds a sus modalidades correspondientes
-          const estiloModalidadMap = modalidades.reduce((map, modalidad) => {
-            map[modalidad.estiloId] = modalidad.id;
-            return map;
-          }, {} as Record<number, number>);
+            // Mapear estilosIds a sus modalidades correspondientes
+            modalidades.forEach(modalidad => {
+              estiloModalidadMap[modalidad.estiloId] = modalidad.id;
+            });
 
-          // Verificar que todos los estilos tengan una modalidad
-          for (const estiloId of estilosIds) {
-            if (!estiloModalidadMap[estiloId]) {
-              throw new Error(`No se encontró modalidad REGULAR para el estilo ID ${estiloId}`);
+            // Verificar que todos los estilos tengan una modalidad
+            for (const estiloId of estilosIds) {
+              if (!estiloModalidadMap[estiloId]) {
+                throw new Error(`No se encontró modalidad REGULAR para el estilo ID ${estiloId}`);
+              }
             }
           }
 
@@ -118,14 +127,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               nombreTutor,
               dniTutor,
               notas,
-              alumnoEstilos: {
-                create: estilosIds.map((id: number) => ({
-                  estiloId: id,
-                  modalidadId: estiloModalidadMap[id], // Usar la modalidad correspondiente
-                  activo: true,
-                  fechaInicio: new Date()
-                }))
-              },
+              // Crear alumnoEstilos solo si hay estilos seleccionados
+              ...(estilosIds && estilosIds.length > 0 && {
+                alumnoEstilos: {
+                  create: estilosIds.map((id: number) => ({
+                    estiloId: id,
+                    modalidadId: estiloModalidadMap[id],
+                    activo: true,
+                    fechaInicio: new Date()
+                  }))
+                }
+              }),
               ...(alumnoSueltoExistente && {
                 alumnosSueltosAnteriores: {
                   connect: { id: alumnoSueltoExistente.id }
@@ -142,68 +154,94 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             }
           });
 
-          // Obtener conceptos para cada estilo
-          const conceptos = await tx.concepto.findMany({
-            where: {
-              estiloId: { in: estilosIds },
-              esInscripcion: false
-            }
-          });
-
-          // Mapear estilos a sus conceptos
-          const estiloConceptoMap = conceptos.reduce((map, concepto) => {
-            if (concepto.estiloId !== null) {
-              map[concepto.estiloId] = concepto;
-            }
-            return map;
-          }, {} as Record<number, any>);
-
-          // Generar deudas desde el mes actual
-          const fechaActual = new Date();
-          const deudasACrear = [];
-
-          // Usar el primer día del mes actual como fecha de inicio
-          const fechaInicio = new Date(fechaActual.getFullYear(), fechaActual.getMonth(), 1);
-          const fechaIteracion = new Date(fechaInicio);
-
-          // Solo generamos para el mes actual
-          while (fechaIteracion <= fechaActual) {
-            for (const estiloId of estilosIds) {
-              const concepto = estiloConceptoMap[estiloId];
-              if (!concepto) {
-                throw new Error(`No se encontró concepto para el estilo ID ${estiloId}`);
+          // Generar deudas solo si hay estilos seleccionados
+          if (estilosIds && estilosIds.length > 0) {
+            // Obtener conceptos para cada estilo
+            const conceptos = await tx.concepto.findMany({
+              where: {
+                estiloId: { in: estilosIds },
+                esInscripcion: false
               }
+            });
 
-              deudasACrear.push({
-                alumnoId: nuevoAlumno.id,
-                estiloId: estiloId,
-                conceptoId: concepto.id,
-                monto: concepto.montoRegular, // Usar monto de la modalidad regular
-                mes: (fechaIteracion.getMonth() + 1).toString(),
-                anio: fechaIteracion.getFullYear(),
-                fechaVencimiento: new Date(
-                  fechaIteracion.getFullYear(),
-                  fechaIteracion.getMonth(),
-                  10  // Vencimiento el día 10 de cada mes
-                ),
-                tipoDeuda: TipoModalidad.REGULAR, // Especificar tipo de modalidad
-                pagada: false
+            // Mapear estilos a sus conceptos
+            const estiloConceptoMap = conceptos.reduce((map, concepto) => {
+              if (concepto.estiloId !== null) {
+                map[concepto.estiloId] = concepto;
+              }
+              return map;
+            }, {} as Record<number, any>);
+
+            // Generar deudas desde el mes actual
+            const fechaActual = new Date();
+            const deudasACrear = [];
+
+            // Usar el primer día del mes actual como fecha de inicio
+            const fechaInicio = new Date(fechaActual.getFullYear(), fechaActual.getMonth(), 1);
+            const fechaIteracion = new Date(fechaInicio);
+
+            // Solo generamos para el mes actual
+            while (fechaIteracion <= fechaActual) {
+              for (const estiloId of estilosIds) {
+                const concepto = estiloConceptoMap[estiloId];
+                if (!concepto) {
+                  throw new Error(`No se encontró concepto para el estilo ID ${estiloId}`);
+                }
+
+                deudasACrear.push({
+                  alumnoId: nuevoAlumno.id,
+                  estiloId: estiloId,
+                  conceptoId: concepto.id,
+                  monto: concepto.montoRegular, // Usar monto de la modalidad regular
+                  mes: (fechaIteracion.getMonth() + 1).toString(),
+                  anio: fechaIteracion.getFullYear(),
+                  fechaVencimiento: new Date(
+                    fechaIteracion.getFullYear(),
+                    fechaIteracion.getMonth(),
+                    10  // Vencimiento el día 10 de cada mes
+                  ),
+                  tipoDeuda: TipoModalidad.REGULAR, // Especificar tipo de modalidad
+                  pagada: false
+                });
+              }
+              // Solo avanzamos al siguiente mes si la fecha actual es después del día 10
+              if (fechaActual.getDate() > 15) {
+                fechaIteracion.setMonth(fechaIteracion.getMonth() + 1);
+              } else {
+                break;
+              }
+            }
+
+            if (deudasACrear.length > 0) {
+              await tx.deuda.createMany({ data: deudasACrear });
+            }
+
+            // Crear deuda de inscripción
+            const conceptoInscripcion = await tx.concepto.findFirst({
+              where: {
+                esInscripcion: true
+              }
+            });
+
+            if (conceptoInscripcion) {
+              await tx.deuda.create({
+                data: {
+                  alumnoId: nuevoAlumno.id,
+                  monto: conceptoInscripcion.montoRegular, // Usar montoRegular para inscripción
+                  mes: (new Date()).getMonth() + 1 + '',
+                  anio: new Date().getFullYear(),
+                  estiloId: estilosIds[0],
+                  conceptoId: conceptoInscripcion.id,
+                  tipoDeuda: TipoModalidad.REGULAR, // Usar REGULAR para inscripción
+                  pagada: false,
+                  fechaVencimiento: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+                }
               });
             }
-            // Solo avanzamos al siguiente mes si la fecha actual es después del día 10
-            if (fechaActual.getDate() > 15) {
-              fechaIteracion.setMonth(fechaIteracion.getMonth() + 1);
-            } else {
-              break;
-            }
           }
 
-          if (deudasACrear.length > 0) {
-            await tx.deuda.createMany({ data: deudasACrear });
-          }
-
-          // Aplicar descuentos
-          if (estilosIds.length >= 2) {
+          // Aplicar descuentos solo si hay 2 o más estilos
+          if (estilosIds && estilosIds.length >= 2) {
             const descuentoAutomatico = await tx.descuento.findFirst({
               where: {
                 esAutomatico: true,
@@ -225,29 +263,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             }
           }
 
-          // Crear deuda de inscripción
-          const conceptoInscripcion = await tx.concepto.findFirst({
-            where: {
-              esInscripcion: true
-            }
-          });
-
-          if (conceptoInscripcion) {
-            await tx.deuda.create({
-              data: {
-                alumnoId: nuevoAlumno.id,
-                monto: conceptoInscripcion.montoRegular, // Usar montoRegular para inscripción
-                mes: (new Date()).getMonth() + 1 + '',
-                anio: new Date().getFullYear(),
-                estiloId: estilosIds[0],
-                conceptoId: conceptoInscripcion.id,
-                tipoDeuda: TipoModalidad.REGULAR, // Usar REGULAR para inscripción
-                pagada: false,
-                fechaVencimiento: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-              }
-            });
-          }
-
+          // Aplicar descuento manual si se proporcionó
           if (descuentoManual) {
             const descuentoCreado = await tx.descuento.create({
               data: {
@@ -396,95 +412,151 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           });
 
           // Actualizar estilos si se proporcionaron
-          if (estilosIds && estilosIds.length > 0) {
-            // Obtener estilos actuales del alumno
-            const estilosActuales = await tx.alumnoEstilos.findMany({
+          const nuevosEstilosIds = (estilosIds && estilosIds.length > 0) 
+            ? estilosIds.map((id: string) => parseInt(id))
+            : [];
+          
+          // Obtener estilos actuales del alumno
+          const estilosActuales = await tx.alumnoEstilos.findMany({
+            where: {
+              alumnoId: parseInt(id),
+              activo: true
+            },
+            select: {
+              estiloId: true
+            }
+          });
+          
+          const estilosActualesIds = estilosActuales.map(e => e.estiloId);
+
+          // Estilos a desactivar (los que están activos pero no están en la nueva lista)
+          const estilosADesactivar = estilosActualesIds.filter(
+            id => !nuevosEstilosIds.includes(id)
+          );
+
+          // Estilos a activar (los que están en la nueva lista pero no están activos)
+          const estilosAAgregar = nuevosEstilosIds.filter(
+            (id: number) => !estilosActualesIds.includes(id)
+          );
+
+          // Desactivar estilos que ya no se necesitan
+          if (estilosADesactivar.length > 0) {
+            await tx.alumnoEstilos.updateMany({
               where: {
                 alumnoId: parseInt(id),
+                estiloId: {
+                  in: estilosADesactivar
+                },
                 activo: true
               },
-              select: {
-                estiloId: true
+              data: {
+                activo: false,
+                fechaFin: new Date()
+              }
+            });
+          }
+
+          // Agregar nuevos estilos
+          for (const estiloId of estilosAAgregar) {
+            // Buscar modalidad REGULAR para este estilo
+            const modalidad = await tx.modalidadClase.findFirst({
+              where: {
+                estiloId: estiloId,
+                tipo: TipoModalidad.REGULAR
               }
             });
 
-            const estilosActualesIds = estilosActuales.map(e => e.estiloId);
-            const nuevosEstilosIds = estilosIds.map((id: string) => parseInt(id));
+            if (!modalidad) {
+              throw new Error(`No se encontró modalidad REGULAR para el estilo ID ${estiloId}`);
+            }
 
-            // Estilos a desactivar (los que están activos pero no están en la nueva lista)
-            const estilosADesactivar = estilosActualesIds.filter(
-              id => !nuevosEstilosIds.includes(id)
-            );
+            // Verificar si ya existe un registro para esta combinación
+            const estiloExistente = await tx.alumnoEstilos.findFirst({
+              where: {
+                alumnoId: parseInt(id),
+                estiloId: estiloId
+              }
+            });
 
-            // Estilos a activar (los que están en la nueva lista pero no están activos)
-            const estilosAAgregar = nuevosEstilosIds.filter(
-              (id: number) => !estilosActualesIds.includes(id)
-            );
-
-            // Desactivar estilos que ya no se necesitan
-            if (estilosADesactivar.length > 0) {
+            if (estiloExistente) {
+              // Si existe pero está inactivo, actualizarlo
               await tx.alumnoEstilos.updateMany({
                 where: {
                   alumnoId: parseInt(id),
-                  estiloId: {
-                    in: estilosADesactivar
-                  },
-                  activo: true
+                  estiloId: estiloId
                 },
                 data: {
-                  activo: false,
-                  fechaFin: new Date()
+                  activo: true,
+                  fechaFin: null,
+                  fechaInicio: new Date()
+                }
+              });
+            } else {
+              // Si no existe, crear nuevo registro
+              await tx.alumnoEstilos.create({
+                data: {
+                  alumnoId: parseInt(id),
+                  estiloId: estiloId,
+                  modalidadId: modalidad.id, // Usar la modalidad REGULAR
+                  activo: true,
+                  fechaInicio: new Date()
                 }
               });
             }
 
-            // Agregar nuevos estilos
-            for (const estiloId of estilosAAgregar) {
-              // Buscar modalidad REGULAR para este estilo
-              const modalidad = await tx.modalidadClase.findFirst({
-                where: {
-                  estiloId: estiloId,
-                  tipo: TipoModalidad.REGULAR
-                }
-              });
-
-              if (!modalidad) {
-                throw new Error(`No se encontró modalidad REGULAR para el estilo ID ${estiloId}`);
+            // Generar deuda para este nuevo estilo
+            const concepto = await tx.concepto.findFirst({
+              where: {
+                estiloId: estiloId,
+                esInscripcion: false
               }
+            });
 
-              // Verificar si ya existe un registro para esta combinación
-              const estiloExistente = await tx.alumnoEstilos.findFirst({
-                where: {
+            if (concepto) {
+              // Generar deuda para el mes actual
+              const fechaActual = new Date();
+              await tx.deuda.create({
+                data: {
                   alumnoId: parseInt(id),
-                  estiloId: estiloId
+                  estiloId: estiloId,
+                  conceptoId: concepto.id,
+                  monto: concepto.montoRegular,
+                  mes: (fechaActual.getMonth() + 1).toString(),
+                  anio: fechaActual.getFullYear(),
+                  fechaVencimiento: new Date(
+                    fechaActual.getFullYear(),
+                    fechaActual.getMonth(),
+                    10
+                  ),
+                  tipoDeuda: TipoModalidad.REGULAR,
+                  pagada: false
                 }
               });
+            }
+          }
 
-              if (estiloExistente) {
-                // Si existe pero está inactivo, actualizarlo
-                await tx.alumnoEstilos.updateMany({
-                  where: {
-                    alumnoId: parseInt(id),
-                    estiloId: estiloId
-                  },
-                  data: {
-                    activo: true,
-                    fechaFin: null,
-                    fechaInicio: new Date()
-                  }
-                });
-              } else {
-                // Si no existe, crear nuevo registro
-                await tx.alumnoEstilos.create({
-                  data: {
-                    alumnoId: parseInt(id),
-                    estiloId: estiloId,
-                    modalidadId: modalidad.id, // Usar la modalidad REGULAR
-                    activo: true,
-                    fechaInicio: new Date()
-                  }
-                });
+          // Si es la primera vez que el alumno tiene estilos, generar deuda de inscripción
+          if (estilosActualesIds.length === 0 && estilosAAgregar.length > 0) {
+            const conceptoInscripcion = await tx.concepto.findFirst({
+              where: {
+                esInscripcion: true
               }
+            });
+
+            if (conceptoInscripcion) {
+              await tx.deuda.create({
+                data: {
+                  alumnoId: parseInt(id),
+                  monto: conceptoInscripcion.montoRegular,
+                  mes: (new Date()).getMonth() + 1 + '',
+                  anio: new Date().getFullYear(),
+                  estiloId: estilosAAgregar[0],
+                  conceptoId: conceptoInscripcion.id,
+                  tipoDeuda: TipoModalidad.REGULAR,
+                  pagada: false,
+                  fechaVencimiento: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+                }
+              });
             }
           }
 

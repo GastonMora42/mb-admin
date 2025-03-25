@@ -18,22 +18,46 @@ interface PorcentajesPersonalizados {
   porcentajeClasesSueltas: number;
 }
 
+// Interfaz común para recibos en liquidación
+interface ReciboLiquidacion {
+  id: number;
+  numeroRecibo: number;
+  fecha: string;
+  monto: number;
+  tipoPago?: string;
+  alumno?: {
+    id: number;
+    nombre: string;
+    apellido: string;
+  } | null;
+  concepto: {
+    nombre: string;
+    estilo?: string;
+  };
+  montoLiquidacion?: number;
+  porcentajeAplicado?: number;
+  tipoLiquidacion?: string;
+}
+
 interface LiquidacionData {
-  periodo: string;
   regularCount: number;
   sueltasCount: number;
+  clasesCount: number;
   totalRegular: number;
   totalSueltas: number;
   montoLiquidacionRegular: number;
   montoLiquidacionSueltas: number;
-  recibos: any[];
+  recibos: ReciboLiquidacion[];
+  periodo: string;
 }
 
-// En PreviewModal.tsx, actualiza la interfaz:
 interface PreviewModalProps {
   liquidacionData: LiquidacionData;
-  profesor: Profesor | null | undefined;  // Actualizado para aceptar null
-  porcentajesPersonalizados: PorcentajesPersonalizados;
+  profesor: Profesor | null;
+  porcentajesPersonalizados: {
+    porcentajeCursos: number;
+    porcentajeClasesSueltas: number;
+  };
   onClose: () => void;
 }
 

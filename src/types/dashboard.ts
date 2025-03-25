@@ -6,6 +6,7 @@ export interface MediosPago {
   };
 }
 
+
 export interface DashboardData {
   metricas: {
     alumnos: {
@@ -28,6 +29,7 @@ export interface DashboardData {
       deudasTotales: number;
       tasaCobranza: string;
       mediosPago: MediosPago;
+      cuotasRegularesPagadas: number; // Nueva propiedad
     };
   };
   rankings: {

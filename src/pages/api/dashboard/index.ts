@@ -15,9 +15,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         alumnosNuevos,
         alumnosInactivos,
         clasesDelMes,
-        
         asistenciasDelMes,
         
+        // Nueva métrica: cuotas regulares pagadas
+        cuotasRegularesPagadas,
         
         // Métricas financieras
         ingresosDelMes,
@@ -26,6 +27,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         
         // Alumnos sueltos
         alumnosSueltosMes,
+        
         // Medios de pago
         bajasMes,           // Agregamos bajas del mes
         inscripcionesMes,
@@ -52,7 +54,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           where: { activo: false }
         }),
         
-
         // Clases del mes
         prisma.clase.count({
           where: {
@@ -63,7 +64,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           }
         }),
         
-
         // Asistencias del mes
         prisma.asistencia.count({
           where: {
@@ -74,6 +74,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 lte: lastDayOfMonth
               }
             }
+          }
+        }),
+
+        // Cuotas regulares pagadas del mes (recibos no anulados con tipoDeuda = REGULAR)
+        prisma.recibo.count({
+          where: {
+            fecha: {
+              gte: firstDayOfMonth,
+              lte: lastDayOfMonth
+            },
+            anulado: false,
+            concepto: {
+              esInscripcion: false
+            },
+            // Aquí podemos filtrar para contar solo las cuotas regulares
+            esMesCompleto: true
           }
         }),
 
@@ -121,29 +137,29 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           }
         }),
 
-          // Bajas del mes
-  prisma.alumno.count({
-    where: {
-      fechaBaja: {
-        gte: firstDayOfMonth,
-        lte: lastDayOfMonth
-      }
-    }
-  }),
+        // Bajas del mes
+        prisma.alumno.count({
+          where: {
+            fechaBaja: {
+              gte: firstDayOfMonth,
+              lte: lastDayOfMonth
+            }
+          }
+        }),
 
-  // Inscripciones del mes (recibos de inscripción)
-  prisma.recibo.count({
-    where: {
-      fecha: {
-        gte: firstDayOfMonth,
-        lte: lastDayOfMonth
-      },
-      concepto: {
-        esInscripcion: true
-      },
-      anulado: false // No contar recibos anulados
-    }
-  }),
+        // Inscripciones del mes (recibos de inscripción)
+        prisma.recibo.count({
+          where: {
+            fecha: {
+              gte: firstDayOfMonth,
+              lte: lastDayOfMonth
+            },
+            concepto: {
+              esInscripcion: true
+            },
+            anulado: false // No contar recibos anulados
+          }
+        }),
 
         // Medios de pago del mes
         prisma.recibo.groupBy({
@@ -242,7 +258,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           take: 10
         })
       ]);
-
+  
       // Procesamiento de medios de pago
       const mediosPagoProcessed = mediosPago.reduce((acc: { [x: string]: { monto: any; cantidad: any; }; }, medio: { tipoPago: string | number; _sum: { monto: any; }; _count: any; }) => {
         acc[medio.tipoPago] = {
@@ -265,30 +281,31 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         ? ((ingresosDelMes._sum?.monto || 0) / deudasDelMes._sum.monto * 100).toFixed(1)
         : "0";
 
-        res.status(200).json({
-          metricas: {
-            alumnos: {
-              activos: alumnosActivos,
-              nuevos: alumnosNuevos,
-              inactivos: alumnosInactivos,
-              sueltos: alumnosSueltosMes,
-              bajas: bajasMes,           // Agregamos bajas
-              inscripciones: inscripcionesMes, // Agregamos inscripciones
-              tasaCrecimiento
-            },
-            clases: {
-              total: clasesDelMes,
-              asistencias: asistenciasDelMes,
-              tasaAsistencia
-            },
-            finanzas: {
-              ingresos: ingresosDelMes._sum?.monto || 0,
-              deudasMes: deudasDelMes._sum?.monto || 0,
-              deudasTotales: deudasPendientes._sum?.monto || 0,
-              tasaCobranza,
-              mediosPago: mediosPagoProcessed
-            }
+      res.status(200).json({
+        metricas: {
+          alumnos: {
+            activos: alumnosActivos,
+            nuevos: alumnosNuevos,
+            inactivos: alumnosInactivos,
+            sueltos: alumnosSueltosMes,
+            bajas: bajasMes,           // Agregamos bajas
+            inscripciones: inscripcionesMes, // Agregamos inscripciones
+            tasaCrecimiento
           },
+          clases: {
+            total: clasesDelMes,
+            asistencias: asistenciasDelMes,
+            tasaAsistencia
+          },
+          finanzas: {
+            ingresos: ingresosDelMes._sum?.monto || 0,
+            deudasMes: deudasDelMes._sum?.monto || 0,
+            deudasTotales: deudasPendientes._sum?.monto || 0,
+            tasaCobranza,
+            mediosPago: mediosPagoProcessed,
+            cuotasRegularesPagadas: cuotasRegularesPagadas // Añadir nueva métrica
+          }
+        },
         rankings: {
           estilosPopulares,
           profesores: profesoresRanking,

@@ -26,7 +26,7 @@ type PagoDeuda = {
 type Deuda = {
   id: number;
   alumnoId: number;
-  estiloId: number;
+  estiloId: number | null;
   monto: number;
   mes: string;
   anio: number;
@@ -37,7 +37,7 @@ type Deuda = {
   cantidadClases: number | null;
   createdAt: Date;
   updatedAt: Date;
-  estilo: any;
+  estilo: any | null;
   concepto: {
     id: number;
     nombre: string;
@@ -187,42 +187,35 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const todosLosRecibos = [...recibosRegulares, ...recibosSueltos]
           .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
 
-        // Antes de procesar las deudas
-        console.log('Deudas sin procesar:', alumnoInfo.deudas);
-
+        // Procesar las deudas para manejar estiloId null
         const deudasProcesadas = alumnoInfo.deudas.map((deuda: Deuda) => {
-          // Log para cada deuda
-          console.log(`Procesando deuda ID ${deuda.id}:`, {
-            monto: deuda.monto,
-            pagos: deuda.pagos
-          });
-
+          // Procesar los pagos válidos
           const pagosValidos = deuda.pagos.filter(pago => !pago.recibo.anulado);
           const montoPagado = pagosValidos.reduce((sum: number, pago: PagoDeuda) => sum + pago.monto, 0);
           const estaPagada = montoPagado >= deuda.monto;
 
-          // Log del resultado
-          console.log(`Resultado deuda ID ${deuda.id}:`, {
-            montoPagado,
-            estaPagada
-          });
+          // Formatear los detalles de pago
+          const pagosDetalle = pagosValidos.map(pago => ({
+            id: pago.id,
+            monto: pago.monto,
+            fecha: pago.recibo.fecha,
+            numeroRecibo: pago.recibo.numeroRecibo
+          }));
 
+          // Construir objeto con información adicional para la UI
           return {
             ...deuda,
             montoPagado,
             saldoPendiente: deuda.monto - montoPagado,
             pagada: estaPagada,
-            pagosDetalle: pagosValidos.map(pago => ({
-              id: pago.id,
-              monto: pago.monto,
-              fecha: pago.recibo.fecha,
-              numeroRecibo: pago.recibo.numeroRecibo
-            }))
+            pagosDetalle,
+            // Agregar información de visualización para deudas sin estilo
+            estiloNombre: deuda.estilo ? deuda.estilo.nombre : 
+                         (deuda.concepto?.esInscripcion ? 'Inscripción' : 'Sin estilo'),
+            conceptoNombre: deuda.concepto ? deuda.concepto.nombre : 
+                           (deuda.tipoDeuda === 'SUELTA' ? 'Clase suelta' : 'Mensualidad')
           };
         });
-
-        // Log final
-        console.log('Deudas procesadas:', deudasProcesadas);
   
         // Definir la fecha de inscripción e inscripción pagada basándonos en deudas
         const deudaInscripcion = deudasProcesadas.find((d: any) => 
@@ -234,6 +227,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           ? deudaInscripcion.pagosDetalle?.[0]?.fecha || null 
           : null;
 
+        // Estadísticas
         const estadisticas = {
           totalPagado: todosLosRecibos
             .filter(r => !r.anulado)
@@ -256,12 +250,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           }
         };
 
-        // Verificar estado de pagos
+        // Estado de pagos
         const mesActual = new Date().getMonth() + 1;
         const anioActual = new Date().getFullYear();
-        const deudasMesActual = alumnoInfo.deudas.filter(
-          (d: any) => d.mes === mesActual.toString() && d.anio === anioActual && !d.pagada
-        );
         
         const estadoPagos = {
           alDia: deudasProcesadas.every((deuda: any) => 
@@ -274,7 +265,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             .map((d: any) => ({
               periodo: `${d.mes}/${d.anio}`,
               monto: d.saldoPendiente,
-              vencida: new Date(d.fechaVencimiento) < new Date()
+              vencida: new Date(d.fechaVencimiento) < new Date(),
+              estilo: d.estilo?.nombre || d.estiloNombre || 'Sin estilo',
+              tipo: d.tipoDeuda,
+              concepto: d.concepto?.nombre || d.conceptoNombre || 'Sin concepto',
+              clases: d.cantidadClases || 'Mensual'
             }))
             .sort((a: any, b: any) => {
               const [mesA, anioA] = a.periodo.split('/').map(Number);

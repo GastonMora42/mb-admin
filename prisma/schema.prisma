@@ -5,7 +5,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = "postgresql://mb-admin_owner:gYph3QlDW5zI@ep-late-block-a5w4dyjy-pooler.us-east-2.aws.neon.tech/mb-admin?sslmode=require"
+  url      = "postgresql://mb-admin_owner:gYph3QlDW5zI@ep-frosty-bush-a5wi7ltt-pooler.us-east-2.aws.neon.tech/mb-admin?sslmode=require"
 }
 
 model Alumno {
@@ -86,15 +86,15 @@ model Deuda {
   monto            Float
   mes              String
   anio             Int
-  estiloId         Int
+  estiloId         Int?          // Campo opcional
   pagada           Boolean       @default(false)
-  tipoDeuda        TipoModalidad // REGULAR o SUELTA
-  cantidadClases   Int? // Solo para modalidad SUELTA
+  tipoDeuda        TipoModalidad
+  cantidadClases   Int?
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
   fechaVencimiento DateTime
   alumno           Alumno        @relation(fields: [alumnoId], references: [id])
-  estilo           Estilo        @relation(fields: [estiloId], references: [id])
+  estilo           Estilo?       @relation(fields: [estiloId], references: [id]) // Relación también opcional
   concepto         Concepto?     @relation(fields: [conceptoId], references: [id])
   conceptoId       Int?
   pagos            PagoDeuda[]
@@ -133,18 +133,18 @@ model Concepto {
   id            Int           @id @default(autoincrement())
   nombre        String
   descripcion   String?
-  montoRegular  Float // Precio para clases regulares (mensual)
-  montoSuelto   Float // Precio para clases sueltas
-  esInscripcion Boolean       @default(false) // Indica si es un concepto de inscripción
+  monto         Float         // Mantener el campo original
+  montoRegular  Float?        // Añadir como opcional primero
+  montoSuelto   Float?        // Añadir como opcional primero
+  esInscripcion Boolean       @default(false)
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
   estiloId      Int?
   estilo        Estilo?       @relation(fields: [estiloId], references: [id])
   recibos       Recibo[]
   deudas        Deuda[]
-  inscripciones Inscripcion[]
 
-  @@unique([estiloId, esInscripcion])
+  inscripciones Inscripcion[]
 }
 
 model Recibo {
