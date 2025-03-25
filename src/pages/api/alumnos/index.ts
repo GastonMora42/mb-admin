@@ -227,7 +227,7 @@ if (req.method === 'POST') {
               await tx.deuda.create({
                 data: {
                   alumnoId: nuevoAlumno.id,
-                  monto: conceptoInscripcion.montoRegular, // Usar montoRegular para inscripción
+                  monto: conceptoInscripcion.montoRegular ?? 0, // Usar montoRegular para inscripción
                   mes: (new Date()).getMonth() + 1 + '',
                   anio: new Date().getFullYear(),
                   estiloId: estilosIds[0],
