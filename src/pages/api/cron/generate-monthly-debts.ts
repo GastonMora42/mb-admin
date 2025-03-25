@@ -1,6 +1,7 @@
 // pages/api/cron/generate-monthly-debts.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
+import { TipoModalidad } from '@prisma/client';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Verificar que sea una solicitud autorizada
@@ -32,8 +33,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
       });
 
-      
-
       const fechaActual = new Date();
       const mes = (fechaActual.getMonth() + 2).toString();  // Mes siguiente (por ejemplo, octubre → 11, noviembre)
       const anio = fechaActual.getFullYear();
@@ -41,6 +40,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       for (const alumno of alumnosActivos) {
         for (const alumnoEstilo of alumno.alumnoEstilos) {
+          // Verificar si ya existe una deuda para este mes/año/estilo
           const deudaExistente = await tx.deuda.findFirst({
             where: {
               alumnoId: alumno.id,
@@ -51,26 +51,52 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           });
 
           if (!deudaExistente) {
+            // Obtener el concepto correspondiente al estilo
+            const concepto = await tx.concepto.findFirst({
+              where: {
+                estiloId: alumnoEstilo.estiloId,
+                esInscripcion: false
+              }
+            });
+
+            if (!concepto) {
+              console.log(`No se encontró concepto para el estilo ${alumnoEstilo.estiloId}`);
+              continue;
+            }
+
+            // Usar el precio del concepto (montoRegular) o el importe del estilo como respaldo
+            const montoCuota = concepto.montoRegular || alumnoEstilo.estilo.importe || 0;
+
             deudasACrear.push({
               alumnoId: alumno.id,
               estiloId: alumnoEstilo.estiloId,
-              monto: alumnoEstilo.estilo.importe || 0,
-              montoOriginal: alumnoEstilo.estilo.importe || 0,
+              conceptoId: concepto.id,
+              monto: montoCuota,
+              montoOriginal: montoCuota,
               mes,
               anio,
+              tipoDeuda: TipoModalidad.REGULAR,
               fechaVencimiento: new Date(anio, fechaActual.getMonth(), 10),
               pagada: false
             });
           }
         }
       }
-
-      
       
       if (deudasACrear.length > 0) {
-        await tx.deuda.createMany({
-          data: deudasACrear
-        });
+        // Crear las deudas una por una si createMany falla
+        try {
+          await tx.deuda.createMany({
+            data: deudasACrear
+          });
+        } catch (error) {
+          console.log("Error en createMany, intentando crear deudas individualmente:", error);
+          for (const deuda of deudasACrear) {
+            await tx.deuda.create({
+              data: deuda
+            });
+          }
+        }
       }
 
       return deudasACrear.length;

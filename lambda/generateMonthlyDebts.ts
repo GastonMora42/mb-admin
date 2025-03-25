@@ -1,6 +1,6 @@
 // pages/api/deudas/generateMonthly.ts
 import { Handler } from 'aws-lambda';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, TipoModalidad } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -49,15 +49,30 @@ export const handler: Handler = async (event) => {
           });
 
           if (!deudaExistente) {
+            // Obtener el concepto correspondiente al estilo
+            const concepto = await tx.concepto.findFirst({
+              where: {
+                estiloId: alumnoEstilo.estiloId,
+                esInscripcion: false
+              }
+            });
+
+            if (!concepto) {
+              console.log(`No se encontró concepto para el estilo ${alumnoEstilo.estiloId}`);
+              continue;
+            }
+
             deudasACrear.push({
               alumnoId: alumno.id,
               estiloId: alumnoEstilo.estiloId,
-              monto: alumnoEstilo.estilo.importe || 0,
-              montoOriginal: alumnoEstilo.estilo.importe || 0,
+              monto: concepto.montoRegular || alumnoEstilo.estilo.importe || 0,
+              montoOriginal: concepto.montoRegular || alumnoEstilo.estilo.importe || 0,
               mes,
               anio,
               fechaVencimiento: new Date(anio, fechaActual.getMonth(), 10),
-              pagada: false
+              pagada: false,
+              tipoDeuda: TipoModalidad.REGULAR,
+              conceptoId: concepto.id
             });
           }
         }
@@ -74,20 +89,20 @@ export const handler: Handler = async (event) => {
     });
 
     return {
-        statusCode: 200,
-        body: JSON.stringify({
-          message: `Se generaron ${resultado} nuevas deudas`
-        })
-      };
-    } catch (error) {
-      console.error('Error al generar deudas mensuales:', error);
-      return {
-        statusCode: 500,
-        body: JSON.stringify({
-          error: 'Error al generar deudas mensuales'
-        })
-      };
-    } finally {
-      await prisma.$disconnect();
-    }
-  };
+      statusCode: 200,
+      body: JSON.stringify({
+        message: `Se generaron ${resultado} nuevas deudas`
+      })
+    };
+  } catch (error) {
+    console.error('Error al generar deudas mensuales:', error);
+    return {
+      statusCode: 500,
+      body: JSON.stringify({
+        error: 'Error al generar deudas mensuales'
+      })
+    };
+  } finally {
+    await prisma.$disconnect();
+  }
+};
