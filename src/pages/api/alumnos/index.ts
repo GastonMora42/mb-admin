@@ -547,7 +547,7 @@ if (req.method === 'POST') {
               await tx.deuda.create({
                 data: {
                   alumnoId: parseInt(id),
-                  monto: conceptoInscripcion.montoRegular,
+                  monto: conceptoInscripcion.montoRegular ?? 0,
                   mes: (new Date()).getMonth() + 1 + '',
                   anio: new Date().getFullYear(),
                   estiloId: estilosAAgregar[0],
