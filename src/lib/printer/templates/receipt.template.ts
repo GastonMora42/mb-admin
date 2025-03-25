@@ -57,7 +57,7 @@ export const formatReceipt = async (
     if (recibo.pagosDeuda && recibo.pagosDeuda.length > 0) {
       await printer.println('\nDeudas Canceladas:');
       for (const pago of recibo.pagosDeuda) {
-        await printer.println(`- ${pago.deuda.estilo.nombre}: $${pago.monto.toFixed(2)}`);
+        await printer.println(`- : $${pago.monto.toFixed(2)}`);
       }
     }
 
