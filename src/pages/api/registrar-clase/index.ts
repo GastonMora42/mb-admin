@@ -153,7 +153,7 @@ if (!estaInscritoAlEstilo && !tieneInscripcionPagada) {
       data: {
         cantidadClases: (deudaExistente.cantidadClases || 0) + 1,
         // Usar montoSuelto y multiplicar por la cantidad de clases
-        monto: concepto.montoSuelto * ((deudaExistente.cantidadClases || 0) + 1)
+        monto: (concepto.montoSuelto ?? 0) * ((deudaExistente.cantidadClases || 0) + 1)
       }
     });
   } else {
