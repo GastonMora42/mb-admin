@@ -251,7 +251,7 @@ if (!estaInscritoAlEstilo && !tieneInscripcionPagada) {
                     alumnoId: asistencia.alumnoId,
                     estiloId: parseInt(estiloId),
                     conceptoId: concepto.id,
-                    monto: concepto.montoRegular,
+                    monto: concepto.montoRegular ?? 0,
                     mes,
                     anio,
                     tipoDeuda: TipoModalidad.REGULAR,
