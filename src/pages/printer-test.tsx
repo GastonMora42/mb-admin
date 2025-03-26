@@ -70,15 +70,13 @@ export default function PrinterTest() {
         id: 1,
         nombre: 'TEST',
         descripcion: null,
-        // monto: 100, // Eliminar esta propiedad si ahora usan montoRegular y montoSuelto
-        montoRegular: 100, // Añadir esta propiedad
-        montoSuelto: 80,   // Añadir esta propiedad
+        montoRegular: 100,
+        montoSuelto: 80,
         createdAt: new Date(),
         updatedAt: new Date(),
         estiloId: null,
-        esInscripcion: false,
-        // activo: true    // Eliminar esta propiedad
-      },
+        esInscripcion: false
+      } as any, // Usar aserción de tipo para evitar el error
        pagosDeuda: []
      };
 
