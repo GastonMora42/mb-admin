@@ -50,28 +50,28 @@ export async function generarDeudaMensual(alumnoId: number) {
       }
     });
 
-    if (!deudaExistente) {
-      // Usar el monto según la modalidad
-      const monto = alumnoEstilo.modalidad?.tipo === TipoModalidad.REGULAR
-        ? concepto.montoRegular
-        : concepto.montoSuelto;
-
-      await prisma.deuda.create({
-        data: {
-          alumnoId,
-          estiloId: alumnoEstilo.estiloId,
-          conceptoId: concepto.id,
-          monto,
-          mes: mes.toString(),
-          anio,
-          tipoDeuda: alumnoEstilo.modalidad?.tipo || TipoModalidad.REGULAR,
-          fechaVencimiento,
-          pagada: false
-        },
-      });
+        if (!deudaExistente) {
+          // Usar el monto según la modalidad con valores predeterminados para casos nulos
+          const montoValor = alumnoEstilo.modalidad?.tipo === TipoModalidad.REGULAR
+            ? (concepto.montoRegular ?? 0) // Usar 0 si es null
+            : (concepto.montoSuelto ?? 0); // Usar 0 si es null
+    
+          await prisma.deuda.create({
+            data: {
+              alumnoId,
+              estiloId: alumnoEstilo.estiloId,
+              conceptoId: concepto.id,
+              monto: montoValor, // Usar la variable con el valor predeterminado
+              mes: mes.toString(),
+              anio,
+              tipoDeuda: alumnoEstilo.modalidad?.tipo || TipoModalidad.REGULAR,
+              fechaVencimiento,
+              pagada: false
+            },
+          });
+        }
+      }
     }
-  }
-}
 
 export async function generarRecibo(
   alumnoId: number, 
