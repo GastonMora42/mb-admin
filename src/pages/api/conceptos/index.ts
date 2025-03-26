@@ -35,14 +35,23 @@ export default async function handler(
   
   else if (req.method === 'POST') {
     try {
-      const { nombre, descripcion, monto, estiloId, esInscripcion } = req.body;
+      // Actualizar para usar montoRegular y montoSuelto en lugar de monto
+      const { 
+        nombre, 
+        descripcion, 
+        montoRegular, 
+        montoSuelto, 
+        estiloId, 
+        esClaseSuelta, 
+        esInscripcion 
+      } = req.body;
   
       const conceptoData = {
         nombre,
         descripcion,
-        monto: Number(monto),
+        montoRegular: Number(montoRegular),
+        montoSuelto: montoSuelto ? Number(montoSuelto) : Number(montoRegular), // Si no hay montoSuelto, usar montoRegular
         esInscripcion: Boolean(esInscripcion),
-        activo: true,
         ...(estiloId && {
           estilo: {
             connect: { id: Number(estiloId) }
@@ -69,7 +78,12 @@ export default async function handler(
   
       res.status(201).json(concepto);
     } catch (error) {
-      res.status(400).json({ error: 'Error al crear concepto' });
+      console.error('Error al crear concepto:', error);
+      // Mostrar mensaje de error más detallado
+      res.status(400).json({ 
+        error: 'Error al crear concepto',
+        details: error instanceof Error ? error.message : 'Error desconocido'
+      });
     }
   }
   

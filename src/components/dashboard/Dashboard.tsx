@@ -190,6 +190,11 @@ const Dashboard: React.FC = () => {
         icon="✍️"
       />
         <MetricCard
+    title="Cuotas regulares Pagadas"
+    value={metricas.finanzas.cuotasRegularesPagadas}
+    icon="📝"
+  />
+        <MetricCard
           title="Clases del Mes"
           value={metricas.clases.total}
           delta={metricas.clases.tasaAsistencia}

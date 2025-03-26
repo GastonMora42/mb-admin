@@ -1,3 +1,4 @@
+//src/lib/printer/printer.service.ts
 import { ReciboWithRelations } from '@/types/recibos';
 import type { Prisma } from '@prisma/client';
 
@@ -114,7 +115,7 @@ export class PrinterService {
         { accion: 'text', datos: '\n\nDeudas Canceladas:\n\n' },
         ...recibo.pagosDeuda.map(pago => ({
           accion: 'text', 
-          datos: `- ${pago.deuda.estilo.nombre}: $${pago.monto.toFixed(2)}\n\n`
+          datos: `- ${pago.deuda.estilo?.nombre || 'Concepto'}: $${pago.monto.toFixed(2)}\n\n`
         }))
       ] : []),
       { accion: 'text', datos: '\n\n\n' },
@@ -197,12 +198,12 @@ export class PrinterService {
        { accion: 'text', datos: `Monto Descuento: -$${(recibo.montoOriginal * recibo.descuento).toFixed(2)}` }
      ] : []),
      ...(recibo.pagosDeuda?.length ? [
-       { accion: 'text', datos: 'Deudas Canceladas:' },
-       ...recibo.pagosDeuda.map(pago => ({
-         accion: 'text', 
-         datos: `- ${pago.deuda.estilo.nombre}: $${pago.monto.toFixed(2)}`
-       }))
-     ] : []),
+      { accion: 'text', datos: 'Deudas Canceladas:' },
+      ...recibo.pagosDeuda.map(pago => ({
+        accion: 'text', 
+        datos: `- ${pago.deuda.estilo?.nombre || 'Concepto sin especificar'}: $${pago.monto.toFixed(2)}`
+      }))
+    ] : []),
      { accion: 'text', datos: `TOTAL: $${recibo.monto.toFixed(2)}` },
      { accion: 'text', datos: `Forma de pago: ${recibo.tipoPago}` },
      { accion: 'text', datos: '¡Gracias por su pago!' }

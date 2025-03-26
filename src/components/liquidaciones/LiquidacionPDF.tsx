@@ -39,7 +39,7 @@ const styles = StyleSheet.create({
   table: {
     width: 'auto',
     marginTop: 10,
-    marginBottom: 50 // Aumentamos el margen inferior para evitar solapamiento
+    marginBottom: 10
   },
   tableHeader: {
     flexDirection: 'row',
@@ -70,7 +70,6 @@ const styles = StyleSheet.create({
   colAlumno: { width: '25%' },
   colConcepto: { width: '15%' },
   colTipoPago: { width: '13%' },
-  colTipo: { width: '10%' },
   colMonto: { width: '12%' },
   colLiquidacion: { width: '13%' },
   summary: {
@@ -87,7 +86,6 @@ const styles = StyleSheet.create({
   total: {
     marginTop: 10,
     paddingTop: 10,
-    marginBottom: 50, // Agregamos margen inferior para evitar solapamiento
     borderTopWidth: 1,
     borderTopColor: '#000',
     borderTopStyle: 'solid',
@@ -102,30 +100,9 @@ const styles = StyleSheet.create({
   },
   pageNumber: {
     position: 'absolute',
-    bottom: 10, // Bajamos un poco el número de página
+    bottom: 30,
     right: 30,
     fontSize: 10
-  },
-  firmasContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 70, // Espacio adicional entre contenido y firmas
-    paddingTop: 20,
-    borderTopWidth: 1,
-    borderTopColor: '#ddd',
-    borderTopStyle: 'solid',
-  },
-  firmaBlock: {
-    flex: 1,
-    alignItems: 'center',
-    paddingHorizontal: 10
-  },
-  firmaLinea: {
-    borderBottomWidth: 1,
-    borderBottomColor: '#000',
-    borderBottomStyle: 'solid',
-    width: '80%',
-    marginBottom: 10
   }
 });
 
@@ -134,6 +111,7 @@ interface LiquidacionPDFProps {
     periodo: string;
     regularCount: number;
     sueltasCount: number;
+    clasesCount: number; // Añadido campo clasesCount
     totalRegular: number;
     totalSueltas: number;
     montoLiquidacionRegular: number;
@@ -149,7 +127,7 @@ interface LiquidacionPDFProps {
     apellido: string; 
     porcentajePorDefecto: number;
     porcentajeClasesSueltasPorDefecto: number;
-  } | null | undefined;  // Actualizado para aceptar null | undefined
+  } | null | undefined;
   porcentajesPersonalizados: {
     porcentajeCursos: number;
     porcentajeClasesSueltas: number;
@@ -160,29 +138,29 @@ const LiquidacionPDF: React.FC<LiquidacionPDFProps> = ({
   liquidacionData, 
   profesor,
   porcentajesPersonalizados
- }) => (
+}) => (
   <Document>
-    <Page size="A4" style={styles.page} wrap>
+    <Page size="A4" style={styles.page}>
       <Text style={styles.title}>Liquidación de Profesores</Text>
- 
-     {/* Código de información general sin cambiar */}
-     <View style={styles.section}>
-         <Text style={styles.subtitle}>Información General</Text>
-         <View style={styles.infoRow}>
-           <Text style={styles.label}>Período:</Text>
-           <Text style={styles.value}>
-             {new Date(liquidacionData.periodo).toLocaleDateString('es-AR', {
-               month: 'long',
-               year: 'numeric'
-             })}
-           </Text>
-         </View>
-         {profesor && (
-           <View style={styles.infoRow}>
-             <Text style={styles.label}>Profesor:</Text>
-             <Text style={styles.value}>{profesor.apellido}, {profesor.nombre}</Text>
-           </View>
-         )}
+
+      {/* Información General */}
+      <View style={styles.section}>
+        <Text style={styles.subtitle}>Información General</Text>
+        <View style={styles.infoRow}>
+          <Text style={styles.label}>Período:</Text>
+          <Text style={styles.value}>
+            {new Date(liquidacionData.periodo).toLocaleDateString('es-AR', {
+              month: 'long',
+              year: 'numeric'
+            })}
+          </Text>
+        </View>
+        {profesor && (
+          <View style={styles.infoRow}>
+            <Text style={styles.label}>Profesor:</Text>
+            <Text style={styles.value}>{profesor.apellido}, {profesor.nombre}</Text>
+          </View>
+        )}
         <View style={styles.infoRow}>
           <Text style={styles.label}>Fecha de Emisión:</Text>
           <Text style={styles.value}>
@@ -190,8 +168,8 @@ const LiquidacionPDF: React.FC<LiquidacionPDFProps> = ({
           </Text>
         </View>
       </View>
- 
-      {/* Resto del código de resumen de liquidación sin cambiar */}
+
+      {/* Resumen de Liquidación */}
       <View style={styles.section}>
         <Text style={styles.subtitle}>Resumen de Liquidación</Text>
         
@@ -202,137 +180,104 @@ const LiquidacionPDF: React.FC<LiquidacionPDFProps> = ({
             {liquidacionData.regularCount} alumnos
           </Text>
         </View>
-       <View style={styles.infoRow}>
-         <Text style={styles.label}>Monto Total:</Text>
-         <Text style={styles.value}>
-           ${liquidacionData.totalRegular.toFixed(2)}
-         </Text>
-       </View>
-       <View style={styles.infoRow}>
-         <Text style={styles.label}>Porcentaje:</Text>
-         <Text style={styles.value}>
-           {porcentajesPersonalizados?.porcentajeCursos || 
-             (profesor?.porcentajePorDefecto || 60) * 100}%
-         </Text>
-       </View>
-       <View style={styles.infoRow}>
-         <Text style={styles.label}>A liquidar:</Text>
-         <Text style={styles.value}>
-           ${liquidacionData.montoLiquidacionRegular.toFixed(2)}
-         </Text>
-       </View>
+        <View style={styles.infoRow}>
+  <Text style={styles.label}>Porcentaje:</Text>
+  <Text style={styles.value}>
+    {porcentajesPersonalizados?.porcentajeCursos || 
+      ((profesor?.porcentajePorDefecto || 0.6) * 100)}%
+  </Text>
+</View>
 
-       {/* Clases Sueltas */}
-       <View style={{...styles.infoRow, marginTop: 10}}>
-         <Text style={styles.label}>Clases Sueltas:</Text>
-         <Text style={styles.value}>
-           {liquidacionData.sueltasCount} alumnos
-         </Text>
-       </View>
-       <View style={styles.infoRow}>
-         <Text style={styles.label}>Monto Total:</Text>
-         <Text style={styles.value}>
-           ${liquidacionData.totalSueltas.toFixed(2)}
-         </Text>
-       </View>
-       <View style={styles.infoRow}>
-         <Text style={styles.label}>Porcentaje:</Text>
-         <Text style={styles.value}>
-           {porcentajesPersonalizados?.porcentajeClasesSueltas || 
-             (profesor?.porcentajeClasesSueltasPorDefecto || 80) * 100}%
-         </Text>
-       </View>
-       <View style={styles.infoRow}>
-         <Text style={styles.label}>A liquidar:</Text>
-         <Text style={styles.value}>
-           ${liquidacionData.montoLiquidacionSueltas.toFixed(2)}
-         </Text>
-       </View>
+        <View style={styles.infoRow}>
+          <Text style={styles.label}>A liquidar:</Text>
+          <Text style={styles.value}>
+            ${liquidacionData.montoLiquidacionRegular.toFixed(2)}
+          </Text>
+        </View>
 
-       {/* Detalle de clases sueltas si existe */}
-       {liquidacionData.claseSueltaDetalle && (
-         <>
-           <View style={{...styles.infoRow, marginTop: 5, marginLeft: 20}}>
-             <Text style={styles.label}>Por concepto:</Text>
-             <Text style={styles.value}>
-               ${liquidacionData.claseSueltaDetalle.porConcepto.toFixed(2)}
-             </Text>
-           </View>
-           <View style={{...styles.infoRow, marginLeft: 20}}>
-             <Text style={styles.label}>Por flag:</Text>
-             <Text style={styles.value}>
-               ${liquidacionData.claseSueltaDetalle.porFlag.toFixed(2)}
-             </Text>
-           </View>
-         </>
-       )}
-     </View>
+        {/* Clases Sueltas */}
+        <View style={{...styles.infoRow, marginTop: 10}}>
+          <Text style={styles.label}>Clases Sueltas:</Text>
+          <Text style={styles.value}>
+            {liquidacionData.sueltasCount} alumnos ({liquidacionData.clasesCount || 0} clases)
+          </Text>
+        </View>
+        <View style={styles.infoRow}>
+  <Text style={styles.label}>Porcentaje:</Text>
+  <Text style={styles.value}>
+    {porcentajesPersonalizados?.porcentajeClasesSueltas || 
+      ((profesor?.porcentajeClasesSueltasPorDefecto || 0.8) * 100)}%
+  </Text>
+</View>
+        <View style={styles.infoRow}>
+          <Text style={styles.label}>A liquidar:</Text>
+          <Text style={styles.value}>
+            ${liquidacionData.montoLiquidacionSueltas.toFixed(2)}
+          </Text>
+        </View>
+      </View>
 
-     {/* Detalle de Recibos */}
-     <Text style={styles.subtitle}>Detalle de Recibos</Text>
-     <View style={styles.table}>
-       <View style={styles.tableHeader}>
-         <Text style={{...styles.tableColHeader, ...styles.colNumero}}>N° Recibo</Text>
-         <Text style={{...styles.tableColHeader, ...styles.colFecha}}>Fecha</Text>
-         <Text style={{...styles.tableColHeader, ...styles.colAlumno}}>Alumno</Text>
-         <Text style={{...styles.tableColHeader, ...styles.colConcepto}}>Concepto</Text>
-         <Text style={{...styles.tableColHeader, ...styles.colTipo}}>Tipo</Text>
-         <Text style={{...styles.tableColHeader, ...styles.colMonto}}>Monto</Text>
-         <Text style={{...styles.tableColHeader, ...styles.colLiquidacion}}>A Liquidar</Text>
-       </View>
+      {/* Detalle de Recibos */}
+      <Text style={styles.subtitle}>Detalle de Recibos</Text>
+      <View style={styles.table}>
+        <View style={styles.tableHeader}>
+          <Text style={{...styles.tableColHeader, ...styles.colNumero}}>N° Recibo</Text>
+          <Text style={{...styles.tableColHeader, ...styles.colFecha}}>Fecha</Text>
+          <Text style={{...styles.tableColHeader, ...styles.colAlumno}}>Alumno</Text>
+          <Text style={{...styles.tableColHeader, ...styles.colConcepto}}>Concepto</Text>
+          <Text style={{...styles.tableColHeader, ...styles.colLiquidacion}}>A Liquidar</Text>
+        </View>
+        
+        {liquidacionData.recibos.map((recibo, index) => (
+          <View key={index} style={styles.tableRow}>
+            <Text style={{...styles.tableCol, ...styles.colNumero}}>{recibo.numeroRecibo}</Text>
+            <Text style={{...styles.tableCol, ...styles.colFecha}}>
+              {new Date(recibo.fecha).toLocaleDateString('es-AR')}
+            </Text>
+            <Text style={{...styles.tableCol, ...styles.colAlumno}}>
+              {recibo.alumno ? 
+                `${recibo.alumno.apellido}, ${recibo.alumno.nombre}` : 
+                'Sin alumno'}
+            </Text>
+            <Text style={{...styles.tableCol, ...styles.colConcepto}}>
+              {recibo.concepto?.nombre || 'Sin concepto'}
+            </Text>
+            <Text style={{...styles.tableCol, ...styles.colLiquidacion}}>
+              ${(recibo.montoLiquidacion || 0).toFixed(2)}
+            </Text>
+          </View>
+        ))}
+      </View>
 
-       {liquidacionData.recibos.map((recibo, index) => (
-         <View key={index} style={styles.tableRow}>
-           <Text style={{...styles.tableCol, ...styles.colNumero}}>{recibo.numeroRecibo}</Text>
-           <Text style={{...styles.tableCol, ...styles.colFecha}}>
-             {new Date(recibo.fecha).toLocaleDateString('es-AR')}
-           </Text>
-           <Text style={{...styles.tableCol, ...styles.colAlumno}}>
-             {recibo.alumno ? 
-               `${recibo.alumno.apellido}, ${recibo.alumno.nombre}` : 
-               recibo.alumnoSuelto ?
-               `${recibo.alumnoSuelto.apellido}, ${recibo.alumnoSuelto.nombre}` :
-               'Sin alumno'}
-           </Text>
-           <Text style={{...styles.tableCol, ...styles.colConcepto}}>{recibo.concepto.nombre}</Text>
-           <Text style={{...styles.tableCol, ...styles.colTipo}}>{recibo.tipoLiquidacion || 'Regular'}</Text>
-           <Text style={{...styles.tableCol, ...styles.colMonto}}>
-             ${(recibo.monto || 0).toFixed(2)}
-           </Text>
-           <Text style={{...styles.tableCol, ...styles.colLiquidacion}}>
-             ${(recibo.montoLiquidacion || 0).toFixed(2)}
-           </Text>
-         </View>
-       ))}
-     </View>
+      {/* Total Final */}
+      <View style={styles.total}>
+        <Text>Total a Liquidar: $
+          {(liquidacionData.montoLiquidacionRegular + 
+            liquidacionData.montoLiquidacionSueltas).toFixed(2)}
+        </Text>
+      </View>
 
-     {/* Total Final */}
-     <View style={styles.total}>
-       <Text>Total a Liquidar: $
-         {(liquidacionData.montoLiquidacionRegular + 
-           liquidacionData.montoLiquidacionSueltas).toFixed(2)}
-       </Text>
-     </View>
+      {/* Footer */}
+      <View style={styles.footer} fixed>
+        <View style={{flexDirection: 'row', justifyContent: 'space-between'}}>
+          <View style={{flex: 1}}>
+            <Text>_________________________</Text>
+            <Text>Firma del Profesor</Text>
+          </View>
+          <View style={{flex: 1, alignItems: 'center'}}>
+            <Text>_________________________</Text>
+            <Text>Firma Administración</Text>
+          </View>
+        </View>
+      </View>
 
-     {/* Reemplazamos el footer antiguo por este bloque de firmas */}
-     <View style={styles.firmasContainer} fixed={false}>
-       <View style={styles.firmaBlock}>
-         <View style={styles.firmaLinea}></View>
-         <Text>Firma del Profesor</Text>
-       </View>
-       <View style={styles.firmaBlock}>
-         <View style={styles.firmaLinea}></View>
-         <Text>Firma Administración</Text>
-       </View>
-     </View>
-
-     <Text 
-       style={styles.pageNumber} 
-       render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`} 
-       fixed 
-     />
-   </Page>
- </Document>
+      <Text 
+        style={styles.pageNumber} 
+        render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`} 
+        fixed 
+      />
+    </Page>
+  </Document>
 );
 
 export default LiquidacionPDF;

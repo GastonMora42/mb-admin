@@ -67,16 +67,16 @@ export default function PrinterTest() {
        alumno: null,
        alumnoSuelto: null,
        concepto: {
-         id: 1,
-         nombre: 'TEST',
-         descripcion: null,
-         monto: 100,
-         createdAt: new Date(),
-         updatedAt: new Date(),
-         estiloId: null,
-         esInscripcion: false,
-         activo: true
-       },
+        id: 1,
+        nombre: 'TEST',
+        descripcion: null,
+        montoRegular: 100,
+        montoSuelto: 80,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        estiloId: null,
+        esInscripcion: false
+      } as any, // Usar aserción de tipo para evitar el error
        pagosDeuda: []
      };
 

@@ -1,5 +1,7 @@
+//src/pages/api/deudas/index.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
+import { TipoModalidad } from '@prisma/client';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'GET') {
@@ -28,7 +30,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             select: {
               id: true,
               nombre: true,
-              monto: true,
+              montoRegular: true,
+              montoSuelto: true,
               esInscripcion: true
             }
           },
@@ -54,55 +57,70 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                   activo: true
                 },
                 include: {
-                  estilo: true
+                  estilo: true,
+                  modalidad: true
                 }
               }
             }
           }
         },
         orderBy: [
-          { esInscripcion: 'desc' }, // Mostrar inscripciones primero
           { anio: 'asc' },
           { mes: 'asc' }
         ]
       });
       
-      // En el procesamiento de deudas, incluir la información de inscripción
+      // En el procesamiento de deudas, incluir la información de modalidad (regular o suelta)
       const deudasProcesadas = deudas.map(deuda => {
-        const montoPagado = deuda.pagos.reduce((sum, pago) => sum + pago.monto, 0);
+        const montoPagado = deuda.pagos ? deuda.pagos.reduce((sum: number, pago: any) => sum + pago.monto, 0) : 0;
+        
+        // Determinar si es una inscripción basado en el concepto
+        const esInscripcion = deuda.concepto ? deuda.concepto.esInscripcion : false;
+        
+        // Determinar el tipo de modalidad para mostrar
+        const tipoModalidadText = deuda.tipoDeuda === TipoModalidad.REGULAR ? 'Mensual' : 'Clase Suelta';
         
         return {
           ...deuda,
-          periodo: deuda.concepto?.esInscripcion ? 'INSCRIPCIÓN' : `${deuda.mes}/${deuda.anio}`,
+          periodo: esInscripcion ? 'INSCRIPCIÓN' : `${deuda.mes}/${deuda.anio}`,
           montoPagado,
           montoPendiente: deuda.monto - montoPagado,
           estaVencida: new Date(deuda.fechaVencimiento) < new Date() && !deuda.pagada,
-          esInscripcion: deuda.concepto?.esInscripcion || false,
-          pagosInfo: deuda.pagos.map(pago => ({
+          esInscripcion,
+          tipoModalidad: tipoModalidadText,
+          cantidadClases: deuda.cantidadClases || (deuda.tipoDeuda === TipoModalidad.REGULAR ? null : 1),
+          pagosInfo: deuda.pagos ? deuda.pagos.map((pago: any) => ({
             fecha: pago.recibo.fecha,
             numeroRecibo: pago.recibo.numeroRecibo,
             monto: pago.monto
-          }))
+          })) : []
         };
       });
       
-      // En el agrupamiento, manejar las inscripciones separadamente
-      const deudasAgrupadas = deudasProcesadas.reduce((acc, deuda) => {
-        const periodo = deuda.esInscripcion ? 'INSCRIPCIÓN' : `${deuda.mes}/${deuda.anio}`;
+      // En el agrupamiento, manejar las inscripciones y tipos de modalidad
+      const deudasAgrupadas = deudasProcesadas.reduce((acc: Record<string, any[]>, deuda: any) => {
+        let periodo;
+        if (deuda.esInscripcion) {
+          periodo = 'INSCRIPCIÓN';
+        } else {
+          // Incluir la modalidad en el periodo para diferenciar
+          periodo = `${deuda.mes}/${deuda.anio} - ${deuda.tipoModalidad}`;
+        }
+        
         if (!acc[periodo]) {
           acc[periodo] = [];
         }
         acc[periodo].push(deuda);
         return acc;
-      }, {} as Record<string, typeof deudasProcesadas>);
+      }, {});
 
       res.status(200).json({
         deudas: deudasProcesadas,
         deudasAgrupadas,
         resumen: {
-          totalDeuda: deudasProcesadas.reduce((sum, deuda) => 
+          totalDeuda: deudasProcesadas.reduce((sum: number, deuda: any) => 
             sum + (deuda.pagada ? 0 : deuda.montoPendiente), 0),
-          cantidadDeudasPendientes: deudasProcesadas.filter(d => !d.pagada).length,
+          cantidadDeudasPendientes: deudasProcesadas.filter((d: any) => !d.pagada).length,
           periodosMasAntiguos: Object.keys(deudasAgrupadas).slice(0, 3)
         }
       });

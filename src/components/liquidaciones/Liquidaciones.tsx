@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { styled } from 'styled-components';
 import { PreviewModal } from './PreviewModal';
 
-
+// Interfaces
 interface Profesor {
   id: number;
   nombre: string;
@@ -18,7 +18,8 @@ interface Alumno {
   apellido: string;
 }
 
-interface Recibo {
+// Interfaz común para recibos en liquidación
+interface ReciboLiquidacion {
   id: number;
   numeroRecibo: number;
   fecha: string;
@@ -27,20 +28,23 @@ interface Recibo {
   alumno: Alumno | null;
   concepto: {
     nombre: string;
+    estilo?: string;
   };
   montoLiquidacion?: number;
-  tipoLiquidacion?: string;
   porcentajeAplicado?: number;
+  tipoLiquidacion?: string;
+  // Más propiedades que puedan ser necesarias
 }
 
 interface LiquidacionData {
   regularCount: number;
   sueltasCount: number;
+  clasesCount: number;
   totalRegular: number;
   totalSueltas: number;
   montoLiquidacionRegular: number;
   montoLiquidacionSueltas: number;
-  recibos: Recibo[];
+  recibos: ReciboLiquidacion[];
   periodo: string;
   claseSueltaDetalle?: {
     porConcepto: number;
@@ -162,42 +166,6 @@ const Button = styled.button`
   &:active {
     transform: scale(0.98);
   }
-`;
-
-const Table = styled.table`
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 20px;
-`;
-
-
-const Th = styled.th`
-  background-color: #000000;
-  color: #FFFFFF;
-  text-align: left;
-  padding: 12px;
-`;
-
-const Td = styled.td`
-  border-bottom: 1px solid #F9F8F8;
-  padding: 12px;
-`;
-
-const Tr = styled.tr`
-  &:nth-child(even) {
-    background-color: #F9F8F8;
-  }
-`;
-
-const TotalContainer = styled.div`
-  margin-top: 20px;
-  text-align: right;
-  font-size: 18px;
-  font-weight: bold;
-`;
-
-const ExportButton = styled(Button)`
-  margin-top: 20px;
 `;
 
 const ResumenContainer = styled.div`
@@ -359,7 +327,7 @@ const DetailsTableRow = styled.tr`
 `;
 
 const Liquidaciones: React.FC = () => {
-  // Estados para datos
+  // Estados
   const [profesores, setProfesores] = useState<Profesor[]>([]);
   const [alumnos, setAlumnos] = useState<Alumno[]>([]);
   const [loading, setLoading] = useState(false);
@@ -375,15 +343,10 @@ const Liquidaciones: React.FC = () => {
     regularCount: 0,
     totalRegular: 0,
     sueltasCount: 0,
-    totalSueltas: 0,
-    claseSueltaConcepto: 0,
-    claseSueltaFlag: 0
+    clasesCount: 0,
+    totalSueltas: 0
   });
 
-  // Estado para los recibos editables individualmente
-  const [recibosEditables, setRecibosEditables] = useState<any[]>([]);
-
-  // Nuevos estados
   const [liquidacionData, setLiquidacionData] = useState<LiquidacionData | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [porcentajesPersonalizados, setPorcentajesPersonalizados] = useState<PorcentajesPersonalizados>({
@@ -394,7 +357,7 @@ const Liquidaciones: React.FC = () => {
   const [mostrarPorcentajes, setMostrarPorcentajes] = useState(false);
   const [mostrarDetalles, setMostrarDetalles] = useState(false);
 
-  // Effects existentes
+  // Effects
   useEffect(() => {
     fetchProfesores();
     fetchAlumnos();
@@ -425,25 +388,13 @@ const Liquidaciones: React.FC = () => {
         regularCount: liquidacionData.regularCount,
         totalRegular: liquidacionData.totalRegular,
         sueltasCount: liquidacionData.sueltasCount,
-        totalSueltas: liquidacionData.totalSueltas,
-        claseSueltaConcepto: liquidacionData.claseSueltaDetalle?.porConcepto || 0,
-        claseSueltaFlag: liquidacionData.claseSueltaDetalle?.porFlag || 0
+        clasesCount: liquidacionData.clasesCount || 0,
+        totalSueltas: liquidacionData.totalSueltas
       });
-
-      // Inicializar los recibos editables
-      setRecibosEditables(liquidacionData.recibos.map(recibo => ({
-        ...recibo,
-        montoEditable: recibo.monto,
-        porcentajeEditable: recibo.porcentajeAplicado || 
-                           (recibo.tipoLiquidacion?.includes('Clase Suelta') 
-                            ? porcentajesPersonalizados.porcentajeClasesSueltas / 100 
-                            : porcentajesPersonalizados.porcentajeCursos / 100),
-        montoLiquidacionEditable: recibo.montoLiquidacion || 0
-      })));
     }
-  }, [liquidacionData, porcentajesPersonalizados]);
+  }, [liquidacionData]);
 
-  // Funciones existentes actualizadas
+  // Funciones
   const fetchProfesores = async () => {
     try {
       const res = await fetch('/api/profesores');
@@ -468,7 +419,6 @@ const Liquidaciones: React.FC = () => {
     }
   };
 
-  // Nuevas funciones de manejo
   const handlePorcentajeChange = (tipo: 'cursos' | 'sueltas', valor: string) => {
     const numeroValor = parseFloat(valor);
     if (isNaN(numeroValor) || numeroValor < 0 || numeroValor > 100) return;
@@ -476,81 +426,6 @@ const Liquidaciones: React.FC = () => {
     setPorcentajesPersonalizados(prev => ({
       ...prev,
       [tipo === 'cursos' ? 'porcentajeCursos' : 'porcentajeClasesSueltas']: numeroValor
-    }));
-
-    // Actualizar los montos de liquidación con el nuevo porcentaje
-    if (recibosEditables.length > 0) {
-      setRecibosEditables(prev => 
-        prev.map(recibo => {
-          if (
-            (tipo === 'cursos' && !recibo.tipoLiquidacion?.includes('Clase Suelta')) ||
-            (tipo === 'sueltas' && recibo.tipoLiquidacion?.includes('Clase Suelta'))
-          ) {
-            const nuevoPorcentaje = numeroValor / 100;
-            return {
-              ...recibo,
-              porcentajeEditable: nuevoPorcentaje,
-              montoLiquidacionEditable: recibo.montoEditable * nuevoPorcentaje
-            };
-          }
-          return recibo;
-        })
-      );
-    }
-  };
-
-  // Manejar cambios en los recibos individuales
-  const handleReciboChange = (id: number, field: string, value: string) => {
-    const numValue = parseFloat(value);
-    if (isNaN(numValue)) return;
-
-    setRecibosEditables(prev => 
-      prev.map(recibo => {
-        if (recibo.id === id) {
-          const updatedRecibo = { ...recibo, [field]: numValue };
-          
-          // Si cambia el monto o el porcentaje, recalcular el monto de liquidación
-          if (field === 'montoEditable' || field === 'porcentajeEditable') {
-            updatedRecibo.montoLiquidacionEditable = 
-              updatedRecibo.montoEditable * updatedRecibo.porcentajeEditable;
-          }
-          
-          return updatedRecibo;
-        }
-        return recibo;
-      })
-    );
-
-    // Recalcular los totales basados en los recibos editados
-    recalcularTotales();
-  };
-
-  // Recalcular totales basados en recibos individuales
-  const recalcularTotales = () => {
-    const regularRecibos = recibosEditables.filter(r => 
-      !r.tipoLiquidacion?.includes('Clase Suelta')
-    );
-    
-    const claseSueltaPorConcepto = recibosEditables.filter(r => 
-      r.tipoLiquidacion?.includes('Clase Suelta (por concepto)')
-    );
-    
-    const claseSueltaPorFlag = recibosEditables.filter(r => 
-      r.tipoLiquidacion?.includes('Clase Suelta (por flag)')
-    );
-
-    const totalRegular = regularRecibos.reduce((sum, r) => sum + r.montoEditable, 0);
-    const totalSueltasConcepto = claseSueltaPorConcepto.reduce((sum, r) => sum + r.montoEditable, 0);
-    const totalSueltasFlag = claseSueltaPorFlag.reduce((sum, r) => sum + r.montoEditable, 0);
-
-    setValoresEditables(prev => ({
-      ...prev,
-      regularCount: regularRecibos.length,
-      totalRegular: totalRegular,
-      sueltasCount: claseSueltaPorConcepto.length + claseSueltaPorFlag.length,
-      totalSueltas: totalSueltasConcepto + totalSueltasFlag,
-      claseSueltaConcepto: totalSueltasConcepto,
-      claseSueltaFlag: totalSueltasFlag
     }));
   };
 
@@ -565,10 +440,9 @@ const Liquidaciones: React.FC = () => {
         body: JSON.stringify({
           ...filtros,
           porcentajes: {
-            porcentajeCursos: porcentajesPersonalizados.porcentajeCursos / 100,
-            porcentajeClasesSueltas: porcentajesPersonalizados.porcentajeClasesSueltas / 100
-          },
-          buscarConceptosClaseSuelta: true
+            porcentajeRegular: porcentajesPersonalizados.porcentajeCursos / 100,
+            porcentajeSueltas: porcentajesPersonalizados.porcentajeClasesSueltas / 100
+          }
         }),
       });
 
@@ -579,7 +453,6 @@ const Liquidaciones: React.FC = () => {
       const data = await res.json();
       setLiquidacionData(data);
       setMostrarPorcentajes(true);
-      setMostrarDetalles(false); // Resetear el estado de detalles
     } catch (error) {
       setError('Error al generar la liquidación');
       console.error('Error generando liquidación:', error);
@@ -588,37 +461,7 @@ const Liquidaciones: React.FC = () => {
     }
   };
 
-  // Preparar data para previsualización con valores editados
-  const prepararDataParaPreview = () => {
-    if (!liquidacionData) return null;
-
-    // Calcular montos de liquidación actualizados
-    const montoLiquidacionRegular = valoresEditables.totalRegular * (porcentajesPersonalizados.porcentajeCursos / 100);
-    const montoLiquidacionSueltas = valoresEditables.totalSueltas * (porcentajesPersonalizados.porcentajeClasesSueltas / 100);
-
-    // Usar los recibos editables
-    return {
-      ...liquidacionData,
-      regularCount: valoresEditables.regularCount,
-      totalRegular: valoresEditables.totalRegular,
-      sueltasCount: valoresEditables.sueltasCount,
-      totalSueltas: valoresEditables.totalSueltas,
-      montoLiquidacionRegular: montoLiquidacionRegular,
-      montoLiquidacionSueltas: montoLiquidacionSueltas,
-      claseSueltaDetalle: {
-        porConcepto: valoresEditables.claseSueltaConcepto,
-        porFlag: valoresEditables.claseSueltaFlag
-      },
-      recibos: recibosEditables.map(recibo => ({
-        ...recibo,
-        monto: recibo.montoEditable,
-        porcentajeAplicado: recibo.porcentajeEditable,
-        montoLiquidacion: recibo.montoLiquidacionEditable
-      }))
-    };
-  };
-
-  // JSX
+  // Renderizado
   return (
     <Container>
       <Title>Generación de Liquidaciones</Title>
@@ -737,7 +580,6 @@ const Liquidaciones: React.FC = () => {
                 <div>Porcentaje profesor: {porcentajesPersonalizados.porcentajeCursos}%</div>
                 <div>Monto liquidación: ${(valoresEditables.totalRegular * porcentajesPersonalizados.porcentajeCursos / 100).toFixed(2)}</div>
               </ResumenItem>
-
               <ResumenItem>
                 <h4>Clases Sueltas</h4>
                 <div>
@@ -748,6 +590,17 @@ const Liquidaciones: React.FC = () => {
                     onChange={(e) => setValoresEditables(prev => ({
                       ...prev,
                       sueltasCount: parseInt(e.target.value) || 0
+                    }))}
+                  />
+                </div>
+                <div>
+                  <label>Cantidad de clases: </label>
+                  <EditableInput
+                    type="number"
+                    value={valoresEditables.clasesCount}
+                    onChange={(e) => setValoresEditables(prev => ({
+                      ...prev,
+                      clasesCount: parseInt(e.target.value) || 0
                     }))}
                   />
                 </div>
@@ -765,140 +618,38 @@ const Liquidaciones: React.FC = () => {
                 </div>
                 <div>Porcentaje profesor: {porcentajesPersonalizados.porcentajeClasesSueltas}%</div>
                 <div>Monto liquidación: ${(valoresEditables.totalSueltas * porcentajesPersonalizados.porcentajeClasesSueltas / 100).toFixed(2)}</div>
-                
-                {/* Detalle de clases sueltas */}
-                <DetalleContainer>
-                  <div><strong>Desglose de Clases Sueltas:</strong></div>
-                  <div>
-                    <label>Por concepto: $</label>
-                    <EditableInput
-                      type="number"
-                      step="0.01"
-                      value={valoresEditables.claseSueltaConcepto}
-                      onChange={(e) => {
-                        const newValue = parseFloat(e.target.value) || 0;
-                        setValoresEditables(prev => ({
-                          ...prev,
-                          claseSueltaConcepto: newValue,
-                          totalSueltas: newValue + prev.claseSueltaFlag
-                        }));
-                      }}
-                    />
-                  </div>
-                  <div>
-                    <label>Por flag: $</label>
-                    <EditableInput
-                      type="number"
-                      step="0.01"
-                      value={valoresEditables.claseSueltaFlag}
-                      onChange={(e) => {
-                        const newValue = parseFloat(e.target.value) || 0;
-                        setValoresEditables(prev => ({
-                          ...prev,
-                          claseSueltaFlag: newValue,
-                          totalSueltas: prev.claseSueltaConcepto + newValue
-                        }));
-                      }}
-                    />
-                  </div>
-                </DetalleContainer>
               </ResumenItem>
             </ResumenGrid>
 
-            <TotalGeneral>
-              Total a Liquidar: ${(
-                (valoresEditables.totalRegular * porcentajesPersonalizados.porcentajeCursos / 100) + 
-                (valoresEditables.totalSueltas * porcentajesPersonalizados.porcentajeClasesSueltas / 100)
-              ).toFixed(2)}
-            </TotalGeneral>
-
             <ButtonContainer>
-              <Button onClick={() => setMostrarDetalles(!mostrarDetalles)}>
-                {mostrarDetalles ? "Ocultar Detalles" : "Mostrar Detalles"}
-              </Button>
               <PreviewButton onClick={() => setShowPreview(true)}>
                 Vista Previa
               </PreviewButton>
             </ButtonContainer>
           </ResumenContainer>
+        </>
+      )}
 
-          {/* Sección de Detalles */}
-          {mostrarDetalles && (
-            <DetailsContainer>
-              <DetailsTitle>Detalle de Recibos</DetailsTitle>
-              <DetailsTable>
-                <thead>
-                  <tr>
-                    <DetailsTableHeader>N° Recibo</DetailsTableHeader>
-                    <DetailsTableHeader>Fecha</DetailsTableHeader>
-                    <DetailsTableHeader>Alumno</DetailsTableHeader>
-                    <DetailsTableHeader>Concepto</DetailsTableHeader>
-                    <DetailsTableHeader>Tipo</DetailsTableHeader>
-                    <DetailsTableHeader>Monto</DetailsTableHeader>
-                    <DetailsTableHeader>%</DetailsTableHeader>
-                    <DetailsTableHeader>A Liquidar</DetailsTableHeader>
-                  </tr>
-                </thead>
-                <tbody>
-                  {recibosEditables.map((recibo) => (
-                    <DetailsTableRow key={recibo.id}>
-                      <DetailsTableCell>{recibo.numeroRecibo}</DetailsTableCell>
-                      <DetailsTableCell>{new Date(recibo.fecha).toLocaleDateString()}</DetailsTableCell>
-                      <DetailsTableCell>
-                        {recibo.alumno ? 
-                          `${recibo.alumno.apellido}, ${recibo.alumno.nombre}` : 
-                          recibo.alumnoSuelto ? 
-                            `${recibo.alumnoSuelto.apellido}, ${recibo.alumnoSuelto.nombre}` : 
-                            'Sin alumno'}
-                      </DetailsTableCell>
-                      <DetailsTableCell>{
-                        recibo.concepto.nombre}</DetailsTableCell>
-                        <DetailsTableCell>{recibo.tipoLiquidacion || 'Regular'}</DetailsTableCell>
-                        <DetailsTableCell>
-                          <input
-                            type="number"
-                            step="0.01"
-                            value={recibo.montoEditable}
-                            onChange={(e) => handleReciboChange(recibo.id, 'montoEditable', e.target.value)}
-                          />
-                        </DetailsTableCell>
-                        <DetailsTableCell>
-                          <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            max="1"
-                            value={recibo.porcentajeEditable}
-                            onChange={(e) => handleReciboChange(recibo.id, 'porcentajeEditable', e.target.value)}
-                          />
-                        </DetailsTableCell>
-                        <DetailsTableCell>
-                          <input
-                            type="number"
-                            step="0.01"
-                            value={recibo.montoLiquidacionEditable}
-                            onChange={(e) => handleReciboChange(recibo.id, 'montoLiquidacionEditable', e.target.value)}
-                          />
-                        </DetailsTableCell>
-                      </DetailsTableRow>
-                    ))}
-                  </tbody>
-                </DetailsTable>
-              </DetailsContainer>
-            )}
-          </>
-        )}
-  
-        {showPreview && liquidacionData && (
-          <PreviewModal
-            liquidacionData={prepararDataParaPreview() || liquidacionData}
-            profesor={profesorSeleccionado}
-            porcentajesPersonalizados={porcentajesPersonalizados}
-            onClose={() => setShowPreview(false)}
-          />
-        )}
-      </Container>
-    );
-  };
-  
-  export default Liquidaciones;
+      {showPreview && liquidacionData && (
+        <PreviewModal
+          liquidacionData={{
+            regularCount: valoresEditables.regularCount,
+            totalRegular: valoresEditables.totalRegular,
+            sueltasCount: valoresEditables.sueltasCount,
+            clasesCount: valoresEditables.clasesCount,
+            totalSueltas: valoresEditables.totalSueltas,
+            montoLiquidacionRegular: valoresEditables.totalRegular * porcentajesPersonalizados.porcentajeCursos / 100,
+            montoLiquidacionSueltas: valoresEditables.totalSueltas * porcentajesPersonalizados.porcentajeClasesSueltas / 100,
+            recibos: liquidacionData.recibos,
+            periodo: liquidacionData.periodo
+          }}
+          profesor={profesorSeleccionado}
+          porcentajesPersonalizados={porcentajesPersonalizados}
+          onClose={() => setShowPreview(false)}
+        />
+      )}
+    </Container>
+  );
+};
+
+export default Liquidaciones;

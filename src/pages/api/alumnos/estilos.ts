@@ -1,6 +1,7 @@
 //src/pages/api/alumnos/estilos.ts
 import type { NextApiRequest, NextApiResponse } from 'next'
 import prisma from '@/lib/prisma'
+import { TipoModalidad } from '@prisma/client'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'PATCH') {
@@ -20,6 +21,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       await prisma.$transaction(async (prisma) => {
+        // Obtener la modalidad REGULAR para el estilo
+        const modalidadRegular = await prisma.modalidadClase.findFirst({
+          where: {
+            estiloId: parsedEstiloId,
+            tipo: TipoModalidad.REGULAR
+          }
+        });
+
+        if (!modalidadRegular && activo) {
+          throw new Error(`No existe configuración de modalidad REGULAR para el estilo ID ${parsedEstiloId}`);
+        }
+
         // Actualizar o crear la relación estilo-alumno
         if (activo) {
           await prisma.alumnoEstilos.upsert({
@@ -36,24 +49,39 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             create: {
               alumnoId: parsedAlumnoId,
               estiloId: parsedEstiloId,
+              modalidadId: modalidadRegular!.id, // Usamos la modalidad REGULAR por defecto
               activo: true,
               fechaInicio: new Date()
             }
           });
 
-          // Crear deuda para el nuevo estilo
+          // Obtener el concepto para este estilo (no inscripción)
+          const concepto = await prisma.concepto.findFirst({
+            where: { 
+              estiloId: parsedEstiloId,
+              esInscripcion: false
+            }
+          });
+
+          if (!concepto) {
+            throw new Error(`No existe concepto para el estilo ID ${parsedEstiloId}`);
+          }
+
+          // Crear deuda para el nuevo estilo como REGULAR
           const estilo = await prisma.estilo.findUnique({
             where: { id: parsedEstiloId }
           });
 
           if (estilo) {
             const currentDate = new Date();
+            
+            // Usamos el montoRegular del concepto
             await prisma.deuda.create({
               data: {
                 alumnoId: parsedAlumnoId,
                 estiloId: parsedEstiloId,
-                monto: estilo.monto,
-                montoOriginal: estilo.monto,
+                conceptoId: concepto.id,
+                monto: concepto.montoRegular ?? 0, // Si es null, usa 0
                 mes: (currentDate.getMonth() + 1).toString(),
                 anio: currentDate.getFullYear(),
                 fechaVencimiento: new Date(
@@ -61,6 +89,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                   currentDate.getMonth(),
                   10
                 ),
+                tipoDeuda: TipoModalidad.REGULAR, // Especificar tipo de modalidad
                 pagada: false
               }
             });
@@ -135,7 +164,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         include: { 
           alumnoEstilos: {
             include: {
-              estilo: true
+              estilo: true,
+              modalidad: true // Incluimos la información de modalidad
             }
           },
           descuentosVigentes: {

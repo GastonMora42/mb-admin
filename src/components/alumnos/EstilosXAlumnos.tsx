@@ -106,7 +106,8 @@ const EstilosComponent: React.FC<EstilosProps> = ({
   const estilosActivos = alumnoEstilos.filter(ae => ae.activo);
 
   useEffect(() => {
-    const total = estilosActivos.reduce((sum, ae) => sum + ae.estilo.monto, 0);
+    // Cambiado de estilo.monto a estilo.importe
+    const total = estilosActivos.reduce((sum, ae) => sum + (ae.estilo.importe || 0), 0);
     setTotalMensual(total);
   }, [estilosActivos]);
 
