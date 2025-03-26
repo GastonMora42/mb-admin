@@ -67,16 +67,18 @@ export default function PrinterTest() {
        alumno: null,
        alumnoSuelto: null,
        concepto: {
-         id: 1,
-         nombre: 'TEST',
-         descripcion: null,
-         monto: 100,
-         createdAt: new Date(),
-         updatedAt: new Date(),
-         estiloId: null,
-         esInscripcion: false,
-         activo: true
-       },
+        id: 1,
+        nombre: 'TEST',
+        descripcion: null,
+        // monto: 100, // Eliminar esta propiedad si ahora usan montoRegular y montoSuelto
+        montoRegular: 100, // Añadir esta propiedad
+        montoSuelto: 80,   // Añadir esta propiedad
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        estiloId: null,
+        esInscripcion: false,
+        // activo: true    // Eliminar esta propiedad
+      },
        pagosDeuda: []
      };
 
