@@ -74,22 +74,22 @@ export const handler: Handler = async (event) => {
             const concepto = conceptosCache[alumnoEstilo.estiloId];
             const modalidadTipo = alumnoEstilo.modalidad?.tipo || TipoModalidad.REGULAR;
             
-            // Determinar el monto según la modalidad
-            const monto = modalidadTipo === TipoModalidad.REGULAR 
-              ? concepto.montoRegular 
-              : concepto.montoSuelto;
+// Determinar el monto según la modalidad y asegurar que nunca sea null
+const monto = modalidadTipo === TipoModalidad.REGULAR 
+  ? (concepto.montoRegular ?? 0) // Usar 0 como valor predeterminado si es null 
+  : (concepto.montoSuelto ?? 0); // Usar 0 como valor predeterminado si es null
 
-            deudasACrear.push({
-              alumnoId: alumno.id,
-              estiloId: alumnoEstilo.estiloId,
-              conceptoId: concepto.id,
-              monto: monto,
-              mes,
-              anio,
-              tipoDeuda: modalidadTipo,
-              fechaVencimiento: new Date(anio, fechaActual.getMonth(), 10),
-              pagada: false
-            });
+deudasACrear.push({
+  alumnoId: alumno.id,
+  estiloId: alumnoEstilo.estiloId,
+  conceptoId: concepto.id,
+  monto: monto, // Este valor ya nunca será null
+  mes,
+  anio,
+  tipoDeuda: modalidadTipo,
+  fechaVencimiento: new Date(anio, fechaActual.getMonth(), 10),
+  pagada: false
+});
           }
         }
       }
