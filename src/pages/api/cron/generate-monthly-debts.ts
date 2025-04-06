@@ -72,7 +72,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               estiloId: alumnoEstilo.estiloId,
               conceptoId: concepto.id,
               monto: montoCuota,
-              montoOriginal: montoCuota,
               mes,
               anio,
               tipoDeuda: TipoModalidad.REGULAR,

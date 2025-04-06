@@ -22,12 +22,15 @@ jobs:
         run: npm install
 
       - name: Run Prisma Migrations
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: npx prisma migrate deploy
 
       - name: Generate Monthly Debts
         env:
           APP_URL: ${{ secrets.APP_URL }}
           CRON_SECRET_KEY: ${{ secrets.CRON_SECRET_KEY }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
           curl -X POST $APP_URL/api/cron/generate-monthly-debts \
           -H "Authorization: Bearer $CRON_SECRET_KEY" \
