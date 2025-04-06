@@ -34,9 +34,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
 
       const fechaActual = new Date();
-      const mes = (fechaActual.getMonth() + 2).toString();  // Mes siguiente (por ejemplo, octubre → 11, noviembre)
+      // Usar el mes actual en lugar de mes + 2
+      const mesActual = fechaActual.getMonth(); // 0-11
+      const mes = (mesActual + 1).toString(); // Convertir a 1-12 formato string
       const anio = fechaActual.getFullYear();
       const deudasACrear = [];
+
+      // Para propósitos de logging/debugging
+      console.log(`Generando deudas para: Mes ${mes}, Año ${anio}`);
 
       for (const alumno of alumnosActivos) {
         for (const alumnoEstilo of alumno.alumnoEstilos) {
@@ -75,12 +80,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               mes,
               anio,
               tipoDeuda: TipoModalidad.REGULAR,
-              fechaVencimiento: new Date(anio, fechaActual.getMonth(), 10),
+              fechaVencimiento: new Date(anio, mesActual, 10), // Vencimiento el día 10 del mes actual
               pagada: false
             });
           }
         }
       }
+      
+      console.log(`Intentando crear ${deudasACrear.length} deudas`);
       
       if (deudasACrear.length > 0) {
         // Crear las deudas una por una si createMany falla
@@ -103,14 +110,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     return res.status(200).json({
       success: true,
-      message: `Se generaron ${resultado} nuevas deudas`
+      message: `Se generaron ${resultado} nuevas deudas para el mes actual`,
+      debug: {
+        mes: new Date().getMonth() + 1,
+        anio: new Date().getFullYear(),
+        cantidadDeudas: resultado
+      }
     });
 
   } catch (error) {
     console.error('Error al generar deudas mensuales:', error);
     return res.status(500).json({ 
       success: false,
-      error: 'Error al generar deudas mensuales' 
+      error: 'Error al generar deudas mensuales',
+      details: error instanceof Error ? error.message : String(error)
     });
   }
 }
