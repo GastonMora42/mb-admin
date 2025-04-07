@@ -16,6 +16,7 @@ const PageContainer = styled.div`
   }
 `;
 
+
 // Contenedor con sombra
 const Container = styled.div`
   background-color: #FFFFFF;
@@ -638,26 +639,33 @@ function Alumnos() {
   }, [filtro, alumnos]);
 
   // Funciones
-  const fetchAlumnos = async () => {
-    setLoadingTable(true);
-    try {
-      const res = await fetch('/api/alumnos');
-      if (!res.ok) throw new Error('Error al obtener alumnos');
-      const data = await res.json();
-      setAlumnos(data);
-      setMessage({ text: 'Alumnos cargados correctamente', isError: false });
-      
-      // Auto-ocultar el mensaje después de 3 segundos
-      setTimeout(() => {
-        setMessage(null);
-      }, 3000);
-    } catch (error) {
-      console.error('Error fetching alumnos:', error);
-      setMessage({ text: 'Error al cargar alumnos', isError: true });
-    } finally {
-      setLoadingTable(false);
-    }
-  };
+// En el método fetchAlumnos del componente React:
+const fetchAlumnos = async () => {
+  setLoadingTable(true);
+  try {
+    const res = await fetch('/api/alumnos');
+    if (!res.ok) throw new Error('Error al obtener alumnos');
+    const data = await res.json();
+    
+    // Ordenar por fecha de creación descendente
+    const sortedData = [...data].sort((a, b) => 
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+    
+    setAlumnos(sortedData);
+    setMessage({ text: 'Alumnos cargados correctamente', isError: false });
+    
+    // Auto-ocultar el mensaje después de 3 segundos
+    setTimeout(() => {
+      setMessage(null);
+    }, 3000);
+  } catch (error) {
+    console.error('Error fetching alumnos:', error);
+    setMessage({ text: 'Error al cargar alumnos', isError: true });
+  } finally {
+    setLoadingTable(false);
+  }
+};
 
   const fetchEstilos = async () => {
     try {

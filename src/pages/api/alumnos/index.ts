@@ -44,7 +44,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             }
           }
         },
-        orderBy: { apellido: 'asc' }
+        orderBy: { createdAt: 'desc' }
       });
       return res.status(200).json(alumnos);
     } catch (error) {

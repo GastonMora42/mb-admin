@@ -12,6 +12,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     const resultado = await prisma.$transaction(async (tx) => {
+      // Obtener alumnos activos con estilos activos
       const alumnosActivos = await tx.alumno.findMany({
         where: {
           activo: true,
@@ -27,14 +28,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               activo: true
             },
             include: {
-              estilo: true
+              estilo: true,
+              modalidad: true // Incluir modalidad para saber si es REGULAR o SUELTA
             }
           }
         }
       });
 
       const fechaActual = new Date();
-      // Usar el mes actual en lugar de mes + 2
+      // Usar el mes actual (1-12 formato string)
       const mesActual = fechaActual.getMonth(); // 0-11
       const mes = (mesActual + 1).toString(); // Convertir a 1-12 formato string
       const anio = fechaActual.getFullYear();
@@ -42,9 +44,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       // Para propósitos de logging/debugging
       console.log(`Generando deudas para: Mes ${mes}, Año ${anio}`);
+      console.log(`Alumnos activos encontrados: ${alumnosActivos.length}`);
 
       for (const alumno of alumnosActivos) {
+        console.log(`Procesando alumno: ${alumno.nombre} ${alumno.apellido}, ID: ${alumno.id}`);
+        
         for (const alumnoEstilo of alumno.alumnoEstilos) {
+          console.log(`Procesando estilo ${alumnoEstilo.estiloId} para alumno ${alumno.id}`);
+          
           // Verificar si ya existe una deuda para este mes/año/estilo
           const deudaExistente = await tx.deuda.findFirst({
             where: {
@@ -55,35 +62,55 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             }
           });
 
-          if (!deudaExistente) {
-            // Obtener el concepto correspondiente al estilo
-            const concepto = await tx.concepto.findFirst({
-              where: {
-                estiloId: alumnoEstilo.estiloId,
-                esInscripcion: false
-              }
-            });
-
-            if (!concepto) {
-              console.log(`No se encontró concepto para el estilo ${alumnoEstilo.estiloId}`);
-              continue;
-            }
-
-            // Usar el precio del concepto (montoRegular) o el importe del estilo como respaldo
-            const montoCuota = concepto.montoRegular || alumnoEstilo.estilo.importe || 0;
-
-            deudasACrear.push({
-              alumnoId: alumno.id,
-              estiloId: alumnoEstilo.estiloId,
-              conceptoId: concepto.id,
-              monto: montoCuota,
-              mes,
-              anio,
-              tipoDeuda: TipoModalidad.REGULAR,
-              fechaVencimiento: new Date(anio, mesActual, 10), // Vencimiento el día 10 del mes actual
-              pagada: false
-            });
+          if (deudaExistente) {
+            console.log(`Ya existe deuda para alumno ${alumno.id}, estilo ${alumnoEstilo.estiloId}, periodo ${mes}/${anio}`);
+            continue;
           }
+
+          // Obtener el concepto correspondiente al estilo
+          const concepto = await tx.concepto.findFirst({
+            where: {
+              estiloId: alumnoEstilo.estiloId,
+              esInscripcion: false
+            }
+          });
+
+          if (!concepto) {
+            console.log(`No se encontró concepto para el estilo ${alumnoEstilo.estiloId}`);
+            continue;
+          }
+
+          // Determinar el monto según la modalidad (REGULAR o SUELTA)
+          const esRegular = alumnoEstilo.modalidad.tipo === TipoModalidad.REGULAR;
+          let montoCuota;
+          
+          if (esRegular && concepto.montoRegular) {
+            montoCuota = concepto.montoRegular;
+          } else if (!esRegular && concepto.montoSuelto) {
+            montoCuota = concepto.montoSuelto;
+          } else {
+            // Fallback al importe del estilo o al monto genérico
+            montoCuota = alumnoEstilo.estilo.importe || concepto.monto || 0;
+          }
+
+          if (montoCuota <= 0) {
+            console.log(`Monto inválido (${montoCuota}) para estilo ${alumnoEstilo.estiloId}`);
+            continue;
+          }
+
+          console.log(`Creando deuda: Alumno ${alumno.id}, Estilo ${alumnoEstilo.estiloId}, Monto ${montoCuota}`);
+
+          deudasACrear.push({
+            alumnoId: alumno.id,
+            estiloId: alumnoEstilo.estiloId,
+            conceptoId: concepto.id,
+            monto: montoCuota,
+            mes,
+            anio,
+            tipoDeuda: alumnoEstilo.modalidad.tipo,
+            fechaVencimiento: new Date(anio, mesActual, 10), // Vencimiento el día 10 del mes actual
+            pagada: false
+          });
         }
       }
       
@@ -97,11 +124,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           });
         } catch (error) {
           console.log("Error en createMany, intentando crear deudas individualmente:", error);
+          
+          // Intentar crear deudas una por una para manejar errores individuales
+          let deudasCreadas = 0;
           for (const deuda of deudasACrear) {
-            await tx.deuda.create({
-              data: deuda
-            });
+            try {
+              await tx.deuda.create({
+                data: deuda
+              });
+              deudasCreadas++;
+            } catch (error) {
+              console.error(`Error creando deuda para alumno ${deuda.alumnoId}, estilo ${deuda.estiloId}:`, error);
+            }
           }
+          console.log(`Se crearon ${deudasCreadas} deudas individualmente`);
+          return deudasCreadas;
         }
       }
 
@@ -110,7 +147,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     return res.status(200).json({
       success: true,
-      message: `Se generaron ${resultado} nuevas deudas para el mes actual`,
+      message: `Se generaron ${resultado} nuevas deudas`,
       debug: {
         mes: new Date().getMonth() + 1,
         anio: new Date().getFullYear(),
