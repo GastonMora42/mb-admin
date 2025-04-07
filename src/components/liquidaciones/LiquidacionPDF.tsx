@@ -143,6 +143,7 @@ const LiquidacionPDF: React.FC<LiquidacionPDFProps> = ({
     <Page size="A4" style={styles.page}>
       <Text style={styles.title}>Liquidación de Profesores</Text>
 
+
       {/* Información General */}
       <View style={styles.section}>
         <Text style={styles.subtitle}>Información General</Text>
