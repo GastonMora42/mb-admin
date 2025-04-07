@@ -149,11 +149,16 @@ const LiquidacionPDF: React.FC<LiquidacionPDFProps> = ({
         <View style={styles.infoRow}>
           <Text style={styles.label}>Período:</Text>
           <Text style={styles.value}>
-            {new Date(liquidacionData.periodo).toLocaleDateString('es-AR', {
-              month: 'long',
-              year: 'numeric'
-            })}
-          </Text>
+  {(() => {
+    // Asegurar que estamos usando el mes correcto
+    const [year, month] = liquidacionData.periodo.split('-');
+    const date = new Date(Number(year), Number(month) - 1, 1);
+    return date.toLocaleDateString('es-AR', {
+      month: 'long',
+      year: 'numeric'
+    });
+  })()}
+</Text>
         </View>
         {profesor && (
           <View style={styles.infoRow}>
