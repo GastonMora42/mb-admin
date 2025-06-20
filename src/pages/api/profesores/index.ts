@@ -40,8 +40,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         cuit,
         estilosIds, // Array de IDs de estilos que dicta
         porcentajePorDefecto,
-        porcentajeClasesSueltasPorDefecto
-      } = req.body;
+        porcentajeClasesSueltasPorDefecto,
+  montoFijoRegular = 0,
+  montoFijoSueltas = 0,
+  tipoLiquidacionRegular = 'PORCENTAJE',
+  tipoLiquidacionSueltas = 'PORCENTAJE'
+} = req.body;
 
       // Verificar que el DNI no esté duplicado
       const profesorExistente = await prisma.profesor.findUnique({
@@ -62,6 +66,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           fechaNacimiento: fechaNacimiento ? new Date(fechaNacimiento) : null,
           direccion,
           cuit,
+          montoFijoRegular: parseFloat(montoFijoRegular),
+          montoFijoSueltas: parseFloat(montoFijoSueltas),
+          tipoLiquidacionRegular,
+          tipoLiquidacionSueltas,
           porcentajePorDefecto: porcentajePorDefecto ? parseFloat(porcentajePorDefecto) : 0.60,
           porcentajeClasesSueltasPorDefecto: porcentajeClasesSueltasPorDefecto ? 
             parseFloat(porcentajeClasesSueltasPorDefecto) : 0.80,
@@ -124,7 +132,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           porcentajeClasesSueltasPorDefecto: porcentajeClasesSueltasPorDefecto ? 
             parseFloat(porcentajeClasesSueltasPorDefecto) : undefined,
           estilos: {
-            disconnect: profesorActual.estilos.map(e => ({ id: e.id })),
+            disconnect: profesorActual.estilos.map((e: { id: any; }) => ({ id: e.id })),
             connect: estilosIds ? estilosIds.map((id: number) => ({ id })) : []
           }
         },
@@ -177,7 +185,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           where: { id: parseInt(id) },
           data: {
             estilos: {
-              disconnect: profesor.estilos.map(e => ({ id: e.id }))
+              disconnect: profesor.estilos.map((e: { id: any; }) => ({ id: e.id }))
             }
           }
         }),

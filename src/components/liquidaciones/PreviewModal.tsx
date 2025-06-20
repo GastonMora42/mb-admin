@@ -1,5 +1,4 @@
-// components/Liquidaciones/PreviewModal.tsx
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import styled from 'styled-components';
 import { PDFViewer, PDFDownloadLink, BlobProvider } from '@react-pdf/renderer';
 import LiquidacionPDF from './LiquidacionPDF';
@@ -13,12 +12,15 @@ interface Profesor {
   porcentajeClasesSueltasPorDefecto: number;
 }
 
-interface PorcentajesPersonalizados {
-  porcentajeCursos: number;
-  porcentajeClasesSueltas: number;
+interface ConfiguracionLiquidacion {
+  tipoRegular: 'PORCENTAJE' | 'MONTO_FIJO';
+  tipoSueltas: 'PORCENTAJE' | 'MONTO_FIJO';
+  porcentajeRegular: number;
+  porcentajeSueltas: number;
+  montoFijoRegular: number;
+  montoFijoSueltas: number;
 }
 
-// Interfaz común para recibos en liquidación
 interface ReciboLiquidacion {
   id: number;
   numeroRecibo: number;
@@ -54,19 +56,8 @@ interface LiquidacionData {
 interface PreviewModalProps {
   liquidacionData: LiquidacionData;
   profesor: Profesor | null;
-  porcentajesPersonalizados: {
-    porcentajeCursos: number;
-    porcentajeClasesSueltas: number;
-  };
+  configuracion: ConfiguracionLiquidacion;
   onClose: () => void;
-}
-
-// Interfaz para el estado del PDFDownloadLink
-interface PDFDownloadLinkState {
-  blob: Blob | null;
-  url: string | null;
-  loading: boolean;
-  error: Error | null;
 }
 
 // Styled Components
@@ -76,56 +67,72 @@ const ModalOverlay = styled.div`
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
+  background-color: rgba(0, 0, 0, 0.75);
   display: flex;
   justify-content: center;
   align-items: center;
   z-index: 1000;
+  padding: 1rem;
 `;
 
 const ModalContent = styled.div`
   background: white;
-  width: 95%;
+  width: 100%;
   height: 95vh;
-  border-radius: 8px;
-  position: relative;
+  border-radius: 1rem;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  
+  @media (min-width: 768px) {
+    width: 95%;
+    max-width: 1200px;
+  }
 `;
 
 const ModalHeader = styled.div`
-  padding: 20px;
-  border-bottom: 1px solid #eee;
+  padding: 1.5rem;
+  border-bottom: 1px solid #e5e7eb;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  background: #f9fafb;
 `;
 
 const ModalTitle = styled.h2`
   margin: 0;
-  color: #333;
+  color: #111827;
+  font-size: 1.25rem;
+  font-weight: 600;
+  
+  @media (min-width: 768px) {
+    font-size: 1.5rem;
+  }
 `;
 
 const CloseButton = styled.button`
   background: none;
   border: none;
-  font-size: 24px;
+  font-size: 1.5rem;
   cursor: pointer;
-  color: #666;
-  padding: 5px;
+  color: #6b7280;
+  padding: 0.5rem;
+  border-radius: 0.5rem;
+  transition: all 0.2s ease;
   
   &:hover {
-    color: #000;
+    color: #374151;
+    background: #e5e7eb;
   }
 `;
 
 const PDFContainer = styled.div`
   flex: 1;
   overflow: hidden;
+  background: #f3f4f6;
   
-  /* Estilo para el visor de PDF */
-  & > iframe {
+  iframe {
     width: 100%;
     height: 100%;
     border: none;
@@ -133,35 +140,44 @@ const PDFContainer = styled.div`
 `;
 
 const ModalActions = styled.div`
-  padding: 20px;
-  border-top: 1px solid #eee;
+  padding: 1.5rem;
+  border-top: 1px solid #e5e7eb;
   display: flex;
   justify-content: flex-end;
-  gap: 10px;
+  gap: 1rem;
+  background: #f9fafb;
+  flex-direction: column;
+  
+  @media (min-width: 640px) {
+    flex-direction: row;
+  }
 `;
 
 const ActionButton = styled.button<{ variant?: 'primary' | 'secondary'; disabled?: boolean }>`
-  padding: 10px 20px;
-  border-radius: 4px;
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.5rem;
   border: none;
   cursor: ${props => props.disabled ? 'not-allowed' : 'pointer'};
-  font-weight: 500;
+  font-weight: 600;
   transition: all 0.2s ease;
-  opacity: ${props => props.disabled ? 0.7 : 1};
+  opacity: ${props => props.disabled ? 0.5 : 1};
+  font-size: 0.875rem;
   
   ${props => props.variant === 'primary' ? `
     background-color: #FFC001;
-    color: #000;
+    color: #1f2937;
     
-    &:hover {
-      background-color: ${props.disabled ? '#FFC001' : '#e6ac00'};
+    &:hover:not(:disabled) {
+      background-color: #e6ac00;
+      transform: translateY(-1px);
     }
   ` : `
-    background-color: #f0f0f0;
-    color: #333;
+    background-color: #f3f4f6;
+    color: #374151;
+    border: 1px solid #d1d5db;
     
-    &:hover {
-      background-color: ${props.disabled ? '#f0f0f0' : '#e0e0e0'};
+    &:hover:not(:disabled) {
+      background-color: #e5e7eb;
     }
   `}
 `;
@@ -171,22 +187,43 @@ const LoadingContainer = styled.div`
   justify-content: center;
   align-items: center;
   height: 100%;
-  color: #666;
+  color: #6b7280;
+  flex-direction: column;
+  gap: 1rem;
 `;
 
-// Añadir un nuevo styled component para ocultar el PDFDownloadLink default
-const HiddenDownloadLink = styled.div`
-  display: none;
+const LoadingSpinner = styled.div`
+  width: 3rem;
+  height: 3rem;
+  border: 4px solid #f3f4f6;
+  border-top: 4px solid #FFC001;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
 `;
 
-// Versión con BlobProvider
+const ErrorContainer = styled.div`
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  color: #dc2626;
+  text-align: center;
+  padding: 2rem;
+`;
+
 export const PreviewModal: React.FC<PreviewModalProps> = ({
   liquidacionData,
   profesor,
-  porcentajesPersonalizados,
+  configuracion,
   onClose
 }) => {
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -197,23 +234,23 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
   }, []);
 
   const handleDownload = async (blob: Blob) => {
-    // Crear un objeto URL para el blob
-    const url = URL.createObjectURL(blob);
-    
-    // Crear un elemento a temporal
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `liquidacion_${
-      profesor ? `${profesor.apellido}_${profesor.nombre}_` : ''
-    }${liquidacionData.periodo.replace('-', '_')}.pdf`;
-    
-    // Añadir al DOM, hacer clic y luego eliminar
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    
-    // Liberar el objeto URL
-    setTimeout(() => URL.revokeObjectURL(url), 100);
+    try {
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `liquidacion_${
+        profesor ? `${profesor.apellido}_${profesor.nombre}_` : ''
+      }${liquidacionData.periodo.replace('-', '_')}.pdf`;
+      
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      setTimeout(() => URL.revokeObjectURL(url), 100);
+    } catch (err) {
+      setError('Error al descargar el archivo');
+      console.error('Error downloading:', err);
+    }
   };
 
   const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -222,25 +259,52 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
     }
   };
 
+  // Preparar datos para el PDF con la configuración actual
+  const pdfData = {
+    ...liquidacionData,
+    configuracion: {
+      tipoRegular: configuracion.tipoRegular,
+      tipoSueltas: configuracion.tipoSueltas,
+      valorRegular: configuracion.tipoRegular === 'MONTO_FIJO' 
+        ? configuracion.montoFijoRegular 
+        : configuracion.porcentajeRegular,
+      valorSueltas: configuracion.tipoSueltas === 'MONTO_FIJO' 
+        ? configuracion.montoFijoSueltas 
+        : configuracion.porcentajeSueltas
+    }
+  };
+
   return (
     <ModalOverlay onClick={handleOverlayClick}>
       <ModalContent onClick={e => e.stopPropagation()}>
         <ModalHeader>
-          <ModalTitle>Vista Previa de Liquidación</ModalTitle>
+          <ModalTitle>
+            Vista Previa - Liquidación {profesor ? `${profesor.apellido}, ${profesor.nombre}` : ''}
+          </ModalTitle>
           <CloseButton onClick={onClose}>&times;</CloseButton>
         </ModalHeader>
 
         <PDFContainer>
-          {isLoading ? (
+          {error ? (
+            <ErrorContainer>
+              <div>
+                <h3>Error al generar la vista previa</h3>
+                <p>{error}</p>
+                <ActionButton onClick={() => setError(null)}>
+                  Reintentar
+                </ActionButton>
+              </div>
+            </ErrorContainer>
+          ) : isLoading ? (
             <LoadingContainer>
-              Cargando vista previa...
+              <LoadingSpinner />
+              <span>Generando vista previa...</span>
             </LoadingContainer>
           ) : (
             <PDFViewer style={{ width: '100%', height: '100%' }}>
               <LiquidacionPDF
-                liquidacionData={liquidacionData}
+                liquidacionData={pdfData}
                 profesor={profesor}
-                porcentajesPersonalizados={porcentajesPersonalizados}
               />
             </PDFViewer>
           )}
@@ -251,25 +315,29 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
             variant="secondary" 
             onClick={onClose}
           >
-            Cancelar
+            Cerrar
           </ActionButton>
           
           <BlobProvider
             document={
               <LiquidacionPDF
-                liquidacionData={liquidacionData}
+                liquidacionData={pdfData}
                 profesor={profesor}
-                porcentajesPersonalizados={porcentajesPersonalizados}
               />
             }
           >
-            {({ blob, loading, error }) => (
+            {({ blob, loading, error: blobError }) => (
               <ActionButton 
                 variant="primary" 
                 onClick={() => blob && handleDownload(blob)}
-                disabled={loading || !blob || !!error}
+                disabled={loading || !blob || !!blobError}
               >
-                {loading ? 'Preparando PDF...' : 'Descargar PDF'}
+                {loading ? (
+                  <>
+                    <LoadingSpinner style={{ width: '1rem', height: '1rem', marginRight: '0.5rem' }} />
+                    Preparando...
+                  </>
+                ) : 'Descargar PDF'}
               </ActionButton>
             )}
           </BlobProvider>
