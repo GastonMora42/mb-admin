@@ -44,6 +44,7 @@
     "framer-motion": "^11.11.9",
     "heroicons": "^2.1.5",
     "jsonwebtoken": "^9.0.2",
+    "lucide-react": "^0.519.0",
     "mongodb": "^6.9.0",
     "motion": "^10.18.0",
     "next": "14.2.13",
