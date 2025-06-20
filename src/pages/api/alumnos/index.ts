@@ -17,8 +17,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                   descripcion: true,
                   importe: true
                 }
-              },
-              modalidad: true // Incluir la modalidad
+              }
+              // La modalidad, al ser un campo escalar de AlumnoEstilos, se incluye por defecto
+              // al usar 'include' en la relación. La línea 'modalidad: true' causaba un error
+              // porque 'include' solo acepta relaciones.
             }
           },
           descuentosVigentes: {
@@ -297,9 +299,8 @@ if (req.method === 'POST') {
             where: { id: nuevoAlumno.id },
             include: {
               alumnoEstilos: {
-                include: { 
-                  estilo: true,
-                  modalidad: true
+                include: {
+                  estilo: true
                 }
               },
               alumnosSueltosAnteriores: true,
@@ -604,7 +605,6 @@ if (req.method === 'POST') {
               alumnoEstilos: {
                 include: { 
                   estilo: true,
-                  modalidad: true 
                 }
               },
               alumnosSueltosAnteriores: true,
@@ -694,7 +694,6 @@ if (req.method === 'POST') {
                     importe: true
                   }
                 },
-                modalidad: true
               }
             },
             descuentosVigentes: {

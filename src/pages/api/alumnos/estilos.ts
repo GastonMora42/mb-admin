@@ -165,7 +165,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           alumnoEstilos: {
             include: {
               estilo: true,
-              modalidad: true // Incluimos la información de modalidad
             }
           },
           descuentosVigentes: {
