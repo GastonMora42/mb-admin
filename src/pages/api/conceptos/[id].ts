@@ -13,6 +13,7 @@ export default async function handler(
     return res.status(400).json({ error: 'ID inválido' });
   }
 
+  
   if (req.method === 'PUT') {
     try {
       const { 
@@ -136,8 +137,7 @@ export default async function handler(
         where: { id: conceptoId },
         include: { 
           deudas: true,
-          recibos: true,
-          inscripciones: true 
+          recibos: true
         }
       });
 
@@ -158,7 +158,7 @@ export default async function handler(
         });
       }
 
-      if (conceptoExistente.inscripciones.length > 0) {
+      if (conceptoExistente.esInscripcion) {
         return res.status(400).json({ 
           error: 'No se puede eliminar el concepto porque está siendo utilizado en inscripciones existentes'
         });

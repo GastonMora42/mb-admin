@@ -18,9 +18,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                   importe: true
                 }
               }
-              // La modalidad, al ser un campo escalar de AlumnoEstilos, se incluye por defecto
-              // al usar 'include' en la relación. La línea 'modalidad: true' causaba un error
-              // porque 'include' solo acepta relaciones.
             }
           },
           descuentosVigentes: {
@@ -55,38 +52,36 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
   }
   
-// POST
-if (req.method === 'POST') {
-  try {
-    const { 
-      nombre, apellido, dni, fechaNacimiento, email, telefono, 
-      numeroEmergencia, direccion, obraSocial, nombreTutor, dniTutor, 
-      notas, estilosIds, descuentoManual, tipoAlumno 
-    } = req.body;
+  // POST
+  if (req.method === 'POST') {
+    try {
+      const { 
+        nombre, apellido, dni, fechaNacimiento, email, telefono, 
+        numeroEmergencia, direccion, obraSocial, nombreTutor, dniTutor, 
+        notas, estilosIds, descuentoManual, tipoAlumno 
+      } = req.body;
 
-    // Asegurarse de que tipoAlumno siempre tenga un valor predeterminado 'regular'
-    const tipoAlumnoFinal = tipoAlumno || 'regular';
+      const tipoAlumnoFinal = tipoAlumno || 'regular';
 
-    // Verificaciones iniciales
-    const alumnoExistente = await prisma.alumno.findUnique({
-      where: { dni }
-    });
+      // Verificaciones iniciales
+      const alumnoExistente = await prisma.alumno.findUnique({
+        where: { dni }
+      });
 
-    const alumnoSueltoExistente = await prisma.alumnoSuelto.findUnique({
-      where: { dni }
-    });
+      const alumnoSueltoExistente = await prisma.alumnoSuelto.findUnique({
+        where: { dni }
+      });
 
-    if (tipoAlumnoFinal === 'regular' && alumnoExistente) {
-      throw new Error('Ya existe un alumno regular con ese DNI');
-    }
+      if (tipoAlumnoFinal === 'regular' && alumnoExistente) {
+        throw new Error('Ya existe un alumno regular con ese DNI');
+      }
 
-    if (tipoAlumnoFinal === 'suelto' && alumnoSueltoExistente) {
-      throw new Error('Ya existe un alumno suelto con ese DNI');
-    }
+      if (tipoAlumnoFinal === 'suelto' && alumnoSueltoExistente) {
+        throw new Error('Ya existe un alumno suelto con ese DNI');
+      }
 
-    // Si es alumno regular
-    if (tipoAlumnoFinal === 'regular') {
-      // El resto del código sigue igual...
+      // Si es alumno regular
+      if (tipoAlumnoFinal === 'regular') {
         const resultado = await prisma.$transaction(async (tx) => {
           // Mapeo de estilos a modalidades
           const estiloModalidadMap: Record<number, number> = {};
@@ -129,17 +124,6 @@ if (req.method === 'POST') {
               nombreTutor,
               dniTutor,
               notas,
-              // Crear alumnoEstilos solo si hay estilos seleccionados
-              ...(estilosIds && estilosIds.length > 0 && {
-                alumnoEstilos: {
-                  create: estilosIds.map((id: number) => ({
-                    estiloId: id,
-                    modalidadId: estiloModalidadMap[id],
-                    activo: true,
-                    fechaInicio: new Date()
-                  }))
-                }
-              }),
               ...(alumnoSueltoExistente && {
                 alumnosSueltosAnteriores: {
                   connect: { id: alumnoSueltoExistente.id }
@@ -147,6 +131,21 @@ if (req.method === 'POST') {
               })
             }
           });
+
+          // Crear relaciones alumnoEstilos solo si hay estilos seleccionados
+          if (estilosIds && estilosIds.length > 0) {
+            for (const estiloId of estilosIds) {
+              await tx.alumnoEstilos.create({
+                data: {
+                  alumnoId: nuevoAlumno.id,
+                  estiloId: estiloId,
+                  modalidadId: estiloModalidadMap[estiloId],
+                  activo: true,
+                  fechaInicio: new Date()
+                }
+              });
+            }
+          }
 
           // Crear cuenta corriente
           await tx.ctaCte.create({
@@ -172,13 +171,12 @@ if (req.method === 'POST') {
                 map[concepto.estiloId] = concepto;
               }
               return map;
-            }, {} as Record<number, any>);
+            }, {} as Record<number, typeof conceptos[0]>);
 
             // Generar deudas desde el mes actual
             const fechaActual = new Date();
             const deudasACrear = [];
 
-            // Usar el primer día del mes actual como fecha de inicio
             const fechaInicio = new Date(fechaActual.getFullYear(), fechaActual.getMonth(), 1);
             const fechaIteracion = new Date(fechaInicio);
 
@@ -194,19 +192,19 @@ if (req.method === 'POST') {
                   alumnoId: nuevoAlumno.id,
                   estiloId: estiloId,
                   conceptoId: concepto.id,
-                  monto: concepto.montoRegular, // Usar monto de la modalidad regular
+                  monto: concepto.montoRegular || 0,
                   mes: (fechaIteracion.getMonth() + 1).toString(),
                   anio: fechaIteracion.getFullYear(),
                   fechaVencimiento: new Date(
                     fechaIteracion.getFullYear(),
                     fechaIteracion.getMonth(),
-                    10  // Vencimiento el día 10 de cada mes
+                    10
                   ),
-                  tipoDeuda: TipoModalidad.REGULAR, // Especificar tipo de modalidad
+                  tipoDeuda: TipoModalidad.REGULAR,
                   pagada: false
                 });
               }
-              // Solo avanzamos al siguiente mes si la fecha actual es después del día 10
+              // Solo avanzamos al siguiente mes si la fecha actual es después del día 15
               if (fechaActual.getDate() > 15) {
                 fechaIteracion.setMonth(fechaIteracion.getMonth() + 1);
               } else {
@@ -229,12 +227,12 @@ if (req.method === 'POST') {
               await tx.deuda.create({
                 data: {
                   alumnoId: nuevoAlumno.id,
-                  monto: conceptoInscripcion.montoRegular ?? 0, // Usar montoRegular para inscripción
+                  monto: conceptoInscripcion.montoRegular || 0,
                   mes: (new Date()).getMonth() + 1 + '',
                   anio: new Date().getFullYear(),
                   estiloId: estilosIds[0],
                   conceptoId: conceptoInscripcion.id,
-                  tipoDeuda: TipoModalidad.REGULAR, // Usar REGULAR para inscripción
+                  tipoDeuda: TipoModalidad.REGULAR,
                   pagada: false,
                   fechaVencimiento: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
                 }
@@ -430,12 +428,12 @@ if (req.method === 'POST') {
           
           const estilosActualesIds = estilosActuales.map(e => e.estiloId);
 
-          // Estilos a desactivar (los que están activos pero no están en la nueva lista)
+          // Estilos a desactivar
           const estilosADesactivar = estilosActualesIds.filter(
             id => !nuevosEstilosIds.includes(id)
           );
 
-          // Estilos a activar (los que están en la nueva lista pero no están activos)
+          // Estilos a activar
           const estilosAAgregar = nuevosEstilosIds.filter(
             (id: number) => !estilosActualesIds.includes(id)
           );
@@ -489,7 +487,8 @@ if (req.method === 'POST') {
                 data: {
                   activo: true,
                   fechaFin: null,
-                  fechaInicio: new Date()
+                  fechaInicio: new Date(),
+                  modalidadId: modalidad.id
                 }
               });
             } else {
@@ -498,7 +497,7 @@ if (req.method === 'POST') {
                 data: {
                   alumnoId: parseInt(id),
                   estiloId: estiloId,
-                  modalidadId: modalidad.id, // Usar la modalidad REGULAR
+                  modalidadId: modalidad.id,
                   activo: true,
                   fechaInicio: new Date()
                 }
@@ -521,7 +520,7 @@ if (req.method === 'POST') {
                   alumnoId: parseInt(id),
                   estiloId: estiloId,
                   conceptoId: concepto.id,
-                  monto: concepto.montoRegular ?? 0,
+                  monto: concepto.montoRegular || 0,
                   mes: (fechaActual.getMonth() + 1).toString(),
                   anio: fechaActual.getFullYear(),
                   fechaVencimiento: new Date(
@@ -548,7 +547,7 @@ if (req.method === 'POST') {
               await tx.deuda.create({
                 data: {
                   alumnoId: parseInt(id),
-                  monto: conceptoInscripcion.montoRegular ?? 0,
+                  monto: conceptoInscripcion.montoRegular || 0,
                   mes: (new Date()).getMonth() + 1 + '',
                   anio: new Date().getFullYear(),
                   estiloId: estilosAAgregar[0],
@@ -604,7 +603,7 @@ if (req.method === 'POST') {
             include: {
               alumnoEstilos: {
                 include: { 
-                  estilo: true,
+                  estilo: true
                 }
               },
               alumnosSueltosAnteriores: true,
@@ -693,7 +692,7 @@ if (req.method === 'POST') {
                     descripcion: true,
                     importe: true
                   }
-                },
+                }
               }
             },
             descuentosVigentes: {

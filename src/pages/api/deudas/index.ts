@@ -1,4 +1,3 @@
-//src/pages/api/deudas/index.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 import { TipoModalidad } from '@prisma/client';
@@ -57,8 +56,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                   activo: true
                 },
                 include: {
-                  estilo: true,
-                  modalidad: true
+                  estilo: true
                 }
               }
             }

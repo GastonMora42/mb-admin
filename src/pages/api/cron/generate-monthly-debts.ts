@@ -29,11 +29,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             },
             include: {
               estilo: true,
-              modalidad: true // Incluir modalidad para saber si es REGULAR o SUELTA
             }
           }
         }
       });
+
 
       const fechaActual = new Date();
       // Usar el mes actual (1-12 formato string)
@@ -81,7 +81,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           }
 
           // Determinar el monto según la modalidad (REGULAR o SUELTA)
-          const esRegular = alumnoEstilo.modalidad.tipo === TipoModalidad.REGULAR;
+          const esRegular = alumnoEstilo.modalidadId === 1; // Asumiendo que 1 = REGULAR
           let montoCuota;
           
           if (esRegular && concepto.montoRegular) {
@@ -107,7 +107,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             monto: montoCuota,
             mes,
             anio,
-            tipoDeuda: alumnoEstilo.modalidad.tipo,
+            tipoDeuda: esRegular ? 'REGULAR' : 'SUELTA',
             fechaVencimiento: new Date(anio, mesActual, 10), // Vencimiento el día 10 del mes actual
             pagada: false
           });
@@ -120,17 +120,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // Crear las deudas una por una si createMany falla
         try {
           await tx.deuda.createMany({
-            data: deudasACrear
+            data: deudasACrear.map(deuda => ({
+              ...deuda,
+              tipoDeuda: deuda.tipoDeuda as 'REGULAR' | 'SUELTA'
+            }))
           });
         } catch (error) {
           console.log("Error en createMany, intentando crear deudas individualmente:", error);
-          
           // Intentar crear deudas una por una para manejar errores individuales
           let deudasCreadas = 0;
           for (const deuda of deudasACrear) {
             try {
               await tx.deuda.create({
-                data: deuda
+                data: {
+                  ...deuda,
+                  tipoDeuda: deuda.tipoDeuda as 'REGULAR' | 'SUELTA'
+                }
               });
               deudasCreadas++;
             } catch (error) {

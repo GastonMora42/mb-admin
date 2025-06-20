@@ -298,19 +298,16 @@ else if (req.method === 'POST') {
       // 3. Si es un alumno suelto
       const esClaseSueltaPorAlumno = !!alumnoSueltoId;
       
+      
       // 4. Si tiene clase con modalidad SUELTA
       let esClaseSueltaPorModalidad = false;
       if (claseId) {
         const clase = await prisma.clase.findUnique({
           where: { id: parseInt(claseId) },
-          include: { modalidad: true }
         });
-        esClaseSueltaPorModalidad = clase?.modalidad?.tipo === 'SUELTA';
       }
-      
       esClaseSueltaFinal = esClaseSueltaPorConcepto || esClaseSueltaPorMonto || 
                           esClaseSueltaPorAlumno || esClaseSueltaPorModalidad;
-      
       console.log('Detección de clase suelta:', {
         porConcepto: esClaseSueltaPorConcepto,
         porMonto: esClaseSueltaPorMonto,
@@ -357,9 +354,7 @@ else if (req.method === 'POST') {
           clase: {
             include: {
               profesor: true,
-              estilo: true,
-              modalidad: true
-            }
+              estilo: true,            }
           }
         }
       });

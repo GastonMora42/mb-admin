@@ -1,4 +1,3 @@
-//src/pages/api/alumnos/estilos.ts
 import type { NextApiRequest, NextApiResponse } from 'next'
 import prisma from '@/lib/prisma'
 import { TipoModalidad } from '@prisma/client'
@@ -44,12 +43,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             },
             update: { 
               activo: true,
-              fechaInicio: new Date() 
+              fechaInicio: new Date(),
+              modalidadId: modalidadRegular!.id
             },
             create: {
               alumnoId: parsedAlumnoId,
               estiloId: parsedEstiloId,
-              modalidadId: modalidadRegular!.id, // Usamos la modalidad REGULAR por defecto
+              modalidadId: modalidadRegular!.id,
               activo: true,
               fechaInicio: new Date()
             }
@@ -81,7 +81,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 alumnoId: parsedAlumnoId,
                 estiloId: parsedEstiloId,
                 conceptoId: concepto.id,
-                monto: concepto.montoRegular ?? 0, // Si es null, usa 0
+                monto: concepto.montoRegular ?? 0,
                 mes: (currentDate.getMonth() + 1).toString(),
                 anio: currentDate.getFullYear(),
                 fechaVencimiento: new Date(
@@ -89,7 +89,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                   currentDate.getMonth(),
                   10
                 ),
-                tipoDeuda: TipoModalidad.REGULAR, // Especificar tipo de modalidad
+                tipoDeuda: TipoModalidad.REGULAR,
                 pagada: false
               }
             });
@@ -164,7 +164,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         include: { 
           alumnoEstilos: {
             include: {
-              estilo: true,
+              estilo: true
             }
           },
           descuentosVigentes: {
