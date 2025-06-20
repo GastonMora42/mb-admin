@@ -300,7 +300,7 @@ else if (req.method === 'POST') {
       
       
       // 4. Si tiene clase con modalidad SUELTA
-      let esClaseSueltaPorModalidad = false;
+      const esClaseSueltaPorModalidad = false;
       if (claseId) {
         const clase = await prisma.clase.findUnique({
           where: { id: parseInt(claseId) },
