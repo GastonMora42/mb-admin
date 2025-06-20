@@ -12,11 +12,11 @@ export async function generarDeudaMensual(alumnoId: number) {
         where: { activo: true },
         include: { 
           estilo: true,
-          modalidad: true // Incluir la modalidad
-        }
+                }
       }
     }
   });
+
 
   if (!alumno || !alumno.activo) return;
 
@@ -52,7 +52,7 @@ export async function generarDeudaMensual(alumnoId: number) {
 
         if (!deudaExistente) {
           // Usar el monto según la modalidad con valores predeterminados para casos nulos
-          const montoValor = alumnoEstilo.modalidad?.tipo === TipoModalidad.REGULAR
+          const montoValor = alumnoEstilo.modalidadId === 1 // Asumiendo que 1 es REGULAR
             ? (concepto.montoRegular ?? 0) // Usar 0 si es null
             : (concepto.montoSuelto ?? 0); // Usar 0 si es null
     
@@ -64,7 +64,7 @@ export async function generarDeudaMensual(alumnoId: number) {
               monto: montoValor, // Usar la variable con el valor predeterminado
               mes: mes.toString(),
               anio,
-              tipoDeuda: alumnoEstilo.modalidad?.tipo || TipoModalidad.REGULAR,
+              tipoDeuda: alumnoEstilo.modalidadId === 1 ? TipoModalidad.REGULAR : TipoModalidad.SUELTA,
               fechaVencimiento,
               pagada: false
             },

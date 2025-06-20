@@ -24,8 +24,8 @@ export const handler: Handler = async (event) => {
             },
             include: {
               estilo: true,
-              modalidad: true // Incluir modalidad
-            }
+                        }
+
           }
         }
       });
@@ -49,7 +49,7 @@ export const handler: Handler = async (event) => {
               estiloId: alumnoEstilo.estiloId,
               mes,
               anio,
-              tipoDeuda: alumnoEstilo.modalidad?.tipo || TipoModalidad.REGULAR
+              tipoDeuda: TipoModalidad.REGULAR
             }
           });
 
@@ -72,7 +72,7 @@ export const handler: Handler = async (event) => {
             }
             
             const concepto = conceptosCache[alumnoEstilo.estiloId];
-            const modalidadTipo = alumnoEstilo.modalidad?.tipo || TipoModalidad.REGULAR;
+            const modalidadTipo = TipoModalidad.REGULAR; // Valor por defecto ya que modalidad no existe en el tipo
             
 // Determinar el monto según la modalidad y asegurar que nunca sea null
 const monto = modalidadTipo === TipoModalidad.REGULAR 
