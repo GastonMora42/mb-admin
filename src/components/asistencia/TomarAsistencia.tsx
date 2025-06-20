@@ -1,3 +1,4 @@
+// src/components/asistencia/TomarAsistencia.tsx
 import React, { useState, useEffect, useCallback } from 'react';
 import styled from 'styled-components';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -1290,7 +1291,7 @@ const TomarAsistencia: React.FC = () => {
               <EmptyState>
                 <BookOpen className="icon" />
                 <h3>No hay clases registradas</h3>
-                <p>Crea tu primera clase usando el botón "Nueva Clase"</p>
+                <p>Crea tu primera clase usando el botón &quot;Nueva Clase&quot;</p>
               </EmptyState>
             ) : (
               clases.slice(0, 10).map(clase => {
