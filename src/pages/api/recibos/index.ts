@@ -248,6 +248,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
   }
   
+//src/pages/api/recibos/index.ts - Sección POST corregida
 else if (req.method === 'POST') {
   try {
     const { 
@@ -273,74 +274,97 @@ else if (req.method === 'POST') {
       getArgentinaDayRange(fecha) : 
       getArgentinaDayRange();
 
-    // ⚠️ Movemos la lógica de detección fuera de la transacción
-    // para reducir el tiempo de transacción
-    
-    // Obtener información del concepto para validar si es clase suelta
+    // ✅ VALIDACIÓN MEJORADA: Verificar que tenemos al menos un alumno válido
+    if (!alumnoId && !alumnoSueltoId) {
+      return res.status(400).json({ 
+        error: 'Debe especificar un alumno regular o un alumno suelto' 
+      });
+    }
+
+    // ✅ VALIDACIÓN MEJORADA: Verificar que los IDs son válidos cuando están presentes
+    if (alumnoId) {
+      const alumnoIdNumber = typeof alumnoId === 'string' ? parseInt(alumnoId) : alumnoId;
+      if (isNaN(alumnoIdNumber) || alumnoIdNumber <= 0) {
+        return res.status(400).json({ 
+          error: 'El ID del alumno no es válido' 
+        });
+      }
+    }
+
+    if (alumnoSueltoId) {
+      const alumnoSueltoIdNumber = typeof alumnoSueltoId === 'string' ? parseInt(alumnoSueltoId) : alumnoSueltoId;
+      if (isNaN(alumnoSueltoIdNumber) || alumnoSueltoIdNumber <= 0) {
+        return res.status(400).json({ 
+          error: 'El ID del alumno suelto no es válido' 
+        });
+      }
+    }
+
+    // ✅ VALIDACIÓN AGREGADA: Verificar que el concepto existe
     const concepto = await prisma.concepto.findUnique({
       where: { id: parseInt(conceptoId) },
       include: { estilo: true }
     });
 
-    // Determinar si es clase suelta basado en múltiples criterios
-    let esClaseSueltaFinal = esClaseSuelta || false;
-    
-    // Si no viene marcado explícitamente, hacemos detección adicional
-    if (!esClaseSueltaFinal) {
-      // 1. Si el concepto incluye "suelta" en el nombre
-      const esClaseSueltaPorConcepto = concepto?.nombre.toLowerCase().includes('suelta') || false;
-      
-      // 2. Si coincide con el monto de clase suelta del concepto
-      const montoSuelto = concepto?.montoSuelto || 0;
-      const montoFloat = parseFloat(monto);
-      const esClaseSueltaPorMonto = Math.abs(montoFloat - montoSuelto) < 0.01;
-      
-      // 3. Si es un alumno suelto
-      const esClaseSueltaPorAlumno = !!alumnoSueltoId;
-      
-      
-      // 4. Si tiene clase con modalidad SUELTA
-      const esClaseSueltaPorModalidad = false;
-      if (claseId) {
-        const clase = await prisma.clase.findUnique({
-          where: { id: parseInt(claseId) },
-        });
-      }
-      esClaseSueltaFinal = esClaseSueltaPorConcepto || esClaseSueltaPorMonto || 
-                          esClaseSueltaPorAlumno || esClaseSueltaPorModalidad;
-      console.log('Detección de clase suelta:', {
-        porConcepto: esClaseSueltaPorConcepto,
-        porMonto: esClaseSueltaPorMonto,
-        porAlumno: esClaseSueltaPorAlumno,
-        porModalidad: esClaseSueltaPorModalidad,
-        resultado: esClaseSueltaFinal
+    if (!concepto) {
+      return res.status(400).json({ 
+        error: 'El concepto especificado no existe' 
       });
     }
 
-    // Ahora realizamos la transacción de forma más eficiente
+    // Determinar si es clase suelta basado en múltiples criterios
+    let esClaseSueltaFinal = esClaseSuelta || false;
+    
+    if (!esClaseSueltaFinal) {
+      const esClaseSueltaPorConcepto = concepto?.nombre.toLowerCase().includes('suelta') || false;
+      const montoSuelto = concepto?.montoSuelto || 0;
+      const montoFloat = parseFloat(monto);
+      const esClaseSueltaPorMonto = Math.abs(montoFloat - montoSuelto) < 0.01;
+      const esClaseSueltaPorAlumno = !!alumnoSueltoId;
+      
+      esClaseSueltaFinal = esClaseSueltaPorConcepto || esClaseSueltaPorMonto || esClaseSueltaPorAlumno;
+    }
+
+    // ✅ CREACIÓN DE RECIBO CORREGIDA
     const recibo = await prisma.$transaction(async (tx) => {
-      // Crear el recibo primero
+      // Preparar datos base del recibo
+      const reciboData: any = {
+        monto: parseFloat(monto),
+        montoOriginal: parseFloat(montoOriginal || monto),
+        descuento: descuento ? parseFloat(descuento) : null,
+        fecha: start,
+        fechaEfecto: start,
+        periodoPago,
+        tipoPago,
+        esClaseSuelta: esClaseSueltaFinal,
+        esMesCompleto,
+        concepto: { connect: { id: parseInt(conceptoId) } }
+      };
+
+      // ✅ CONEXIÓN CONDICIONAL CORREGIDA - Maneja tanto strings como números
+      if (alumnoId && alumnoId !== '' && alumnoId !== null && alumnoId !== undefined) {
+        const alumnoIdNumber = typeof alumnoId === 'string' ? parseInt(alumnoId) : alumnoId;
+        if (!isNaN(alumnoIdNumber) && alumnoIdNumber > 0) {
+          reciboData.alumno = { connect: { id: alumnoIdNumber } };
+        }
+      } else if (alumnoSueltoId && alumnoSueltoId !== '' && alumnoSueltoId !== null && alumnoSueltoId !== undefined) {
+        const alumnoSueltoIdNumber = typeof alumnoSueltoId === 'string' ? parseInt(alumnoSueltoId) : alumnoSueltoId;
+        if (!isNaN(alumnoSueltoIdNumber) && alumnoSueltoIdNumber > 0) {
+          reciboData.alumnoSuelto = { connect: { id: alumnoSueltoIdNumber } };
+        }
+      }
+
+      // Agregar clase si existe
+      if (claseId && claseId !== '' && claseId !== null && claseId !== undefined) {
+        const claseIdNumber = typeof claseId === 'string' ? parseInt(claseId) : claseId;
+        if (!isNaN(claseIdNumber) && claseIdNumber > 0) {
+          reciboData.clase = { connect: { id: claseIdNumber } };
+        }
+      }
+
+      // Crear el recibo
       const nuevoRecibo = await tx.recibo.create({
-        data: {
-          monto: parseFloat(monto),
-          montoOriginal: parseFloat(montoOriginal || monto),
-          descuento: descuento ? parseFloat(descuento) : null,
-          fecha: start,
-          fechaEfecto: start,
-          periodoPago,
-          tipoPago,
-          esClaseSuelta: esClaseSueltaFinal,
-          esMesCompleto,
-          concepto: { connect: { id: parseInt(conceptoId) } },
-          ...(claseId && {
-            clase: { connect: { id: parseInt(claseId) } }
-          }),
-          ...(alumnoId ? {
-            alumno: { connect: { id: parseInt(alumnoId) } }
-          } : {
-            alumnoSuelto: { connect: { id: parseInt(alumnoSueltoId) } }
-          })
-        },
+        data: reciboData,
         include: {
           alumno: true,
           alumnoSuelto: true,
@@ -354,13 +378,16 @@ else if (req.method === 'POST') {
           clase: {
             include: {
               profesor: true,
-              estilo: true,            }
+              estilo: true,
+            }
           }
         }
       });
  
       // Procesar pagos de deuda solo si hay alumnoId y deudasAPagar
       if (alumnoId && deudasAPagar?.length > 0) {
+        const alumnoIdNumber = typeof alumnoId === 'string' ? parseInt(alumnoId) : alumnoId;
+        
         for (const deuda of deudasAPagar) {
           const deudaOriginal = await tx.deuda.findUnique({
             where: { id: deuda.deudaId },
@@ -399,12 +426,11 @@ else if (req.method === 'POST') {
             });
           }
 
-          // Procesamiento condicional para inscripción (simplificado)
+          // Procesamiento condicional para inscripción
           if (deudaOriginal.concepto?.esInscripcion) {
-            // Marcar deudas de clase suelta como pagadas
             const deudasClaseSuelta = await tx.deuda.findMany({
               where: {
-                alumnoId: parseInt(alumnoId),
+                alumnoId: alumnoIdNumber,
                 tipoDeuda: 'SUELTA',
                 pagada: false
               }
@@ -422,11 +448,10 @@ else if (req.method === 'POST') {
       
       return nuevoRecibo;
     }, {
-      // Opciones de transacción - Aumentamos el timeout
-      timeout: 20000 // 20 segundos (ajusta según sea necesario)
+      timeout: 20000
     });
  
-    // Recuperamos los pagosDeuda fuera de la transacción principal
+    // Recuperar pagosDeuda fuera de la transacción
     const pagosDeuda = await prisma.pagoDeuda.findMany({
       where: { reciboId: recibo.id },
       include: {
@@ -439,7 +464,6 @@ else if (req.method === 'POST') {
       }
     });
 
-    // Construimos el objeto final
     const reciboFinal = {
       ...recibo,
       pagosDeuda

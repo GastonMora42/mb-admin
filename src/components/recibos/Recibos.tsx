@@ -685,68 +685,140 @@ const [filtros, setFiltros] = useState<Filtros>({
   };
 
   
-  const agregarReciboPendiente = () => {
-    setLoading(true);
-    try {
-      const descuento = nuevoRecibo.descuentoManual ? 
-        nuevoRecibo.descuentoManual : // Ya no dividimos entre 100 aquí
-        undefined;
-      
-      const reciboTemp: ReciboPendiente = {
-        id: crypto.randomUUID(),
-        alumno: alumnos.find(a => a.id === parseInt(nuevoRecibo.alumnoId)),
-        alumnoSuelto: alumnosSueltos.find(a => a.id === parseInt(nuevoRecibo.alumnoSueltoId)),
-        monto: parseFloat(nuevoRecibo.monto),
-        fecha: nuevoRecibo.fecha,
-        fechaEfecto: nuevoRecibo.fechaEfecto,
-        periodoPago: nuevoRecibo.periodoPago,
-        concepto: conceptos.find(c => c.id === parseInt(nuevoRecibo.conceptoId))!,
-        tipoPago: nuevoRecibo.tipoPago,
-        descuento,
-        deudasSeleccionadas: {...deudasSeleccionadas}
-      };
-      
-      setRecibosPendientes(prev => [...prev, reciboTemp]);
-      resetForm();
-    } catch (error) {
-      console.error('Error:', error);
-    } finally {
+// En el componente Recibos.tsx - Función agregarReciboPendiente corregida
+const agregarReciboPendiente = () => {
+  setLoading(true);
+  try {
+    // ✅ VALIDACIONES MEJORADAS EN EL FRONTEND
+    
+    // Validar que hay un alumno seleccionado
+    if (!nuevoRecibo.alumnoId && !nuevoRecibo.alumnoSueltoId) {
+      setMessage({ 
+        text: 'Debe seleccionar un alumno regular o un alumno suelto', 
+        isError: true 
+      });
       setLoading(false);
+      return;
     }
-  };
 
-  
-// Función para crear todos los recibos pendientes
+    // Validar que hay un concepto seleccionado
+    if (!nuevoRecibo.conceptoId) {
+      setMessage({ 
+        text: 'Debe seleccionar un concepto', 
+        isError: true 
+      });
+      setLoading(false);
+      return;
+    }
+
+    // Validar que hay un monto válido
+    if (!nuevoRecibo.monto || parseFloat(nuevoRecibo.monto) <= 0) {
+      setMessage({ 
+        text: 'Debe ingresar un monto válido', 
+        isError: true 
+      });
+      setLoading(false);
+      return;
+    }
+
+    // ✅ MANEJAR IDs COMO NÚMEROS PARA EVITAR PROBLEMAS DE TIPO
+    const alumnoIdLimpio = nuevoRecibo.alumnoId && nuevoRecibo.alumnoId !== '' 
+      ? parseInt(nuevoRecibo.alumnoId) 
+      : null;
+    
+    const alumnoSueltoIdLimpio = nuevoRecibo.alumnoSueltoId && nuevoRecibo.alumnoSueltoId !== '' 
+      ? parseInt(nuevoRecibo.alumnoSueltoId) 
+      : null;
+
+    // Validar que los IDs parseados son válidos
+    if (nuevoRecibo.alumnoId && (isNaN(alumnoIdLimpio!) || alumnoIdLimpio! <= 0)) {
+      setMessage({ 
+        text: 'ID de alumno no válido', 
+        isError: true 
+      });
+      setLoading(false);
+      return;
+    }
+
+    if (nuevoRecibo.alumnoSueltoId && (isNaN(alumnoSueltoIdLimpio!) || alumnoSueltoIdLimpio! <= 0)) {
+      setMessage({ 
+        text: 'ID de alumno suelto no válido', 
+        isError: true 
+      });
+      setLoading(false);
+      return;
+    }
+
+    const descuento = nuevoRecibo.descuentoManual ? 
+      nuevoRecibo.descuentoManual : 
+      undefined;
+    
+    const reciboTemp: ReciboPendiente = {
+      id: crypto.randomUUID(),
+      alumno: alumnoIdLimpio ? alumnos.find(a => a.id === alumnoIdLimpio) : undefined,
+      alumnoSuelto: alumnoSueltoIdLimpio ? alumnosSueltos.find(a => a.id === alumnoSueltoIdLimpio) : undefined,
+      monto: parseFloat(nuevoRecibo.monto),
+      fecha: nuevoRecibo.fecha,
+      fechaEfecto: nuevoRecibo.fechaEfecto,
+      periodoPago: nuevoRecibo.periodoPago,
+      concepto: conceptos.find(c => c.id === parseInt(nuevoRecibo.conceptoId))!,
+      tipoPago: nuevoRecibo.tipoPago,
+      descuento,
+      deudasSeleccionadas: {...deudasSeleccionadas}
+    };
+    
+    setRecibosPendientes(prev => [...prev, reciboTemp]);
+    resetForm();
+  } catch (error) {
+    console.error('Error:', error);
+    setMessage({ 
+      text: 'Error al procesar el recibo', 
+      isError: true 
+    });
+  } finally {
+    setLoading(false);
+  }
+};
+
+// ✅ FUNCIÓN crearRecibosPendientes MEJORADA
 const crearRecibosPendientes = async () => {
   setLoading(true);
   try {
     for (const recibo of recibosPendientes) {
+      // Validar recibo antes de enviarlo
+      if (!recibo.alumno && !recibo.alumnoSuelto) {
+        console.error('Recibo sin alumno válido:', recibo);
+        continue;
+      }
+
+      if (!recibo.concepto || !recibo.concepto.id) {
+        console.error('Recibo sin concepto válido:', recibo);
+        continue;
+      }
+
       // Calculamos el monto final con el descuento aplicado
       const descuentoDecimal = recibo.descuento ? (recibo.descuento / 100) : 0;
       const montoFinal = recibo.monto * (1 - descuentoDecimal);
       
-      // Determinar si es una clase suelta basado en múltiples criterios
+      // Determinar si es una clase suelta
       const esClaseSueltaPorConcepto = recibo.concepto.nombre.toLowerCase().includes('suelta');
-      const esClaseSueltaPorMonto = recibo.monto === 15000; // Ajusta según tus montos
-      const esClaseSueltaPorAlumno = !!recibo.alumnoSuelto; // Si tiene alumnoSuelto, es clase suelta
-      
-      // Si cualquiera de los criterios se cumple, consideramos que es clase suelta
+      const esClaseSueltaPorMonto = recibo.monto === 15000;
+      const esClaseSueltaPorAlumno = !!recibo.alumnoSuelto;
       const esClaseSuelta = esClaseSueltaPorConcepto || esClaseSueltaPorMonto || esClaseSueltaPorAlumno;
       
-      const reciboData = {
-        monto: montoFinal, // Monto con descuento aplicado
-        montoOriginal: recibo.monto, // Monto original sin descuento
-        descuento: descuentoDecimal, // Descuento en decimal (ej: 0.1 para 10%)
+      // ✅ PREPARAR DATOS CON TIPOS CORRECTOS
+      const reciboData: any = {
+        monto: montoFinal,
+        montoOriginal: recibo.monto,
+        descuento: descuentoDecimal,
         periodoPago: recibo.periodoPago,
         tipoPago: recibo.tipoPago,
         fecha: recibo.fecha,
         fechaEfecto: recibo.fechaEfecto,
         fueraDeTermino: false,
-        esClaseSuelta: esClaseSuelta, // Asignamos el valor calculado
+        esClaseSuelta: esClaseSuelta,
         esMesCompleto: true,
-        alumnoId: recibo.alumno?.id,
-        alumnoSueltoId: recibo.alumnoSuelto?.id,
-        conceptoId: recibo.concepto.id,
+        conceptoId: recibo.concepto.id, // Ya es número
         deudasAPagar: Object.entries(recibo.deudasSeleccionadas || {}).map(([deudaId, deuda]) => ({
           deudaId: parseInt(deudaId),
           monto: deuda.monto,
@@ -756,11 +828,14 @@ const crearRecibosPendientes = async () => {
         }))
       };
 
-      console.log('Creando recibo con esClaseSuelta:', esClaseSuelta, 'por:', {
-        porConcepto: esClaseSueltaPorConcepto,
-        porMonto: esClaseSueltaPorMonto, 
-        porAlumno: esClaseSueltaPorAlumno
-      });
+      // ✅ AGREGAR SOLO EL ID QUE CORRESPONDE COMO NÚMERO
+      if (recibo.alumno?.id) {
+        reciboData.alumnoId = recibo.alumno.id; // Ya es número
+      } else if (recibo.alumnoSuelto?.id) {
+        reciboData.alumnoSueltoId = recibo.alumnoSuelto.id; // Ya es número
+      }
+
+      console.log('Enviando recibo:', reciboData);
 
       const res = await fetch('/api/recibos', {
         method: 'POST',
@@ -769,7 +844,8 @@ const crearRecibosPendientes = async () => {
       });
 
       if (!res.ok) {
-        throw new Error('Error al crear el recibo');
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Error al crear el recibo');
       }
 
       const reciboCreado = await res.json();
@@ -782,17 +858,9 @@ const crearRecibosPendientes = async () => {
           
           if (!printResult.success) {
             console.warn('Detalles del error de impresión:', printResult.message);
-            setMessage({ 
-              text: `No se pudo imprimir: ${printResult.message}`, 
-              isError: true 
-            });
           }
         } catch (printError) {
-          console.error('Error completo al imprimir:', printError);
-          setMessage({ 
-            text: 'Error crítico al imprimir', 
-            isError: true 
-          });
+          console.error('Error al imprimir:', printError);
         }
       }
     }
@@ -809,7 +877,10 @@ const crearRecibosPendientes = async () => {
     });
   } catch (error) {
     console.error('Error:', error);
-    setMessage({ text: 'Error al crear los recibos', isError: true });
+    setMessage({ 
+      text: error instanceof Error ? error.message : 'Error al crear los recibos', 
+      isError: true 
+    });
   } finally {
     setLoading(false);
   }
